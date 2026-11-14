@@ -54,6 +54,23 @@ lv_font_t *Cp0FontService::get_mono(const char *font_name, uint16_t size,
                static_cast<lv_freetype_font_render_mode_t>(2));
 }
 
+lv_font_t *Cp0FontService::get_chrome(uint16_t size)
+{
+    const uint16_t px = size > 16 ? kCp0ChromeFontSize * 2 : kCp0ChromeFontSize;
+    lv_font_t *font = get_mono(kCp0ChromeFont, px);
+    if (font && !font->fallback && font != fallback(px)) {
+        lv_font_t *latin = get("DejaVuSans.ttf", px);
+        if (latin && latin != font && latin != fallback(px)) {
+            if (!latin->fallback) {
+                lv_font_t *cjk = get("AlibabaPuHuiTi-3-55-Regular.ttf", px);
+                if (cjk && cjk != latin && cjk != fallback(px)) latin->fallback = cjk;
+            }
+            font->fallback = latin;
+        }
+    }
+    return font;
+}
+
 #if LV_USE_FREETYPE
 std::string Cp0FontService::resolve_path(const char *font_name)
 {

@@ -77,15 +77,16 @@ void HomeIconBufferPool::DrawBufferDeleter::operator()(lv_draw_buf_t *buffer) co
     if (buffer) lv_draw_buf_destroy(buffer);
 }
 
-void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths)
+void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths, uint32_t size)
 {
+    base_size_ = size == 0 ? kIconSize : size;
     icons_.clear();
     resized_icons_.clear();
     icons_.reserve(icon_paths.size());
 
     for (const std::string &path : icon_paths) {
         if (path.empty() || icons_.find(path) != icons_.end()) continue;
-        DrawBufferPtr icon = decode_and_prepare(path, kIconSize);
+        DrawBufferPtr icon = decode_and_prepare(path, base_size_);
         if (!icon) {
             SLOGW("[HOME] failed to preload icon: %s", path.c_str());
             continue;
@@ -103,7 +104,7 @@ const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path) const
 
 const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path, uint32_t size)
 {
-    if (size == 0 || size == kIconSize)
+    if (size == 0 || size == base_size_)
         return find(path);
 
     const auto found = icons_.find(path);
@@ -125,6 +126,7 @@ const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path, uint32_t
 
 void HomeIconBufferPool::swap(HomeIconBufferPool &other) noexcept
 {
+    std::swap(base_size_, other.base_size_);
     icons_.swap(other.icons_);
     resized_icons_.swap(other.resized_icons_);
 }

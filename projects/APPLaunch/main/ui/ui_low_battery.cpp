@@ -8,6 +8,7 @@
 #include "ui_screensaver.h"
 
 #include "low_battery_flow.hpp"
+#include "cp0_font_service.hpp"
 #include "keyboard_input.h"
 #include "input_keys.h"
 #include "hal_lvgl_bsp.h"
@@ -23,6 +24,7 @@ constexpr int kScreenWidth = 320;
 constexpr int kScreenHeight = 240;
 constexpr uint32_t kFlashMs = 500;
 constexpr uint32_t kBatteryRefreshMs = 3000;
+constexpr uint32_t kActivePeriodMs = 250;
 
 LowBatteryFlow flow;
 LowBatteryWarning rendered_warning = LowBatteryWarning::None;
@@ -47,28 +49,14 @@ void render(uint32_t now, bool force = false);
  * sounds, so the launcher's startup/switch/enter slots are untouched. */
 constexpr const char *kReminderSound = "applaunch-arcade-refund.mp3";
 constexpr const char *kCriticalSound = "applaunch-arcade-warning.mp3";
-bool low_battery_sounds_registered = false;
 /* One latch per cue.  Low and ShutdownCountdown share the critical latch so the
  * 4% -> 3% promotion does not repeat the warning. */
 bool reminder_sound_played = false;
 bool critical_sound_played = false;
 
-void register_low_battery_sounds()
+// UI sounds are removed from this launcher build; low-battery cues are visual only.
+void play_low_battery_sound(const char *) noexcept
 {
-    if (low_battery_sounds_registered) return;
-    /* Latch first: a failing backend must not retry on every 250 ms frame. */
-    low_battery_sounds_registered = true;
-    cp0_signal_audio_api({"RegisterSystemSounds", kReminderSound, kCriticalSound}, nullptr);
-}
-
-void play_low_battery_sound(const char *asset) noexcept
-{
-    if (!asset) return;
-    try {
-        register_low_battery_sounds();
-        cp0_signal_system_play(asset);
-    } catch (...) {
-    }
 }
 
 int reminder_key_filter(const struct key_item *item) noexcept
@@ -199,22 +187,22 @@ void create_overlay()
     lv_obj_clear_flag(panel, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
     lv_obj_set_pos(panel, 18, 73);
     lv_obj_set_size(panel, 284, 94);
-    lv_obj_set_style_bg_color(panel, lv_color_hex(0x160000), 0);
-    lv_obj_set_style_bg_opa(panel, LV_OPA_80, 0);
+    lv_obj_set_style_bg_color(panel, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(panel, lv_color_hex(0xFF3030), 0);
-    lv_obj_set_style_border_width(panel, 2, 0);
+    lv_obj_set_style_border_width(panel, 1, 0);
 
     lv_obj_t *title = lv_label_create(panel);
     if (!title) {
         lv_obj_delete(overlay);
         return;
     }
-    lv_label_set_text(title, "LOW BATTERY");
+    lv_label_set_text(title, "low battery");
     lv_obj_set_width(title, 260);
     lv_obj_set_pos(title, 12, 10);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xE6E6E6), 0);
+    lv_obj_set_style_text_font(title, cp0_fonts().get_chrome(11), 0);
 
     countdown_label = lv_label_create(panel);
     if (!countdown_label) {
@@ -227,7 +215,7 @@ void create_overlay()
     lv_obj_set_pos(countdown_label, 12, 36);
     lv_obj_set_style_text_align(countdown_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(countdown_label, lv_color_hex(0xFF4444), 0);
-    lv_obj_set_style_text_font(countdown_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(countdown_label, cp0_fonts().get_chrome(22), 0);
 
     message_label = lv_label_create(panel);
     if (!message_label) {
@@ -239,8 +227,8 @@ void create_overlay()
     lv_obj_set_pos(message_label, 12, 64);
     lv_label_set_long_mode(message_label, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(message_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(message_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(message_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(message_label, lv_color_hex(0xE6E6E6), 0);
+    lv_obj_set_style_text_font(message_label, cp0_fonts().get_chrome(11), 0);
 
     lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
 }
@@ -299,21 +287,21 @@ void render(uint32_t now, bool force)
         else lv_obj_clear_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
         flash_tick = now;
         lv_obj_set_style_bg_opa(tint, reminder ? LV_OPA_TRANSP : LV_OPA_20, 0);
-        lv_obj_set_style_bg_color(panel, lv_color_hex(reminder ? 0x171717 : 0x160000), 0);
+        lv_obj_set_style_bg_color(panel, lv_color_hex(0x000000), 0);
         lv_obj_set_style_bg_opa(panel, reminder ? LV_OPA_COVER : LV_OPA_80, 0);
         lv_obj_set_style_border_color(panel, lv_color_hex(reminder ? 0xFFAA00 : 0xFF3030), 0);
         lv_obj_set_style_text_color(countdown_label,
                                     lv_color_hex(reminder ? 0xFFAA00 : 0xFF4444), 0);
-        lv_label_set_text(message_label, reminder ? "Connect a charger. Press Enter to close."
-                                                 : "Shut down now or connect a charger.");
+        lv_label_set_text(message_label, reminder ? "plug in a charger, enter to close"
+                                                 : "shut down now or plug in a charger");
     }
     const uint32_t seconds = flow.seconds_until_shutdown(now);
     if (force || warning_changed || seconds != rendered_seconds) {
         const std::string text = warning == LowBatteryWarning::ShutdownCountdown
-            ? "Power off in " + std::to_string(seconds) + "s"
+            ? "power off in " + std::to_string(seconds) + "s"
             : warning == LowBatteryWarning::Reminder
-            ? "Battery: " + std::to_string(flow.reminder_soc()) + "%"
-            : "Battery below 5%";
+            ? "battery " + std::to_string(flow.reminder_soc()) + "%"
+            : "battery below 5%";
         lv_label_set_text(countdown_label, text.c_str());
         rendered_warning = warning;
         rendered_seconds = seconds;
@@ -346,6 +334,10 @@ void timer_cb(lv_timer_t *timer) noexcept
         const lv_opa_t opacity = lv_obj_get_style_bg_opa(tint, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(tint, opacity == LV_OPA_20 ? LV_OPA_50 : LV_OPA_20, 0);
     }
+    const bool urgent = (overlay && !lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN)) ||
+        flow.warning() == LowBatteryWarning::Low ||
+        flow.warning() == LowBatteryWarning::ShutdownCountdown;
+    lv_timer_set_period(timer, urgent ? kActivePeriodMs : kBatteryRefreshMs);
     } catch (...) {
         if (overlay)
             lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
@@ -363,7 +355,7 @@ void init_warning()
     critical_sound_played = false;
     flow.reset();
     battery_refresh_tick = lv_tick_get();
-    warning_timer = lv_timer_create(timer_cb, 250, nullptr);
+    warning_timer = lv_timer_create(timer_cb, kActivePeriodMs, nullptr);
     if (!warning_timer) return;
     previous_key_filter = cp0_keyboard_get_key_filter();
     cp0_keyboard_set_key_filter(reminder_key_filter);

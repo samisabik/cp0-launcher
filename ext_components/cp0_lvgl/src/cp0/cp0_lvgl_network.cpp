@@ -34,9 +34,15 @@
 #include <utility>
 #include <vector>
 
+#include <gio/gio.h>
+
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <poll.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 int cp0_network_list(cp0_netif_info_t *entries, int max_entries, int *out_count)
 {
@@ -86,6 +92,7 @@ public:
     {
         update_status_cache();
         worker_ = std::thread([this]() { poll_loop(); });
+        monitor_ = std::thread([this]() { monitor_loop(); });
     }
 
     ~WifiSystem() { stop(); }
@@ -94,6 +101,11 @@ public:
     {
         running_.store(false);
         wake_.notify_all();
+        {
+            std::lock_guard<std::mutex> lock(monitor_context_mutex_);
+            if (monitor_context_) g_main_context_wakeup(monitor_context_);
+        }
+        if (monitor_.joinable()) monitor_.join();
         if (worker_.joinable()) worker_.join();
     }
 
@@ -481,37 +493,100 @@ private:
     std::condition_variable wake_;
     std::mutex wake_mutex_;
 
-    // Each refresh starts two nmcli processes (~0.2 s of CPU on the device, plus work in
-    // NetworkManager and the system bus). Refresh every 3 s only while the status can be
-    // seen: the launcher in the foreground and the backlight on. Otherwise every 60 s.
-    static constexpr auto kVisiblePollInterval = std::chrono::seconds(3);
-    static constexpr auto kHiddenPollInterval = std::chrono::seconds(60);
+    // The status cache is refreshed when NetworkManager signals a change on D-Bus, with
+    // a slow periodic refresh as a backstop in case an event is missed or the
+    // monitor cannot run. Bursts of events are coalesced before refreshing.
+    static constexpr auto kBackstopInterval = std::chrono::seconds(60);
+    static constexpr auto kEventSettle = std::chrono::milliseconds(300);
+    static constexpr auto kMonitorRestartDelay = std::chrono::seconds(5);
 
-    static bool status_visible()
-    {
-        if (LVGL_RUN_FLAGE != 1) return false;  // another app owns the screen
-        FILE *fp = std::fopen("/sys/class/backlight/backlight/brightness", "r");
-        if (!fp) return true;
-        int level = 1;
-        if (std::fscanf(fp, "%d", &level) != 1) level = 1;
-        std::fclose(fp);
-        return level > 0;
-    }
+    std::thread monitor_;
+    std::mutex monitor_context_mutex_;
+    GMainContext *monitor_context_ = nullptr;
+    std::atomic<bool> changed_{false};
 
     void poll_loop()
     {
-        auto last_refresh = std::chrono::steady_clock::time_point{};
         while (running_.load()) {
-            const auto now = std::chrono::steady_clock::now();
-            if (last_refresh == std::chrono::steady_clock::time_point{} || status_visible() ||
-                now - last_refresh >= kHiddenPollInterval) {
-                update_status_cache();
-                last_refresh = std::chrono::steady_clock::now();
+            {
+                std::unique_lock<std::mutex> lock(wake_mutex_);
+                wake_.wait_for(lock, kBackstopInterval,
+                               [this] { return !running_.load() || changed_.load(); });
             }
-            std::unique_lock<std::mutex> lock(wake_mutex_);
-            wake_.wait_for(lock, kVisiblePollInterval,
-                           [this] { return !running_.load(); });
+            if (!running_.load()) break;
+            if (changed_.load()) {
+                std::unique_lock<std::mutex> lock(wake_mutex_);
+                wake_.wait_for(lock, kEventSettle, [this] { return !running_.load(); });
+            }
+            if (!running_.load()) break;
+            changed_.store(false);
+            update_status_cache();
         }
+    }
+
+    void signal_change()
+    {
+        changed_.store(true);
+        wake_.notify_all();
+    }
+
+    void monitor_loop()
+    {
+        while (running_.load()) {
+            run_monitor_once();
+            std::unique_lock<std::mutex> lock(wake_mutex_);
+            wake_.wait_for(lock, kMonitorRestartDelay, [this] { return !running_.load(); });
+        }
+    }
+
+    static void on_nm_signal(GDBusConnection *, const gchar *, const gchar *, const gchar *,
+                             const gchar *, GVariant *, gpointer user_data)
+    {
+        static_cast<WifiSystem *>(user_data)->signal_change();
+    }
+
+    // Listens for NetworkManager state changes on the system bus instead of
+    // running `nmcli monitor` as a child process.
+    void run_monitor_once()
+    {
+        GMainContext *context = g_main_context_new();
+        g_main_context_push_thread_default(context);
+        GError *error = nullptr;
+        GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
+        if (!bus) {
+            if (error) g_error_free(error);
+            g_main_context_pop_thread_default(context);
+            g_main_context_unref(context);
+            return;
+        }
+        const guint state_id = g_dbus_connection_signal_subscribe(
+            bus, "org.freedesktop.NetworkManager", nullptr, "StateChanged", nullptr, nullptr,
+            G_DBUS_SIGNAL_FLAGS_NONE, on_nm_signal, this, nullptr);
+        const guint props_id = g_dbus_connection_signal_subscribe(
+            bus, "org.freedesktop.NetworkManager", "org.freedesktop.DBus.Properties",
+            "PropertiesChanged", "/org/freedesktop/NetworkManager", nullptr,
+            G_DBUS_SIGNAL_FLAGS_NONE, on_nm_signal, this, nullptr);
+        {
+            std::lock_guard<std::mutex> lock(monitor_context_mutex_);
+            monitor_context_ = context;
+        }
+
+        // A (re)started listener may have missed changes; refresh once.
+        signal_change();
+        while (running_.load() && !g_dbus_connection_is_closed(bus))
+            g_main_context_iteration(context, TRUE);
+
+        {
+            std::lock_guard<std::mutex> lock(monitor_context_mutex_);
+            monitor_context_ = nullptr;
+        }
+        g_dbus_connection_signal_unsubscribe(bus, state_id);
+        g_dbus_connection_signal_unsubscribe(bus, props_id);
+        g_object_unref(bus);
+        while (g_main_context_iteration(context, FALSE)) {
+        }
+        g_main_context_pop_thread_default(context);
+        g_main_context_unref(context);
     }
 
     void update_status_cache()

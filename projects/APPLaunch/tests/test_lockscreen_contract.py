@@ -39,12 +39,8 @@ assert 'play_lockscreen_sound("select.mp3")' in SOURCE
 assert 'play_lockscreen_sound("unlock.mp3")' in SOURCE
 assert "decision.blocked" in SOURCE
 
-# The wiring is useless without the assets; they ship with the app tree, and the
-# built-in decoders cover WAV/MP3/FLAC but not OGG.
-for asset in ("lock.mp3", "blocked.mp3", "select.mp3", "unlock.mp3"):
-    path = ROOT / "APPLaunch/share/audio" / asset
-    assert path.is_file(), path
-    assert path.read_bytes()[:3] == b"ID3", path
+# This build ships no UI sounds: the cue call sites stay, but play nothing.
+assert not (ROOT / "APPLaunch/share/audio").exists()
 
 # Both entry points (the idle timeout and the long-press gesture) share one path,
 # so the two can no longer drift apart.
@@ -70,7 +66,7 @@ assert "kHoldPollMs = 100" in SOURCE
 # The gesture announces itself through the shared launcher toast before it locks,
 # and clears that announcement again as soon as the gesture ends.
 assert "launcher_toast().show_persistent(kHoldHintText)" in SOURCE
-assert '"Hold TAB for 3s to lock"' in SOURCE
+assert '"hold tab 3s to lock"' in SOURCE
 assert "hold.hide_hint" in SOURCE
 assert "hold.fire" in SOURCE
 
@@ -86,15 +82,14 @@ assert "ScreensaverPanel full_screen_panel()" in SOURCE
 assert "apply_panel(full_screen_panel())" in SOURCE
 assert "panel_layout" not in SOURCE
 
-# The visible states show cached wallpaper, with step hints over the top-bar title.
+# The visible states show a clock and a prompt line with the step hint; no wallpaper.
 assert "ScreensaverPanel wake_panel()" in SOURCE
 assert "apply_panel(wake_panel())" in SOURCE
-assert "Press TAB to unlock" in SOURCE
-assert "Press ENTER to unlock" in SOURCE
+assert "press tab to unlock" in SOURCE
+assert "press enter to unlock" in SOURCE
 assert "show_hint(" in SOURCE and "hide_hint()" in SOURCE
-assert 'launcher_platform::path("lockscreen.png")' in SOURCE
-assert "lv_draw_buf_dup(decoder.decoded)" in SOURCE
-assert "panel.black ? nullptr : s_background_cache.image()" in SOURCE
+assert "refresh_clock()" in SOURCE
+assert "lockscreen.png" not in SOURCE
 
 # Unlocking slides the wallpaper away, restoring the backlight first.
 assert "lv_anim_set_values(&animation, s_panel.y, -s_panel.height)" in SOURCE
@@ -106,12 +101,8 @@ assert "ScreensaverImageCache" not in SOURCE
 assert '"screensaver.png"' not in SOURCE
 assert "kAnimationFrameMs" not in SOURCE
 
-# The sounds ride the platform's system-sound player, which decodes each sound
-# once, keeps the PCM and a warm engine, and plays on its own worker.  Do not
-# hand-roll a second player here, and do not fall back to the uncached per-file
-# path (that re-opens the audio device per play and swallows the sound's start).
-assert 'cp0_signal_audio_api({"RegisterSystemSounds"' in SOURCE
-assert "cp0_signal_system_play(asset);" in SOURCE
+assert "RegisterSystemSounds" not in SOURCE
+assert "cp0_signal_system_play" not in SOURCE
 assert "launcher_platform::path_c" not in SOURCE
 assert "std::thread" not in SOURCE
 

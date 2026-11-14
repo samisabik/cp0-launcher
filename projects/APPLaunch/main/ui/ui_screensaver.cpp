@@ -15,13 +15,16 @@
 #include "launcher_platform.hpp"
 #include "launcher_toast.h"
 #include "lvgl/lvgl.h"
-#include "lvgl/src/draw/lv_image_decoder_private.h"
 #include "model/lockscreen_state_model.hpp"
 #include "model/screensaver_model.hpp"
 #include "model/screensaver_runtime_contract.hpp"
 #include "ui_app_page.hpp"
+#include "cp0_font_service.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <ctime>
 #include <future>
 #include <string>
 #include <utility>
@@ -29,62 +32,30 @@
 namespace {
 
 constexpr uint32_t kIdleCheckMs = 500;
+constexpr uint32_t kIdleMaxMs = 5000;
 constexpr uint32_t kHoldPollMs = 100;
 constexpr uint32_t kExitAnimationMs = 350;
 /* Shown once the idle TAB hold matures past the model's hint delay. */
-constexpr const char *kHoldHintText = "Hold TAB for 3s to lock";
-
-class LockscreenBackgroundCache
-{
-public:
-    LockscreenBackgroundCache() = default;
-    LockscreenBackgroundCache(const LockscreenBackgroundCache &) = delete;
-    LockscreenBackgroundCache &operator=(const LockscreenBackgroundCache &) = delete;
-    ~LockscreenBackgroundCache() { reset(); }
-
-    bool load(const std::string &path)
-    {
-        if (attempted_) return buffer_ != nullptr;
-        attempted_ = true;
-        lv_image_decoder_dsc_t decoder{};
-        lv_image_decoder_args_t args{};
-        args.no_cache = true;
-        if (path.empty() || lv_image_decoder_open(&decoder, path.c_str(), &args) != LV_RESULT_OK)
-            return false;
-        if (decoder.decoded)
-            buffer_ = lv_draw_buf_dup(decoder.decoded);
-        lv_image_decoder_close(&decoder);
-        if (buffer_) lv_draw_buf_to_image(buffer_, &image_);
-        return buffer_ != nullptr;
-    }
-
-    const lv_image_dsc_t *image() const { return buffer_ ? &image_ : nullptr; }
-
-    void reset()
-    {
-        if (buffer_) {
-            lv_image_cache_drop(&image_);
-            lv_draw_buf_destroy(buffer_);
-        }
-        buffer_ = nullptr;
-        image_ = {};
-        attempted_ = false;
-    }
-
-private:
-    lv_draw_buf_t *buffer_ = nullptr;
-    lv_image_dsc_t image_{};
-    bool attempted_ = false;
-};
+constexpr const char *kHoldHintText = "hold tab 3s to lock";
 
 lv_obj_t *s_overlay = nullptr;
 lv_obj_t *s_hint = nullptr;
+lv_obj_t *s_content = nullptr;
+lv_obj_t *s_clock = nullptr;
+lv_obj_t *s_date = nullptr;
+lv_obj_t *s_prompt_text = nullptr;
+constexpr uint32_t kColorAccent = 0x3DDC84;
+constexpr uint32_t kColorText = 0xE6E6E6;
+constexpr uint32_t kColorDim = 0x5F7A66;
+constexpr lv_coord_t kContentLeft = 16;
+constexpr lv_coord_t kClockTop = 22;
+constexpr lv_coord_t kDateTop = 52;
+constexpr lv_coord_t kPromptTop = 94;
 lv_timer_t *s_timer = nullptr;
 ScreensaverModel s_model;
 LockscreenStateModel s_lock;
 bool s_exiting = false;
 std::future<bool> s_audio_prepare_future;
-LockscreenBackgroundCache s_background_cache;
 /* Raw backlight value captured when the panel is forced dark, or -1 while the
  * backlight is under normal control. */
 int s_screen_off_backlight_raw = -1;
@@ -137,8 +108,71 @@ void apply_panel(const ScreensaverPanel &panel)
     lv_obj_set_size(s_overlay, panel.width, panel.height);
     lv_obj_set_style_bg_color(s_overlay, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(s_overlay, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_image_src(s_overlay,
-                                 panel.black ? nullptr : s_background_cache.image(), 0);
+    if (s_content) {
+        if (panel.black) lv_obj_add_flag(s_content, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(s_content, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void refresh_clock()
+{
+    if (!s_clock || !s_date) return;
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+    if (!localtime_r(&now, &local)) return;
+    char clock_text[8];
+    char date_text[24];
+    std::strftime(clock_text, sizeof(clock_text), "%H:%M", &local);
+    std::strftime(date_text, sizeof(date_text), "%a %d %b", &local);
+    for (char *c = date_text; *c; ++c)
+        *c = static_cast<char>(std::tolower(static_cast<unsigned char>(*c)));
+    if (std::strcmp(lv_label_get_text(s_clock), clock_text) != 0) lv_label_set_text(s_clock, clock_text);
+    if (std::strcmp(lv_label_get_text(s_date), date_text) != 0) lv_label_set_text(s_date, date_text);
+}
+
+lv_obj_t *content_label(lv_obj_t *parent, uint16_t size, uint32_t color)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    if (!label) return nullptr;
+    lv_obj_set_style_text_font(label, cp0_fonts().get_chrome(size), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
+    lv_label_set_text(label, "");
+    return label;
+}
+
+/* Clock, date and prompt in the launcher's terminal style. They are children of
+ * the overlay so they slide away with it on unlock. */
+void create_content()
+{
+    if (!s_overlay || s_content) return;
+    s_content = lv_obj_create(s_overlay);
+    if (!s_content) return;
+    lv_obj_remove_style_all(s_content);
+    lv_obj_set_size(s_content, LV_PCT(100), LV_PCT(100));
+    lv_obj_clear_flag(s_content, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+
+    s_clock = content_label(s_content, kCp0ChromeFontSize * 2, kColorText);
+    if (s_clock) lv_obj_set_pos(s_clock, kContentLeft, kClockTop);
+    s_date = content_label(s_content, kCp0ChromeFontSize, kColorDim);
+    if (s_date) lv_obj_set_pos(s_date, kContentLeft, kDateTop);
+
+    lv_obj_t *prompt = lv_obj_create(s_content);
+    if (!prompt) return;
+    lv_obj_remove_style_all(prompt);
+    lv_obj_set_size(prompt, LV_SIZE_CONTENT, 26);
+    lv_obj_set_pos(prompt, kContentLeft, kPromptTop);
+    lv_obj_set_flex_flow(prompt, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(prompt, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    if (lv_obj_t *dollar = content_label(prompt, kCp0ChromeFontSize, kColorDim))
+        lv_label_set_text(dollar, "$ ");
+    s_prompt_text = content_label(prompt, kCp0ChromeFontSize, kColorText);
+    if (lv_obj_t *cursor = lv_obj_create(prompt)) {
+        lv_obj_remove_style_all(cursor);
+        lv_obj_set_size(cursor, 7, 11);
+        lv_obj_set_style_margin_left(cursor, 2, 0);
+        lv_obj_set_style_bg_color(cursor, lv_color_hex(kColorAccent), 0);
+        lv_obj_set_style_bg_opa(cursor, LV_OPA_COVER, 0);
+    }
 }
 
 /* The title mask is a top-layer sibling: the wallpaper's application-area
@@ -146,19 +180,14 @@ void apply_panel(const ScreensaverPanel &panel)
 void hide_hint()
 {
     if (s_hint) lv_obj_add_flag(s_hint, LV_OBJ_FLAG_HIDDEN);
+    if (s_prompt_text) lv_label_set_text(s_prompt_text, "");
 }
 
 void show_hint(const char *text)
 {
-    if (!s_hint || !text) return;
-    lv_label_set_text(s_hint, text);
-    /* Size the mask from the rendered text. A fixed width leaves a large black
-     * block after the short TAB/ENTER instruction. */
-    lv_obj_set_size(s_hint, LV_SIZE_CONTENT, AppPageRoot::kTopBarHeightPx);
-    lv_obj_update_layout(s_hint);
-    lv_obj_set_pos(s_hint, 0, 0);
-    lv_obj_move_foreground(s_hint);
-    lv_obj_clear_flag(s_hint, LV_OBJ_FLAG_HIDDEN);
+    if (!s_prompt_text || !text) return;
+    lv_label_set_text(s_prompt_text, text);
+    refresh_clock();
 }
 
 /* The launcher toast is shared with the other global hints, so only clear it
@@ -178,29 +207,14 @@ void hide_hold_hint()
  * every play, which also swallows the start of a short sound while the sink
  * settles.  Registration appends after the platform's indexed sounds, so the
  * launcher's own startup/switch/enter slots are untouched. */
-bool s_sounds_registered = false;
 /* Last asset asked for, kept for diagnostics and for tests to observe the
  * request without racing the player's worker. */
 const char *s_last_sound_asset = "";
 
-void register_lockscreen_sounds()
-{
-    if (s_sounds_registered) return;
-    s_sounds_registered = true;
-    cp0_signal_audio_api({"RegisterSystemSounds", "lock.mp3", "blocked.mp3",
-                          "select.mp3", "unlock.mp3"},
-                         nullptr);
-}
-
+// UI sounds are removed from this launcher build; lock-screen cues are silent.
 void play_lockscreen_sound(const char *asset) noexcept
 {
-    if (!asset) return;
-    try {
-        register_lockscreen_sounds();
-        s_last_sound_asset = asset;
-        cp0_signal_system_play(asset);
-    } catch (...) {
-    }
+    if (asset) s_last_sound_asset = asset;
 }
 
 void update_timer_period()
@@ -328,6 +342,7 @@ void overlay_delete_cb(lv_event_t *event) noexcept
                 lv_event_get_target(event), lv_event_get_current_target(event), s_overlay))
             return;
         s_overlay = nullptr;
+        s_content = s_clock = s_date = s_prompt_text = nullptr;
         if (s_hint) lv_obj_delete(s_hint);
         s_hint = nullptr;
         s_exiting = false;
@@ -336,6 +351,7 @@ void overlay_delete_cb(lv_event_t *event) noexcept
         update_timer_period();
     } catch (...) {
         s_overlay = nullptr;
+        s_content = s_clock = s_date = s_prompt_text = nullptr;
         if (s_hint) lv_obj_delete(s_hint);
         s_hint = nullptr;
         s_exiting = false;
@@ -382,9 +398,6 @@ void create_objects()
     if (!display)
         return;
 
-    if (!s_background_cache.image())
-        s_background_cache.load(launcher_platform::path("lockscreen.png"));
-
     if (!s_overlay) {
         lv_obj_t *parent = lv_layer_top();
         if (!parent)
@@ -398,22 +411,7 @@ void create_objects()
         lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    }
-
-    if (!s_hint) {
-        s_hint = lv_label_create(lv_layer_top());
-        if (s_hint) {
-            lv_obj_add_event_cb(s_hint, hint_delete_cb, LV_EVENT_DELETE, nullptr);
-            lv_obj_remove_style_all(s_hint);
-            lv_label_set_long_mode(s_hint, LV_LABEL_LONG_CLIP);
-            lv_obj_set_style_bg_color(s_hint, lv_color_black(), 0);
-            lv_obj_set_style_bg_opa(s_hint, LV_OPA_COVER, 0);
-            lv_obj_set_style_pad_left(s_hint, 5, 0);
-            lv_obj_set_style_pad_top(s_hint, 2, 0);
-            lv_obj_set_style_text_color(s_hint, lv_color_hex(0xCCAA00), 0);
-            lv_obj_set_style_text_font(s_hint, &lv_font_montserrat_14, 0);
-            lv_obj_add_flag(s_hint, LV_OBJ_FLAG_HIDDEN);
-        }
+        create_content();
     }
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
@@ -500,8 +498,8 @@ void show_lockscreen_panel()
     lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
     release_screen_off_backlight();
     show_hint(s_lock.state() == LockscreenState::Armed
-                  ? "Press ENTER to unlock"
-                  : "Press TAB to unlock");
+                  ? "press enter to unlock"
+                  : "press tab to unlock");
 }
 
 /* Back to (1) after the visible state timed out. */
@@ -525,6 +523,8 @@ void timer_cb(lv_timer_t *timer) noexcept
         /* The visible lock states fall back to the black screen when idle. */
         if (s_lock.poll(now).sleep)
             sleep_lockscreen();
+        else if (!s_panel.black)
+            refresh_clock();
         return;
     }
 
@@ -536,9 +536,18 @@ void timer_cb(lv_timer_t *timer) noexcept
         return;
     }
 
-    const int seconds = timeout_seconds();
-    if (s_model.should_activate(now, static_cast<uint32_t>(seconds) * 1000u, true))
+    const uint32_t timeout_ms = static_cast<uint32_t>(timeout_seconds()) * 1000u;
+    if (s_model.should_activate(now, timeout_ms, true)) {
         enter_lockscreen();
+        return;
+    }
+    if (!s_model.hold_pending()) {
+        // Sleep until the idle timeout is due; key activity only pushes it later.
+        const uint32_t elapsed = now - s_model.last_activity_tick();
+        const uint32_t remaining =
+            timeout_ms > elapsed ? timeout_ms - elapsed : kIdleCheckMs;
+        lv_timer_set_period(s_timer, std::clamp(remaining, kIdleCheckMs, kIdleMaxMs));
+    }
     } catch (...) {
         stop_screensaver();
     }
@@ -577,8 +586,8 @@ extern "C" void ui_screensaver_deinit(void)
     if (s_hint)
         lv_obj_delete(s_hint);
     s_overlay = nullptr;
+    s_content = s_clock = s_date = s_prompt_text = nullptr;
     s_hint = nullptr;
-    s_background_cache.reset();
     s_model.reset(0);
     s_model.set_foreground(false, 0);
 }

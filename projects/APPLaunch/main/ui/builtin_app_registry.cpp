@@ -72,8 +72,6 @@ void append_builtin_app(std::list<app> &apps, const BuiltinAppRegistration &regi
 constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
     {{"Settings", "setting_100.png", "app_Setting", false, true},
      nullptr, false, true, false, append_page_app<UISettingTreePage>},
-    {{"Store", "store_100.png", "app_Store", false, true},
-     "@appstore_exec", false, true, false, nullptr},
     {{"CLI", "cli_100.png", "app_CLI", false, true},
      nullptr, false, true, false, append_cli_app},
     {{"Python", "python_100.png", "app_Python", true, false},
@@ -86,10 +84,6 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
 #endif
     {{"Calculator", "math_100.png", "app_Math", true, false},
      "@calculator_exec", false, true, false, nullptr},
-    {{"Snake", "game_100.png", "app_Game", true, false},
-     nullptr, false, true, false, append_page_app<UIGamePage>},
-    {{"Tank", "tank_100.png", "app_Tank", true, false},
-     nullptr, false, true, false, append_page_app<UITankBattlePage>},
 };
 
 DynamicAppRegistry &dynamic_app_registry()

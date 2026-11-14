@@ -463,8 +463,8 @@ private:
     mutable std::mutex mutex_;
     std::condition_variable wake_;
     std::deque<Command> commands_;
-    std::vector<std::string> names_{"Ding2.wav", "key_back.wav", "key_back.wav"};
-    std::atomic<bool> enabled_{true};
+    std::vector<std::string> names_{};
+    std::atomic<bool> enabled_{false};
     bool stopping_ = false;
     std::thread worker_;
 

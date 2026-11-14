@@ -23,9 +23,17 @@ static cp0_keyboard_key_handler_t global_key_handler;
 static cp0_keyboard_key_filter_t key_filter;
 static cp0_keyboard_input_lifecycle_t keypad_lifecycle;
 static volatile int lvgl_keypad_intercept;
+static lv_indev_t *keypad_indev;
+static unsigned keypad_reads;
+
+void cp0_lvgl_set_input_pump(int (*pump)(void));
 
 static void keypad_delete_cb(lv_event_t *event)
 {
+    if (lv_event_get_user_data(event) == keypad_indev) {
+        keypad_indev = NULL;
+        cp0_lvgl_set_input_pump(NULL);
+    }
     cp0_keyboard_input_handle_deleted(
         &keypad_lifecycle, lv_event_get_user_data(event));
 }
@@ -90,6 +98,7 @@ static uint32_t lvgl_key_from_evdev(uint16_t code)
 static void keypad_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
     (void)indev;
+    ++keypad_reads;
     data->key = 0;
     data->state = LV_INDEV_STATE_RELEASED;
     data->continue_reading = false;
@@ -140,6 +149,21 @@ static void keypad_read(lv_indev_t *indev, lv_indev_data_t *data)
     }
 }
 
+/* Runs on the LVGL thread after the keyboard thread wakes it. Returns
+ * nonzero when keys stay queued, e.g. while LVGL blocks input during a
+ * screen animation, so the runner retries soon. */
+static int keypad_pump(void)
+{
+    lv_indev_t *indev = keypad_indev;
+    if (!indev) return 0;
+    while (cp0_keyboard_queue_has_data()) {
+        const unsigned before = keypad_reads;
+        lv_indev_read(indev);
+        if (keypad_reads == before) break;
+    }
+    return cp0_keyboard_queue_has_data();
+}
+
 void cp0_keyboard_create_lvgl_input_devices(void)
 {
 #if LV_USE_EVDEV
@@ -154,6 +178,9 @@ void cp0_keyboard_create_lvgl_input_devices(void)
         lv_indev_set_type(indev, LV_INDEV_TYPE_KEYPAD);
         lv_indev_set_read_cb(indev, keypad_read);
         lv_indev_add_event_cb(indev, keypad_delete_cb, LV_EVENT_DELETE, indev);
+        lv_indev_set_mode(indev, LV_INDEV_MODE_EVENT);
+        keypad_indev = indev;
+        cp0_lvgl_set_input_pump(keypad_pump);
     }
     cp0_keyboard_input_finish_create(&keypad_lifecycle, indev);
 }

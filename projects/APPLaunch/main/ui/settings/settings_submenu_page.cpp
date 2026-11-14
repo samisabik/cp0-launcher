@@ -437,7 +437,7 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
 
             const bool pending = operation_started.load(std::memory_order_acquire);
             set_status_icon(icon_obj, std::get<0>(result));
-            set_status_hint(pending ? "Wait" : "ok:enter", pending ? 0xF0C850 : 0x00CC66);
+            set_status_hint(pending ? "Wait" : "ok:enter", pending ? 0xF0C850 : 0x3DDC84);
             return pending;
         };
 
@@ -481,7 +481,7 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
         }
 
         set_status_icon(icon_obj, result.enabled);
-        set_status_hint("ok:enter", 0x00CC66);
+        set_status_hint("ok:enter", 0x3DDC84);
     };
     callbacks.on_exception = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &,
                                                                                  std::exception_ptr) {
@@ -845,9 +845,11 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     if (!selection_bg_) return;
     lv_obj_set_size(selection_bg_, metric(LayoutMetric::PanelW), metric(LayoutMetric::BarH));
     lv_obj_set_pos(selection_bg_, metric(LayoutMetric::PanelX), metric(LayoutMetric::BarY));
-    lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x2A2A2A), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x13261B), LV_PART_MAIN);
+    lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(selection_bg_, 2, LV_PART_MAIN);
     lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_SCROLLABLE);
@@ -856,7 +858,6 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     if (right_arrow_) {
         lv_img_set_src(right_arrow_, &setting_right_arrow);
         lv_image_set_pivot(right_arrow_, 0, 0);
-        lv_image_set_scale(right_arrow_, 224);
         lv_obj_update_layout(right_arrow_);
         lv_obj_set_pos(right_arrow_, metric(LayoutMetric::PanelX) - lv_obj_get_width(right_arrow_) - 4,
                        metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(right_arrow_)) / 2);
@@ -932,7 +933,7 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     hint_ = lv_label_create(utility_obj_);
     if (hint_) {
         lv_label_set_text(hint_, "ok:enter");
-        lv_obj_set_style_text_color(hint_, lv_color_hex(0x00CC66), LV_PART_MAIN);
+        lv_obj_set_style_text_color(hint_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint_, settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD),
                                    LV_PART_MAIN);
         lv_obj_update_layout(hint_);

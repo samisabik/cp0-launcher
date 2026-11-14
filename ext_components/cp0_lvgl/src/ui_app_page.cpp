@@ -5,6 +5,8 @@
  */
 
 #include "ui_app_page.hpp"
+#include "cp0_font_service.hpp"
+#include <cstring>
 #include "cp0_callback_contract.hpp"
 #include "cp0_pointer_lifecycle.hpp"
 #include "cp0_status_lifecycle.hpp"
@@ -345,8 +347,8 @@ void AppTopBarTitleComponent::on_create(lv_obj_t *obj)
     lv_obj_add_event_cb(label_, child_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_set_size(label_, LV_PCT(100), LV_PCT(100));
     lv_label_set_long_mode(label_, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_color(label_, lv_color_hex(0xCCAA00), 0);
-    lv_obj_set_style_text_font(label_, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(label_, lv_color_hex(0x3DDC84), 0);
+    lv_obj_set_style_text_font(label_, cp0_fonts().get_chrome(kCp0ChromeFontSize), 0);
     lv_obj_set_style_text_align(label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_label_set_text(label_, title_.c_str());
 }
@@ -381,7 +383,7 @@ void configure_status_component(lv_obj_t *obj, const lv_image_dsc_t *background)
 {
     lv_obj_set_style_radius(obj, 0, 0);
     lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_bg_image_src(obj, background, 0);
+    (void)background;
     lv_obj_set_style_border_width(obj, 0, 0);
     lv_obj_set_style_pad_all(obj, 0, 0);
 }
@@ -391,8 +393,8 @@ lv_obj_t *create_centered_status_label(lv_obj_t *obj)
     lv_obj_t *label = lv_label_create(obj);
     if (!label) return nullptr;
     lv_obj_center(label);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(label, LV_FONT_DEFAULT, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x8A8A8A), 0);
+    lv_obj_set_style_text_font(label, cp0_fonts().get_chrome(kCp0ChromeFontSize), 0);
     lv_label_set_text(label, "--");
     return label;
 }
@@ -429,7 +431,10 @@ void AppTopBarTimeComponent::refresh()
     if (!label_) return;
     char text[16] = "--:--";
     cp0_time_str(text, sizeof(text));
-    lv_label_set_text(label_, text[0] ? text : "--:--");
+    const char *next = text[0] ? text : "--:--";
+    const char *current = lv_label_get_text(label_);
+    if (!current || std::strcmp(current, next) != 0)
+        lv_label_set_text(label_, next);
 }
 
 void AppTopBarTimeComponent::on_object_deleted()
@@ -544,29 +549,13 @@ void AppTopBarBatteryComponent::set_charging(bool charging)
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(label_, lv_color_hex(charging ? 0xFFF2A8 : 0xFFFFFF),
+    lv_obj_set_style_text_color(label_, lv_color_hex(charging ? 0x3DDC84 : 0x8A8A8A),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    if (charging == charging_) return;
+    // The charging state shows as a green percentage; no animation runs.
     charging_ = charging;
-    if (!charging) {
-        lv_anim_del(charge_wave_, nullptr);
-        lv_obj_set_x(charge_wave_, -8);
-        lv_obj_add_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
-        return;
-    }
-
-    lv_obj_clear_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(label_);
-    lv_anim_t animation;
-    lv_anim_init(&animation);
-    lv_anim_set_var(&animation, charge_wave_);
-    lv_anim_set_values(&animation, -8, 36);
-    lv_anim_set_time(&animation, 850);
-    lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_path_cb(&animation, lv_anim_path_linear);
-    lv_anim_set_exec_cb(&animation, reinterpret_cast<lv_anim_exec_xcb_t>(lv_obj_set_x));
-    lv_anim_start(&animation);
+    lv_anim_del(charge_wave_, nullptr);
+    lv_obj_add_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void AppTopBarBatteryComponent::set_low_battery_blink(bool enabled)
@@ -642,7 +631,7 @@ void AppTopBarNetworkComponent::on_create(lv_obj_t *obj)
         lv_obj_set_size(wifi_bars_[index], 4, HEIGHTS[index]);
         lv_obj_set_pos(wifi_bars_[index], index * 6, 15 - HEIGHTS[index]);
         lv_obj_set_style_radius(wifi_bars_[index], 2, 0);
-        lv_obj_set_style_bg_color(wifi_bars_[index], lv_color_hex(0x4D4D4D), 0);
+        lv_obj_set_style_bg_color(wifi_bars_[index], lv_color_hex(0x333333), 0);
         lv_obj_set_style_border_width(wifi_bars_[index], 0, 0);
         lv_obj_clear_flag(wifi_bars_[index], LV_OBJ_FLAG_SCROLLABLE);
     }
@@ -672,7 +661,7 @@ void AppTopBarNetworkComponent::refresh()
     for (int index = 0; index < 4; ++index) {
         bool active = status.connected && status.signal >= THRESHOLDS[index];
         lv_obj_set_style_bg_color(wifi_bars_[index],
-                                  lv_color_hex(active ? 0x33CC33 : 0x4D4D4D), 0);
+                                  lv_color_hex(active ? 0x3DDC84 : 0x333333), 0);
     }
     if (status.ethernet) lv_obj_remove_flag(ethernet_image_, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(ethernet_image_, LV_OBJ_FLAG_HIDDEN);

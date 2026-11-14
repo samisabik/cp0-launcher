@@ -67,7 +67,8 @@ public:
     void select_previous_app();
     std::size_t app_count() const;
     std::size_t current_app_index() const;
-    const app *carousel_slot_app(size_t slot) const;
+    const app *app_at(std::size_t index) const;
+    void set_current_app_index(std::size_t index);
     void launch_app();
 
 private:
@@ -92,7 +93,7 @@ private:
     static void app_registry_changed_cb(void *user_data) noexcept;
 
     std::weak_ptr<UILaunchPage> launch_page_;
-    int current_app = 2;
+    int current_app = 0;
     AppDirectoryWatcher app_directory_watcher_;
     EscUiWatchdog esc_ui_watchdog_;
     LauncherPageLifecycleModel page_lifecycle_;

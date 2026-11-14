@@ -77,14 +77,13 @@ void UISTPage::start_command(const std::string &command,
 void UISTPage::start_shell()
 {
     hide_help();
-    start_command("bash", {
+    // Start the user's login shell from passwd so the CLI matches an SSH session.
+    start_command("sh", {
         "-c",
         "cd ~ && "
-        "if [ -r ~/.bashrc ]; then "
-        "exec env TERM=st-256color COLORTERM=truecolor bash --rcfile ~/.bashrc -i; "
-        "else "
-        "exec env TERM=st-256color COLORTERM=truecolor bash -i; "
-        "fi"
+        "login_shell=$(getent passwd \"$(id -un)\" | cut -d: -f7); "
+        "[ -x \"$login_shell\" ] || login_shell=/bin/bash; "
+        "exec env TERM=st-256color COLORTERM=truecolor SHELL=\"$login_shell\" \"$login_shell\" -l"
     }, "CLI", "cli: failed to open PTY\r\n");
 }
 

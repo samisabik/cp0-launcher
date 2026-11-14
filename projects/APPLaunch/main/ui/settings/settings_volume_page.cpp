@@ -199,7 +199,7 @@ public:
     {
         if (index < 0 || index > 2)
             return {static_cast<int>(ErrorCode::Invalid), "system sound index out of range"};
-        return invoke_default({"SystemSoundPlay", std::to_string(index)}, std::chrono::milliseconds(3000));
+        return {0, ""};
     }
 };
 

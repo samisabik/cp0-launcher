@@ -13,8 +13,9 @@
 namespace {
 
 constexpr uint32_t kShowDurationMs = 1500;
-constexpr uint32_t kBackgroundColor = 0x1F3A5F;
-constexpr uint32_t kTextColor = 0xFFFFFF;
+constexpr uint32_t kBackgroundColor = 0x000000;
+constexpr uint32_t kBorderColor = 0x3DDC84;
+constexpr uint32_t kTextColor = 0xE6E6E6;
 constexpr lv_coord_t kWidth = 280;
 constexpr lv_coord_t kHeight = 22;
 constexpr lv_coord_t kMultilineHeight = 38;
@@ -40,9 +41,10 @@ bool LauncherToast::ensure_created() noexcept
     lv_obj_set_size(container_, kWidth, kHeight);
     lv_obj_align(container_, LV_ALIGN_TOP_MID, 0, kTopOffset);
     lv_obj_set_style_bg_color(container_, lv_color_hex(kBackgroundColor), 0);
-    lv_obj_set_style_bg_opa(container_, LV_OPA_80, 0);
-    lv_obj_set_style_radius(container_, 6, 0);
-    lv_obj_set_style_border_width(container_, 0, 0);
+    lv_obj_set_style_bg_opa(container_, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(container_, 0, 0);
+    lv_obj_set_style_border_width(container_, 1, 0);
+    lv_obj_set_style_border_color(container_, lv_color_hex(kBorderColor), 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_set_style_shadow_width(container_, 0, 0);
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_CLICKABLE);
@@ -57,8 +59,7 @@ bool LauncherToast::ensure_created() noexcept
     lv_obj_add_event_cb(label_, label_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_set_style_text_color(label_, lv_color_hex(kTextColor), 0);
     lv_obj_set_style_text_font(
-        label_, launcher_fonts().get("AlibabaPuHuiTi-3-55-Regular.ttf", 12,
-                                    LV_FREETYPE_FONT_STYLE_BOLD), 0);
+        label_, launcher_fonts().get_chrome(11), 0);
     lv_obj_set_width(label_, kWidth - 12);
     lv_label_set_long_mode(label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(label_, LV_TEXT_ALIGN_CENTER, 0);

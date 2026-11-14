@@ -92,18 +92,8 @@ void UISTPage::create_ui()
         }
     }
 
-    lv_font_t *primary = launcher_fonts().get(
-        "JetBrainsMono-Bold.ttf", font_size(FontSize::Terminal),
-        LV_FREETYPE_FONT_STYLE_NORMAL, LV_FREETYPE_FONT_RENDER_MODE_BITMAP);
-    lv_font_t *cjk = launcher_fonts().get(
-        "AlibabaPuHuiTi-3-55-Regular.ttf", font_size(FontSize::Terminal),
-        LV_FREETYPE_FONT_STYLE_NORMAL, LV_FREETYPE_FONT_RENDER_MODE_BITMAP);
-    lv_font_t *symbols = launcher_fonts().get(
-        "DejaVuSansMono.ttf", font_size(FontSize::Terminal),
-        LV_FREETYPE_FONT_STYLE_NORMAL, LV_FREETYPE_FONT_RENDER_MODE_BITMAP);
-    if (cjk && symbols && cjk != symbols) cjk->fallback = symbols;
-    if (primary && cjk && primary != cjk) primary->fallback = cjk;
-    mono_font_ = primary;
+    // The UI font already falls back to DejaVu Sans and then the CJK font.
+    mono_font_ = launcher_fonts().get_chrome(font_size(FontSize::Terminal));
     cursor_label_ = lv_label_create(term_canvas_);
     if (!cursor_label_) return;
     lv_obj_add_event_cb(cursor_label_, static_renderer_delete_cb, LV_EVENT_DELETE, this);

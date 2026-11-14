@@ -134,28 +134,20 @@ public:
     {
         if (!label) return;
 
-        int font_size  = 12;
-        int opa        = 130;
-        uint32_t color = 0x555555;
+        // One pixel-font size for every row; distance from the selection only dims the colour.
+        uint32_t color = 0x3A4A3F;
         if (distance == 0) {
-            font_size = 18;
-            opa       = 255;
-            color     = 0xFFFFFF;
+            color = 0xE6E6E6;
         } else if (distance == 1) {
-            font_size = 16;
-            opa       = 220;
-            color     = 0xAAAAAA;
+            color = 0x8A8A8A;
         } else if (distance == 2) {
-            font_size = 12;
-            opa       = 170;
-            color     = 0x777777;
+            color = 0x5F7A66;
         }
 
-        // Set the current row font, color, and opacity first, then recalculate the text width using the final font.
-        lv_obj_set_style_text_font(
-            label, settings_fonts::sans(font_size, LV_FREETYPE_FONT_STYLE_BOLD), LV_PART_MAIN);
+        // Set the current row font and colour first, then recalculate the text width using the final font.
+        lv_obj_set_style_text_font(label, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-        lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
+        lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         // Restore the content width and disable scrolling first to obtain the text's natural width.
         // Re-enable marquee scrolling only when the entry is selected and the text actually exceeds the display box.
@@ -470,9 +462,11 @@ public:
         lv_obj_set_size(selection_bg, 312, 21);
         lv_obj_set_pos(selection_bg, 4, 66);
         selection_bg_base_x_ = lv_obj_get_x(selection_bg);
-        lv_obj_set_style_bg_color(selection_bg, lv_color_hex(0x2A2A2A), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(selection_bg, lv_color_hex(0x13261B), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(selection_bg, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_width(selection_bg, 0, LV_PART_MAIN);
+        lv_obj_set_style_border_side(selection_bg, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
+        lv_obj_set_style_border_color(selection_bg, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+        lv_obj_set_style_border_width(selection_bg, 2, LV_PART_MAIN);
         lv_obj_set_style_radius(selection_bg, 0, LV_PART_MAIN);
         lv_obj_remove_flag(selection_bg, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(selection_bg, LV_OBJ_FLAG_SCROLLABLE);
@@ -494,18 +488,24 @@ public:
         lv_obj_set_style_pad_row(ComponensObj, 0, LV_PART_MAIN);
 
         // Create and position the scrolling hint arrows.
-        arrow_up_ = lv_img_create(page_container);
+        // Arrows sit right of the label column so they never overlap a row.
+        constexpr lv_coord_t kArrowX = 106;
+        auto make_arrow = [page_container](const char *glyph) {
+            lv_obj_t *arrow = lv_label_create(page_container);
+            if (!arrow) return arrow;
+            lv_label_set_text(arrow, glyph);
+            lv_obj_set_style_text_font(arrow, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+            lv_obj_set_style_text_color(arrow, lv_color_hex(0x5F7A66), LV_PART_MAIN);
+            lv_obj_update_layout(arrow);
+            return arrow;
+        };
+        arrow_up_ = make_arrow("\u25B2");
+        if (arrow_up_)
+            lv_obj_set_pos(arrow_up_, kArrowX, 2);
 
-        lv_img_set_src(arrow_up_, &setting_red_up);
-        lv_obj_update_layout(arrow_up_);
-        lv_obj_set_pos(arrow_up_, metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(arrow_up_) / 2, 2);
-
-        arrow_down_ = lv_img_create(page_container);
-
-        lv_img_set_src(arrow_down_, &setting_red_down);
-        lv_obj_update_layout(arrow_down_);
-        lv_obj_set_pos(arrow_down_, metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(arrow_down_) / 2,
-                       150 - lv_obj_get_height(arrow_down_) - 4);
+        arrow_down_ = make_arrow("\u25BC");
+        if (arrow_down_)
+            lv_obj_set_pos(arrow_down_, kArrowX, 150 - lv_obj_get_height(arrow_down_) - 4);
 
         // Refresh each row's font and color while scrolling; forward key events to the member function through the
         // bound callback.

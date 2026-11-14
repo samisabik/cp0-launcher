@@ -120,7 +120,7 @@ def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
     assert "launcher::is_launcher_settings_origin(descriptor.origin)" in SETTINGS_ADAPTER
     assert "launcher::is_protected_launcher_app(descriptor.config_key)" in SETTINGS_ADAPTER
     assert '{"Python", "python_100.png", "app_Python", true, false}' in BUILTIN_REGISTRY
-    assert '{"Snake", "game_100.png", "app_Game", true, false}' in BUILTIN_REGISTRY
+    assert '"Snake"' not in BUILTIN_REGISTRY and '"Tank"' not in BUILTIN_REGISTRY
     assert (
         "zclaw.desktop\tZClaw\tshare/images/claw_100.png\t"
         "/usr/share/APPLaunch/bin/ZClaw\tfalse\ttrue"

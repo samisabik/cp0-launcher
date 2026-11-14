@@ -542,7 +542,7 @@ static void test_screensaver_battery_interaction()
     unlock_screensaver();
     assert(visible());
     assert(flow.seconds_until_shutdown(lv_tick_get()) == 9);
-    assert(std::strcmp(lv_label_get_text(countdown_label), "Power off in 9s") == 0);
+    assert(std::strcmp(lv_label_get_text(countdown_label), "power off in 9s") == 0);
     enter_lockscreen();
     assert(!visible());
     const int shutdown_before = shutdown_calls;
@@ -813,7 +813,7 @@ int main()
 
     set_battery(3);
     advance(3000);
-    assert(std::strcmp(lv_label_get_text(countdown_label), "Power off in 15s") == 0);
+    assert(std::strcmp(lv_label_get_text(countdown_label), "power off in 15s") == 0);
     // Low -> ShutdownCountdown promotes the same critical phase, not a new cue.
     assert(sound_plays("applaunch-arcade-warning.mp3") == 1);
     advance(12000);

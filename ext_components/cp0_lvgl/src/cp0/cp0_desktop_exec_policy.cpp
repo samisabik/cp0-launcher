@@ -65,7 +65,7 @@ Result evaluate(const char *exec)
                                       : reject("executable path is not executable");
     }
 
-    static const char *kAllowedNames[] = {"bash", "python3", "vim", "vi", "nano", "sh"};
+    static const char *kAllowedNames[] = {"bash", "zsh", "python3", "vim", "vi", "nano", "micro", "htop", "sh"};
     const bool allowed =
         std::find(std::begin(kAllowedNames), std::end(kAllowedNames), token) !=
         std::end(kAllowedNames);

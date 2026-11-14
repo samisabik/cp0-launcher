@@ -5,7 +5,6 @@
 set -eu
 test_root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 settings_ui_root=$(CDPATH= cd -- "$test_root/../main/ui/settings" && pwd)
-python3 "$test_root/test_carousel_border_contract.py"
 python3 "$test_root/test_external_framebuffer_ownership.py"
 python3 "$test_root/test_settings_input_font_contract.py"
 python3 "$test_root/test_settings_menu_order.py"

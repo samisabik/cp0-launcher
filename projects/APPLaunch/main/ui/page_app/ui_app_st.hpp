@@ -39,7 +39,7 @@
 class UISTPage : public AppPage
 {
     enum class FontSize : uint8_t {
-        Terminal = 12,
+        Terminal = 11,
     };
 
     static constexpr int font_size(FontSize size)
@@ -49,11 +49,11 @@ class UISTPage : public AppPage
 
     static constexpr int TERM_W = 320;
     static constexpr int TERM_H = 150;
-    // JetBrains Mono Bold at 12px resolves to a 7px advance and 15px line height in LVGL.
+    // Departure Mono at 11px has a 7px advance; every glyph's ink sits in rows 2-13
+    // of its 14px line, so a 13px cell shifted up 1px keeps a 1px gap between rows.
     static constexpr int CHAR_W = 7;
-    static constexpr int CHAR_H = 15;
-    // Descenders in the 12px Bold face need the full 15px cell height.
-    static constexpr int TEXT_Y_PAD = 0;
+    static constexpr int CHAR_H = 13;
+    static constexpr int TEXT_Y_PAD = -1;
     static constexpr int NORMAL_COLS = TERM_W / CHAR_W;
     static constexpr int NORMAL_ROWS = TERM_H / CHAR_H;
     static constexpr int BIG_COLS = 80;

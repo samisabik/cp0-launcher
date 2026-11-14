@@ -97,7 +97,7 @@ std::string UISTPage::printable(uint32_t codepoint)
 lv_color_t UISTPage::palette(uint32_t color)
 {
     static constexpr uint32_t COLORS[] = {
-        0x0D1117, 0xFF5F56, 0x27C93F, 0xFFBD2E,
+        0x000000, 0xFF5F56, 0x3DDC84, 0xFFBD2E,
         0x2F81F7, 0xBC8CFF, 0x39C5CF, 0xF0F6FC,
         0x6E7681, 0xFFA198, 0x56D364, 0xE3B341,
         0x79C0FF, 0xD2A8FF, 0x56D4DD, 0xFFFFFF,
@@ -107,9 +107,7 @@ lv_color_t UISTPage::palette(uint32_t color)
 
 const lv_font_t *UISTPage::terminal_font()
 {
-    return launcher_fonts().get("JetBrainsMono-Bold.ttf", font_size(FontSize::Terminal),
-                                LV_FREETYPE_FONT_STYLE_NORMAL,
-                                LV_FREETYPE_FONT_RENDER_MODE_BITMAP);
+    return launcher_fonts().get_chrome(font_size(FontSize::Terminal));
 }
 
 uint32_t UISTPage::xterm256_to_palette(int color)

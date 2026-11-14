@@ -7969,7 +7969,6 @@ public:
         ValueCenterX    = ValueListW / 2,
         ValueBoxX       = 16,
         ValueBoxW       = 88,
-        RightArrowScale = 224,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -8410,9 +8409,11 @@ protected:
         if (selection_bg_) {
             lv_obj_set_size(selection_bg_, metric(LayoutMetric::BarW), metric(LayoutMetric::BarH));
             lv_obj_set_pos(selection_bg_, metric(LayoutMetric::BarX), metric(LayoutMetric::BarY));
-            lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x2A2A2A), LV_PART_MAIN);
+            lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x13261B), LV_PART_MAIN);
             lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
+            lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
+            lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+            lv_obj_set_style_border_width(selection_bg_, 2, LV_PART_MAIN);
             lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
             lv_obj_remove_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_remove_flag(selection_bg_, LV_OBJ_FLAG_SCROLLABLE);
@@ -8472,7 +8473,7 @@ protected:
         if (right_arrow_) {
             lv_img_set_src(right_arrow_, &setting_right_arrow);
             lv_image_set_pivot(right_arrow_, 0, 0);
-            lv_image_set_scale(right_arrow_, metric(LayoutMetric::RightArrowScale));
+            lv_image_set_scale(right_arrow_, LV_SCALE_NONE);
             lv_obj_update_layout(right_arrow_);
             lv_obj_set_pos(
                 right_arrow_, metric(LayoutMetric::ValueListX) - lv_obj_get_width(right_arrow_) - 4,
@@ -8502,7 +8503,7 @@ protected:
         hint_ = lv_label_create(ComponensObj);
         if (hint_) {
             lv_label_set_text(hint_, "ok:set");
-            lv_obj_set_style_text_color(hint_, lv_color_hex(0x00CC66), LV_PART_MAIN);
+            lv_obj_set_style_text_color(hint_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
             lv_obj_set_style_text_font(hint_, settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD),
                                        LV_PART_MAIN);
             lv_obj_update_layout(hint_);

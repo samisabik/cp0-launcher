@@ -14,6 +14,7 @@
 #include "cp0_runner_shutdown.hpp"
 #include "hal_lvgl_bsp.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cerrno>
 #include <condition_variable>
@@ -33,6 +34,8 @@ size_t pending_wakes = 0;
 sem_t lvgl_sem;
 #endif
 std::mutex runner_mutex;
+int (*input_pump)(void) = nullptr;
+constexpr uint32_t kInputRetryMs = 10;
 cp0::RunnerLifetime runner_lifetime;
 bool semaphore_ready = false;
 
@@ -148,6 +151,16 @@ void cp0_lvgl_wake()
     post_lvgl_semaphore();
 }
 
+extern "C" void cp0_lvgl_wake_from_c(void)
+{
+    post_lvgl_semaphore();
+}
+
+extern "C" void cp0_lvgl_set_input_pump(int (*pump)(void))
+{
+    input_pump = pump;
+}
+
 int cp0_lvgl_run(Cp0LvglRunOptions options)
 {
     {
@@ -226,9 +239,12 @@ int cp0_lvgl_run(Cp0LvglRunOptions options)
         lv_refr_now(nullptr);
 
         while (!options.should_quit || !options.should_quit()) {
+            const bool input_pending = input_pump && input_pump();
             uint32_t milliseconds = lv_timer_handler();
             if (options.should_quit && options.should_quit())
                 break;
+            if (input_pending)
+                milliseconds = std::min<uint32_t>(milliseconds, kInputRetryMs);
             if (milliseconds == LV_NO_TIMER_READY)
                 wait_for_lvgl();
             else

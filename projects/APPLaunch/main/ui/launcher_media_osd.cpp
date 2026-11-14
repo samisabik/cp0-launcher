@@ -12,10 +12,10 @@ namespace {
 
 constexpr lv_coord_t kWidth = 190;
 constexpr lv_coord_t kHeight = 82;
-constexpr uint32_t kBackgroundColor = 0x20242C;
-constexpr uint32_t kBarBackgroundColor = 0x555C66;
-constexpr uint32_t kAccentColor = 0xF2C94C;
-constexpr uint32_t kTextColor = 0xFFFFFF;
+constexpr uint32_t kBackgroundColor = 0x000000;
+constexpr uint32_t kBarBackgroundColor = 0x1E2B23;
+constexpr uint32_t kAccentColor = 0x3DDC84;
+constexpr uint32_t kTextColor = 0xE6E6E6;
 
 void center_osd(lv_obj_t *obj)
 {
@@ -49,9 +49,9 @@ bool LauncherMediaOsd::ensure_created() noexcept
     center_osd(container_);
     lv_obj_set_style_bg_color(container_, lv_color_hex(kBackgroundColor), 0);
     lv_obj_set_style_bg_opa(container_, LV_OPA_90, 0);
-    lv_obj_set_style_radius(container_, 8, 0);
+    lv_obj_set_style_radius(container_, 0, 0);
     lv_obj_set_style_border_width(container_, 1, 0);
-    lv_obj_set_style_border_color(container_, lv_color_hex(0x3A404A), 0);
+    lv_obj_set_style_border_color(container_, lv_color_hex(kAccentColor), 0);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_set_style_shadow_width(container_, 0, 0);
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_CLICKABLE);
@@ -70,8 +70,7 @@ bool LauncherMediaOsd::ensure_created() noexcept
     lv_obj_set_style_text_font(icon_, LV_FONT_DEFAULT, 0);
     lv_obj_set_style_text_align(icon_, LV_TEXT_ALIGN_CENTER, 0);
 
-    lv_font_t *font = launcher_fonts().get(
-        "AlibabaPuHuiTi-3-55-Regular.ttf", 12, LV_FREETYPE_FONT_STYLE_BOLD);
+    lv_font_t *font = launcher_fonts().get_chrome(11);
     title_ = lv_label_create(container_);
     if (!title_) {
         lv_obj_delete(container_);
@@ -105,8 +104,8 @@ bool LauncherMediaOsd::ensure_created() noexcept
     lv_obj_set_size(bar_, 154, 10);
     lv_obj_set_pos(bar_, 18, 50);
     lv_bar_set_range(bar_, 0, 100);
-    lv_obj_set_style_radius(bar_, 5, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar_, 5, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(bar_, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(bar_, 0, LV_PART_INDICATOR);
     lv_obj_set_style_bg_color(bar_, lv_color_hex(kBarBackgroundColor), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar_, lv_color_hex(kAccentColor), LV_PART_INDICATOR);

@@ -25,11 +25,6 @@
 #include <string>
 #include <utility>
 
-namespace {
-constexpr size_t kHomeCarouselSlotCount = 5;
-constexpr int kHomeCarouselCenterSlot = 2;
-}
-
 // ============================================================
 // Launch
 // ============================================================
@@ -204,11 +199,15 @@ std::size_t Launch::current_app_index() const
     return normalized < 0 ? 0 : static_cast<std::size_t>(normalized);
 }
 
-const app *Launch::carousel_slot_app(size_t slot) const
+const app *Launch::app_at(std::size_t index) const
 {
-    if (slot >= kHomeCarouselSlotCount)
-        return nullptr;
-    return app_at_index(current_app + static_cast<int>(slot) - kHomeCarouselCenterSlot);
+    return app_at_index(static_cast<int>(index));
+}
+
+void Launch::set_current_app_index(std::size_t index)
+{
+    const int normalized = normalized_app_index(static_cast<int>(index));
+    if (normalized >= 0) current_app = normalized;
 }
 
 void Launch::applications_load()
@@ -222,7 +221,7 @@ void Launch::refresh_home_carousel()
     int normalized = normalized_app_index(current_app);
     if (normalized < 0) return;
     current_app = normalized;
-    if (auto page = launch_page_.lock()) page->refresh_carousel();
+    if (auto page = launch_page_.lock()) page->refresh_home();
 }
 
 void Launch::reload_home_icons()
@@ -230,11 +229,11 @@ void Launch::reload_home_icons()
     const int normalized = normalized_app_index(current_app);
     if (normalized >= 0) current_app = normalized;
 
-    std::vector<std::string> icon_paths;
-    icon_paths.reserve(app_list.size());
+    std::vector<std::string> app_names;
+    app_names.reserve(app_list.size());
     for (const app &item : app_list)
-        icon_paths.push_back(item.Icon);
-    if (auto page = launch_page_.lock()) page->reload_home_icons(icon_paths);
+        app_names.push_back(item.Name);
+    if (auto page = launch_page_.lock()) page->reload_home_icons(app_names);
 }
 
 void Launch::applications_reload()
