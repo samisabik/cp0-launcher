@@ -1,0 +1,155 @@
+/*
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "spectrum_model.hpp"
+
+#include <algorithm>
+#include <cstdio>
+
+namespace spectrum {
+
+uint32_t freq_word(uint32_t hz)
+{
+    const uint64_t scaled = (static_cast<uint64_t>(hz) << 16) + kCrystalHz / 2;
+    return static_cast<uint32_t>(scaled / kCrystalHz);
+}
+
+uint32_t bin_frequency(const Band &band, int bin)
+{
+    bin = std::clamp(bin, 0, kBins - 1);
+    const uint64_t span = band.stop_hz - band.start_hz;
+    return band.start_hz + static_cast<uint32_t>(span * static_cast<uint64_t>(bin) / (kBins - 1));
+}
+
+int rssi_dbm(uint8_t raw)
+{
+    const int value = raw >= 128 ? static_cast<int>(raw) - 256 : static_cast<int>(raw);
+    return value / 2 - 74;
+}
+
+int level_index(int dbm)
+{
+    const int clamped = std::clamp(dbm, kMinDbm, kMaxDbm);
+    return (clamped - kMinDbm) * (kLevels - 1) / (kMaxDbm - kMinDbm);
+}
+
+uint32_t level_color(int index)
+{
+    struct Stop { int at; int r, g, b; };
+    static constexpr Stop kStops[] = {
+        // Black up to the typical noise floor so only signals show colour.
+        {0, 0x00, 0x00, 0x00},
+        {12, 0x00, 0x00, 0x00},
+        {28, 0x13, 0x26, 0x1B},
+        {46, 0x3D, 0xDC, 0x84},
+        {63, 0xFF, 0xFF, 0xFF},
+    };
+    index = std::clamp(index, 0, kLevels - 1);
+    for (std::size_t i = 1; i < sizeof(kStops) / sizeof(kStops[0]); ++i) {
+        const Stop &a = kStops[i - 1];
+        const Stop &b = kStops[i];
+        if (index <= b.at) {
+            const int span = b.at - a.at;
+            const int t = index - a.at;
+            const int r = a.r + (b.r - a.r) * t / span;
+            const int g = a.g + (b.g - a.g) * t / span;
+            const int bl = a.b + (b.b - a.b) * t / span;
+            return static_cast<uint32_t>((r << 16) | (g << 8) | bl);
+        }
+    }
+    return 0xFFFFFF;
+}
+
+std::string format_mhz(uint32_t hz)
+{
+    char text[16];
+    std::snprintf(text, sizeof(text), "%u.%03u", hz / 1000000, (hz / 1000) % 1000);
+    return text;
+}
+
+std::string csv_header(const std::string &started_iso)
+{
+    std::string text = "# cc1101 spectrum session, started " + started_iso + "\n";
+    text += "# rssi in dBm (approximate), one row per sweep\n";
+    for (const Band &band : kBands) {
+        char line[96];
+        std::snprintf(line, sizeof(line), "# band %s start_hz=%u stop_hz=%u bins=%d\n",
+                      band.label, band.start_hz, band.stop_hz, kBins);
+        text += line;
+    }
+    text += "timestamp_ms,band";
+    for (int bin = 0; bin < kBins; ++bin) text += ",b" + std::to_string(bin);
+    text += "\n";
+    return text;
+}
+
+std::string csv_row(int64_t timestamp_ms, const Band &band, const int8_t *dbm, std::size_t count)
+{
+    std::string text = std::to_string(timestamp_ms) + "," + band.label;
+    for (std::size_t i = 0; i < count; ++i) text += "," + std::to_string(static_cast<int>(dbm[i]));
+    text += "\n";
+    return text;
+}
+
+std::vector<int32_t> normalize_durations(const std::vector<int32_t> &durations)
+{
+    std::vector<int32_t> out;
+    out.reserve(durations.size());
+    for (int32_t value : durations) {
+        if (value == 0) continue;
+        if (out.empty() && value < 0) continue;
+        if (!out.empty() && (out.back() > 0) == (value > 0))
+            out.back() += value;
+        else
+            out.push_back(value);
+    }
+    return out;
+}
+
+std::string ook_file_header(const std::string &created)
+{
+    return ";pulse data\n;version 1\n;timescale 1us\n;created " + created + "\n";
+}
+
+std::string ook_packet(const std::vector<int32_t> &durations, uint32_t freq_hz,
+                       const std::string &received, int rssi_dbm)
+{
+    // rtl_433 skips marks or spaces above 100 ms.
+    constexpr int32_t kMaxUs = 100000;
+    const std::vector<int32_t> values = normalize_durations(durations);
+    const std::size_t pulses = (values.size() + 1) / 2;
+    std::string text = ";received " + received + "\n";
+    text += ";ook " + std::to_string(pulses) + " pulses\n";
+    text += ";freq1 " + std::to_string(freq_hz) + "\n";
+    text += ";rssi " + std::to_string(rssi_dbm) + ".0 dB\n";
+    for (std::size_t i = 0; i < values.size(); i += 2) {
+        const int32_t mark = std::min(values[i], kMaxUs);
+        const int32_t space = i + 1 < values.size() ? std::min(-values[i + 1], kMaxUs) : 0;
+        text += std::to_string(mark) + " " + std::to_string(space) + "\n";
+    }
+    text += ";end\n";
+    return text;
+}
+
+std::string sub_file_header(uint32_t freq_hz)
+{
+    return "Filetype: Flipper SubGhz RAW File\nVersion: 1\nFrequency: " + std::to_string(freq_hz) +
+           "\nPreset: FuriHalSubGhzPresetOok650Async\nProtocol: RAW\n";
+}
+
+std::string sub_raw_lines(const std::vector<int32_t> &durations)
+{
+    constexpr std::size_t kPerLine = 512;
+    const std::vector<int32_t> values = normalize_durations(durations);
+    std::string text;
+    for (std::size_t i = 0; i < values.size(); i += kPerLine) {
+        text += "RAW_Data:";
+        for (std::size_t j = i; j < std::min(values.size(), i + kPerLine); ++j)
+            text += " " + std::to_string(values[j]);
+        text += "\n";
+    }
+    return text;
+}
+
+} // namespace spectrum
