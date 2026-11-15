@@ -484,14 +484,16 @@ void AppTopBarBatteryComponent::on_create(lv_obj_t *obj)
     charge_wave_ = lv_obj_create(obj);
     if (!charge_wave_) return;
     lv_obj_add_event_cb(charge_wave_, child_delete_cb, LV_EVENT_DELETE, this);
-    lv_obj_set_size(charge_wave_, 8, 14);
-    lv_obj_set_pos(charge_wave_, -8, 1);
+    // A thin accent underline beneath the percentage while charging.
+    lv_obj_set_size(charge_wave_, 20, 2);
+    lv_obj_set_align(charge_wave_, LV_ALIGN_BOTTOM_MID);
+    lv_obj_set_y(charge_wave_, 0);
     lv_obj_clear_flag(charge_wave_, static_cast<lv_obj_flag_t>(
         LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
     lv_obj_set_style_radius(charge_wave_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(charge_wave_, lv_color_hex(0xFFF176),
+    lv_obj_set_style_bg_color(charge_wave_, lv_color_hex(0x3DDC84),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(charge_wave_, 190, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(charge_wave_, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(charge_wave_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
 
@@ -562,7 +564,10 @@ void AppTopBarBatteryComponent::set_charging(bool charging)
     // The charging state shows as a green percentage; no animation runs.
     charging_ = charging;
     lv_anim_del(charge_wave_, nullptr);
-    lv_obj_add_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
+    if (charging)
+        lv_obj_remove_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(charge_wave_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void AppTopBarBatteryComponent::set_low_battery_blink(bool enabled)
