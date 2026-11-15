@@ -52,7 +52,7 @@ std::string line_icon_path(const std::string &name)
     static const std::set<std::string> kKnown = {
         "cli", "factorytest", "files", "gps", "ip_panel",
         "ir_chat", "ir_remote", "keyboard_guide", "lora", "micro", "nfc", "power", "python",
-        "rec", "settings", "spectrum", "ssh", "subg_chat",
+        "rec", "sdr", "settings", "spectrum", "ssh", "subg_chat",
     };
     const std::string slug = app_slug(name);
     return launcher_platform::path("line/" + (kKnown.count(slug) ? slug : std::string("app")) + ".png");
