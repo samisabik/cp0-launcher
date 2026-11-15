@@ -19,6 +19,7 @@
 UISSHPage::UISSHPage() : AppPage()
 {
     set_page_title("SSH");
+    reclaim_top_bar();
     load_profile();
     create_ui();
     if (root_screen_ && form_container_) {

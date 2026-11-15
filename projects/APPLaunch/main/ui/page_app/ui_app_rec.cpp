@@ -206,6 +206,7 @@ bool whisper_installed()
 UIRecPage::UIRecPage() : AppPage()
 {
     set_page_title("Rec");
+    reclaim_top_bar();
     create_ui();
     load_clips();
     if (!whisper_installed()) show_message("whisper not installed");

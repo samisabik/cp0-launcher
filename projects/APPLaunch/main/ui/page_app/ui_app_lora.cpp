@@ -177,6 +177,7 @@ void run_lora_initialization(const std::shared_ptr<lora_app_detail::LoraInitiali
 UILoraPage::UILoraPage() : AppPage()
 {
     set_page_title("LoRa");
+    reclaim_top_bar();
     create_ui();
     if (!ui_ready()) {
         if (page_root_) lv_obj_delete(page_root_);

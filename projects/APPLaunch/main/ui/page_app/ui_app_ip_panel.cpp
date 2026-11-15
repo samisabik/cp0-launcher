@@ -17,6 +17,7 @@ UIIpPanelPage::UIIpPanelPage() : AppPage()
 {
     try {
         set_page_title("IP INFO");
+        reclaim_top_bar();
         create_ui();
         if (root_screen_ && ip_panel_view_ready(background_, list_container_))
             event_handler_init();

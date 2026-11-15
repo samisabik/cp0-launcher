@@ -43,6 +43,7 @@ int text_width(lv_obj_t *obj)
 UIPowerPage::UIPowerPage() : AppPage()
 {
     set_page_title("Power");
+    reclaim_top_bar();
     create_ui();
     render();
     if (root_screen_)

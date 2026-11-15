@@ -61,6 +61,7 @@ void UISTPage::start_command(const std::string &command,
         return;
     }
     if (title && title[0]) set_page_title(title);
+    reclaim_top_bar();
     if (!start_timers()) {
         stop_pty();
         terminal_active_ = false;

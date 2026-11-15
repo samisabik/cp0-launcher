@@ -259,6 +259,16 @@ void AppContentRegion::refresh()
                             LV_EVENT_DELETE, this);
 }
 
+void AppContentRegion::reclaim_top_bar()
+{
+    disable_top_bar();
+    top_bar_height_px_ = 0;
+    if (!ui_APP_Container) return;
+    lv_obj_set_pos(ui_APP_Container, 0, 0);
+    lv_obj_set_height(ui_APP_Container,
+                      cp0::app_content_height(has_bottom_bar_) + AppPageRoot::kTopBarHeightPx);
+}
+
 AppTopBarComponent::AppTopBarComponent(std::string id, int recommended_width, int height)
     : id_(std::move(id)),
       recommended_width_(recommended_width > 0 ? recommended_width : kDefaultRecommendedWidth),

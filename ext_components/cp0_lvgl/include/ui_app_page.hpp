@@ -175,6 +175,11 @@ public:
     // Kept for source compatibility with existing applications.
     void refash() { refresh(); }
 
+    // Full-bleed mode: hide the 20 px top bar and grow the content container to
+    // the whole 320x170 screen. For apps that want every pixel and do not need
+    // the clock/battery chrome while running.
+    void reclaim_top_bar();
+
     lv_obj_t *ui_APP_Container = nullptr;
 
 private:

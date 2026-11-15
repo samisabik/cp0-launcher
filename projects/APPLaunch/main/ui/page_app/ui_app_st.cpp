@@ -17,6 +17,7 @@ UISTPage::UISTPage(TerminalHelpFactory help_factory)
     : AppPage(), help_factory_(help_factory)
 {
     set_page_title("CLI");
+    reclaim_top_bar();
     reset_terminal();
     create_ui();
     create_help();

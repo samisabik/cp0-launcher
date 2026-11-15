@@ -16,6 +16,7 @@
 UIMeshPage::UIMeshPage() : AppPage()
 {
     set_page_title("MESH");
+    reclaim_top_bar();
     generate_node_id();
     create_ui();
     const auto bg = ui_obj_.find("bg");
