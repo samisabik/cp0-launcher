@@ -153,9 +153,13 @@ public:
         std::exit(0);
 #else
         std::printf("[CP0] shutdown\n");
-        cp0_backlight_write(0);
         const std::vector<std::string> argv = {"systemctl", "poweroff", "-i"};
-        return cp0_process_commands::run_argv(argv, false);
+        const int result = cp0_process_commands::run_argv(argv, false);
+        // Only darken the panel once logind has accepted the request; a refused
+        // poweroff must leave a lit, usable screen rather than one that only
+        // looks switched off.
+        if (result == 0) cp0_backlight_write(0);
+        return result;
 #endif
     }
 

@@ -90,10 +90,18 @@ void UIPowerPage::render()
         title = "powering off";
         detail = "the screen goes dark now. wait about 10 s, then flip the switch.";
         key = word = key2 = word2 = "";
+    } else if (state_ == State::Refused) {
+        title = "power off refused";
+        detail = "linux is still running, do not flip the switch. the system did not allow the shutdown.";
+        word = " try again";
+        word2 = " back";
     }
     if (title_) {
         lv_label_set_text(title_, title);
-        lv_obj_set_style_text_color(title_, lv_color_hex(state_ == State::ShuttingDown ? kColorAccent : kColorText), 0);
+        const uint32_t color = state_ == State::ShuttingDown ? kColorAccent
+                               : state_ == State::Refused    ? 0xFF5F56
+                                                             : kColorText;
+        lv_obj_set_style_text_color(title_, lv_color_hex(color), 0);
     }
     if (detail_) lv_label_set_text(detail_, detail);
     int x = 4;
@@ -113,10 +121,18 @@ void UIPowerPage::shutdown_cb(lv_timer_t *timer) noexcept
     auto *page = static_cast<UIPowerPage *>(lv_timer_get_user_data(timer));
     if (page) page->timer_ = nullptr;
     lv_timer_delete(timer);
+    bool refused = true;
     try {
-        cp0_signal_process_api({"Shutdown"}, [](int, std::string) {});
+        cp0_signal_process_api({"Shutdown"}, [&refused](int code, std::string) { refused = code != 0; });
     } catch (...) {
     }
+    if (refused && page) page->shutdown_refused();
+}
+
+void UIPowerPage::shutdown_refused()
+{
+    state_ = State::Refused;
+    render();
 }
 
 void UIPowerPage::event_cb(lv_event_t *event) noexcept
@@ -135,7 +151,7 @@ void UIPowerPage::handle_key(uint32_t key)
 {
     if (state_ == State::ShuttingDown) return;
     if (key == KEY_ESC) {
-        if (state_ == State::Confirm) {
+        if (state_ == State::Confirm || state_ == State::Refused) {
             state_ = State::Ask;
             render();
         } else if (navigate_home) {
@@ -144,7 +160,7 @@ void UIPowerPage::handle_key(uint32_t key)
         return;
     }
     if (key != KEY_ENTER && key != KEY_KPENTER) return;
-    if (state_ == State::Ask) {
+    if (state_ == State::Ask || state_ == State::Refused) {
         state_ = State::Confirm;
         render();
         return;

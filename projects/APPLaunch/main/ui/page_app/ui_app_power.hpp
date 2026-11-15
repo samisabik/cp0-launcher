@@ -21,7 +21,7 @@ public:
     ~UIPowerPage() override;
 
 private:
-    enum class State { Ask, Confirm, ShuttingDown };
+    enum class State { Ask, Confirm, ShuttingDown, Refused };
 
     State state_ = State::Ask;
     lv_obj_t *title_ = nullptr;
@@ -35,6 +35,7 @@ private:
     void create_ui();
     void render();
     void handle_key(uint32_t key);
+    void shutdown_refused();
     static void event_cb(lv_event_t *event) noexcept;
     static void shutdown_cb(lv_timer_t *timer) noexcept;
 };
