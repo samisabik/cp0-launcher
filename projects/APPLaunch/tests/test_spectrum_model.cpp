@@ -75,13 +75,15 @@ int main()
     assert(std::count(lines.begin(), lines.end(), '\n') == 2);
 
     assert(tx_allowed(433920000));
-    assert(tx_allowed(433050000));
-    assert(tx_allowed(434790000));
     assert(tx_allowed(868000000));
-    assert(!tx_allowed(315000000));
-    assert(!tx_allowed(433000000));
-    assert(!tx_allowed(434800000));
-    assert(!tx_allowed(862000000));
+    assert(tx_allowed(315000000)); // CC1101 300-348 band
+    assert(tx_allowed(390000000)); // 387-464 band
+    assert(tx_allowed(434800000));
+    assert(tx_allowed(915000000)); // 779-928 band
+    assert(!tx_allowed(200000000)); // below the lowest band
+    assert(!tx_allowed(360000000)); // gap between 348 and 387
+    assert(!tx_allowed(600000000)); // gap between 464 and 779
+    assert(!tx_allowed(1000000000)); // above 928
 
     const std::string sub = sub_file_header(433920000) + sub_raw_lines({320, -800, 350, -9000});
     const Capture round_trip = parse_sub(sub);
@@ -103,38 +105,39 @@ int main()
         assert(channel.band < kBands.size());
     }
 
-    // Detector: quiet warm-up, one hit per burst, re-arm after quiet.
+    // Detector: fixed absolute trigger threshold, smoothed, debounced.
     FinderDetector detector;
-    int8_t quiet[FinderDetector::kChannels];
-    for (int8_t &value : quiet) value = -100;
+    detector.configure(3, -50);
+    int8_t quiet3[3] = {-90, -78, -92};
     uint32_t t = 0;
-    for (int i = 0; i < 40; ++i, t += 15) assert(!detector.update(quiet, t).hit);
-    assert(detector.warmed_up());
-    assert(detector.floor_dbm(3) == -100);
+    for (int i = 0; i < 20; ++i) assert(!detector.update(quiet3, t += 15).hit);
+    assert(detector.smoothed_dbm(1) <= -76 && detector.smoothed_dbm(1) >= -80);
+    // Busy-band ambient below the trigger never fires, however long it holds.
+    int8_t bump[3] = {-90, -66, -92};
+    for (int i = 0; i < 8; ++i) assert(!detector.update(bump, t += 15).hit);
+    // A press above the trigger fires once the smoothed reading clears it for
+    // kHitPasses consecutive passes.
+    int8_t press[3] = {-90, -21, -92};
+    assert(!detector.update(press, t += 15).hit);
+    assert(!detector.update(press, t += 15).hit);
+    const FinderHit hit = detector.update(press, t += 15);
+    assert(hit.hit && hit.slot == 1 && hit.rssi_dbm == -21);
+    // Held press: no second hit while disarmed.
+    for (int i = 0; i < 10; ++i) assert(!detector.update(press, t += 15).hit);
+    // Quiet re-arms; next sustained press is a new hit.
+    for (int i = 0; i < 40; ++i) assert(!detector.update(quiet3, t += 15).hit);
+    assert(!detector.update(press, t += 15).hit);
+    assert(!detector.update(press, t += 15).hit);
+    assert(detector.update(press, t += 15).hit);
 
-    int8_t burst[FinderDetector::kChannels];
-    for (int i = 0; i < FinderDetector::kChannels; ++i) burst[i] = quiet[i];
-    burst[3] = -50; // 433.92
-    burst[2] = -80; // leakage into the neighbour
-    const FinderHit hit = detector.update(burst, t += 15);
-    assert(hit.hit && hit.channel == 3 && hit.rssi_dbm == -50);
-    // Still transmitting: no second hit, and the floor is not dragged up.
-    for (int i = 0; i < 10; ++i) assert(!detector.update(burst, t += 15).hit);
-    assert(detector.floor_dbm(3) == -100);
-    // Quiet long enough re-arms; the next burst is a new hit.
-    for (int i = 0; i < 20; ++i) assert(!detector.update(quiet, t += 15).hit);
-    assert(detector.update(burst, t += 15).hit);
-    // A carrier that never stops re-triggers after the hold time.
-    bool again = false;
-    for (int i = 0; i < 120 && !again; ++i) again = detector.update(burst, t += 15).hit;
-    assert(again);
+    // A single-pass spike never fires (needs kHitPasses consecutive passes).
+    FinderDetector spiky;
+    spiky.configure(3, -50);
+    int8_t base[3] = {-90, -80, -92};
+    for (int i = 0; i < 20; ++i) spiky.update(base, i * 15);
+    int8_t spike[3] = {-90, -20, -92};
+    assert(!spiky.update(spike, 1000).hit);
+    assert(!spiky.update(base, 1015).hit);
 
-    // Too weak in absolute terms is ignored even if it clears the margin.
-    FinderDetector deaf;
-    int8_t low[FinderDetector::kChannels];
-    for (int8_t &value : low) value = -120;
-    for (int i = 0; i < 30; ++i) deaf.update(low, i * 15);
-    low[0] = -100;
-    assert(!deaf.update(low, 1000).hit);
-    return 0;
+        return 0;
 }

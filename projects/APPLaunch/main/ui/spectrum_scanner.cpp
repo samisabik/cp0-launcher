@@ -65,7 +65,9 @@ constexpr std::size_t kPacketMinDurations = 32;
 constexpr int kAutoThresholdMarginDb = 12;
 constexpr int kFloorSamples = 50;
 // Settle time for the RSSI estimate after entering RX on a finder hop.
-constexpr int kFinderSettleUs = 250;
+// RSSI needs a few ms after a retune with per-hop calibration to settle;
+// sampling sooner (the old 250 us) read a meaningless floor.
+constexpr int kFinderSettleUs = 3500;
 // Automatic captures stop this long after the last packet, or after this long
 // if nothing decodes at all.
 constexpr int64_t kAutoQuietNs = 1200000000LL;
@@ -368,14 +370,15 @@ void Cc1101::end_transmit()
 bool Cc1101::begin_finder()
 {
     if (fd_ < 0) return false;
+    // Same receiver as capture: a low, frequency-dependent noise floor that
+    // actually tracks signals. The fast-hop config read ~-53 dBm everywhere.
     static const struct { uint8_t address, value; } kFinder[] = {
-        {0x10, 0x07}, // MDMCFG4: 812 kHz receive filter tolerates off-centre remotes
-        {0x18, 0x18}, // MCSM0: calibrate on every IDLE -> RX, needed when hopping bands
+        {0x10, 0x17}, // MDMCFG4: 650 kHz receive filter
         {0x1B, 0x07}, // AGCCTRL2
         {0x1C, 0x00}, // AGCCTRL1
         {0x1D, 0x91}, // AGCCTRL0
         {0x21, 0xB6}, // FREND1
-        {0x2C, 0x81}, // TEST2: values for filters over 325 kHz
+        {0x2C, 0x81}, // TEST2
         {0x2D, 0x35}, // TEST1
         {REG_IOCFG0, 0x2E},
     };
@@ -384,16 +387,22 @@ bool Cc1101::begin_finder()
         if (!write_reg(entry.address, entry.value)) return false;
     return true;
 }
-
 int Cc1101::finder_read(uint32_t hz)
 {
     if (fd_ < 0) return spectrum::kMinDbm;
     strobe(SIDLE);
     set_frequency(hz);
+    strobe(SCAL);
+    wait_state(STATE_IDLE, 2000);
     strobe(SRX);
     wait_state(STATE_RX, 2000);
     usleep(kFinderSettleUs);
-    return read_rssi_dbm();
+    int peak = read_rssi_dbm();
+    for (int i = 0; i < 4; ++i) {
+        usleep(700);
+        peak = std::max(peak, read_rssi_dbm());
+    }
+    return peak;
 }
 
 bool SpectrumScanner::start(std::string &error)
@@ -423,6 +432,13 @@ void SpectrumScanner::toggle_capture(uint32_t hz)
 void SpectrumScanner::adjust_threshold(int delta_db)
 {
     threshold_dbm_.store(std::clamp(threshold_dbm_.load() + delta_db, -105, -40));
+}
+
+void SpectrumScanner::adjust_finder_threshold(int delta_db)
+{
+    finder_threshold_.store(std::clamp(finder_threshold_.load() + delta_db,
+                                       spectrum::FinderDetector::kMinThresholdDbm,
+                                       spectrum::FinderDetector::kMaxThresholdDbm));
 }
 
 void SpectrumScanner::cycle_capture_bandwidth()
@@ -863,9 +879,26 @@ void SpectrumScanner::finder_step()
         }
         finder_ready_ = true;
     }
+
+    // Active channels are those of the fitted antenna (the selected band).
+    const std::size_t antenna = band_.load();
+    const int threshold = finder_threshold_.load();
+    std::array<uint32_t, spectrum::kFinderChannels.size()> active_hz{};
+    int count = 0;
+    for (const spectrum::FinderChannel &channel : spectrum::kFinderChannels)
+        if (channel.band == antenna && count < static_cast<int>(active_hz.size()))
+            active_hz[count++] = channel.hz;
+
+    if (antenna != finder_antenna_ || threshold != finder_threshold_applied_) {
+        finder_antenna_ = antenna;
+        finder_threshold_applied_ = threshold;
+        detector_.configure(count, threshold);
+        std::lock_guard<std::mutex> lock(mutex_);
+        finder_.hits.clear();
+    }
+
     std::array<int8_t, spectrum::kFinderChannels.size()> rssi{};
-    for (std::size_t i = 0; i < rssi.size(); ++i)
-        rssi[i] = static_cast<int8_t>(radio_.finder_read(spectrum::kFinderChannels[i].hz));
+    for (int i = 0; i < count; ++i) rssi[i] = static_cast<int8_t>(radio_.finder_read(active_hz[i]));
     const int64_t now_ns = monotonic_ns();
     const spectrum::FinderHit hit = detector_.update(rssi.data(), static_cast<uint32_t>(now_ns / 1000000));
 
@@ -876,24 +909,24 @@ void SpectrumScanner::finder_step()
         rate_window_ns_ = now_ns;
         rate_passes_ = 0;
     }
+    const uint32_t hit_hz = hit.hit && hit.slot < count ? active_hz[hit.slot] : 0;
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        finder_.count = count;
+        finder_.antenna = antenna;
+        finder_.threshold_dbm = threshold;
+        finder_.hz = active_hz;
         finder_.rssi = rssi;
-        for (int i = 0; i < spectrum::FinderDetector::kChannels; ++i)
-            finder_.floor[i] = static_cast<int8_t>(detector_.floor_dbm(i));
         ++finder_.sequence;
         if (rate >= 0) finder_.passes_per_second = rate;
-        if (hit.hit) {
-            finder_.hits.insert(finder_.hits.begin(), {hit.channel, hit.rssi_dbm, now_ms()});
+        if (hit_hz) {
+            finder_.hits.insert(finder_.hits.begin(), {hit_hz, hit.rssi_dbm, now_ms()});
             if (finder_.hits.size() > 4) finder_.hits.resize(4);
         }
     }
 
-    if (hit.hit && auto_capture_.load()) {
-        const spectrum::FinderChannel &channel = spectrum::kFinderChannels[hit.channel];
-        // Remotes repeat their frame while the button is held, so the capture
-        // starts on the next repeat of the burst the finder just saw.
-        if (open_capture(channel.hz, capture_floor_[channel.band] + kAutoCaptureMarginDb)) {
+    if (hit_hz && auto_capture_.load()) {
+        if (open_capture(hit_hz, capture_floor_[antenna] + kAutoCaptureMarginDb)) {
             auto_session_ = true;
             auto_started_ns_ = monotonic_ns();
             last_packet_ns_ = 0;

@@ -156,7 +156,11 @@ std::string sub_raw_lines(const std::vector<int32_t> &durations)
 
 bool tx_allowed(uint32_t hz)
 {
-    return (hz >= 433050000 && hz <= 434790000) || (hz >= 863000000 && hz <= 870000000);
+    // Gated on the CC1101 synthesiser bands only (datasheet: 300-348, 387-464,
+    // 779-928 MHz). Within those the chip can key a carrier; staying legal on a
+    // given frequency is the operator's call.
+    return (hz >= 300000000 && hz <= 348000000) || (hz >= 387000000 && hz <= 464000000) ||
+           (hz >= 779000000 && hz <= 928000000);
 }
 
 Capture parse_sub(const std::string &contents)
@@ -183,41 +187,56 @@ Capture parse_sub(const std::string &contents)
 
 void FinderDetector::reset()
 {
-    floor_set_ = false;
-    passes_ = 0;
+    for (int &h : hot_) h = 0;
+    seeded_ = false;
     armed_ = true;
     quiet_ = true;
 }
 
-int FinderDetector::floor_dbm(int channel) const
+void FinderDetector::configure(int count, int threshold_dbm)
 {
-    if (!floor_set_ || channel < 0 || channel >= kChannels) return kMinDbm;
-    return static_cast<int>(floor_[channel] + (floor_[channel] < 0 ? -0.5f : 0.5f));
+    count_ = count < 0 ? 0 : (count > kMaxChannels ? kMaxChannels : count);
+    threshold_ = threshold_dbm < kMinThresholdDbm ? kMinThresholdDbm
+                 : threshold_dbm > kMaxThresholdDbm ? kMaxThresholdDbm
+                                                    : threshold_dbm;
+    reset();
+}
+
+int FinderDetector::smoothed_dbm(int slot) const
+{
+    if (!seeded_ || slot < 0 || slot >= count_) return kMinDbm;
+    return static_cast<int>(smooth_[slot] < 0 ? smooth_[slot] - 0.5f : smooth_[slot] + 0.5f);
 }
 
 FinderHit FinderDetector::update(const int8_t *rssi, uint32_t now_ms)
 {
     FinderHit result;
-    if (!floor_set_) {
-        for (int i = 0; i < kChannels; ++i) floor_[i] = rssi[i];
-        floor_set_ = true;
-    }
-    ++passes_;
-
-    int best = -1;
-    int best_excess = 0;
-    bool quiet = true;
-    for (int i = 0; i < kChannels; ++i) {
-        const float excess = rssi[i] - floor_[i];
-        if (excess < kQuietDb) {
-            // Track the floor only from quiet readings so bursts do not raise it.
-            floor_[i] += (rssi[i] - floor_[i]) * (passes_ < kWarmupPasses ? 0.3f : 0.05f);
-        } else {
-            quiet = false;
+    if (count_ <= 0) return result;
+    if (!seeded_) {
+        for (int i = 0; i < count_; ++i) {
+            smooth_[i] = rssi[i];
+            hot_[i] = 0;
         }
-        if (best < 0 || excess > best_excess) {
+        seeded_ = true;
+    }
+
+    bool quiet = true;
+    int best = -1;
+    int best_dbm = kMinDbm - 1;
+    for (int i = 0; i < count_; ++i) {
+        // Two-tap smoothing, as the reference analyser uses, to reject a single
+        // stray sample without lagging a real press.
+        smooth_[i] = (smooth_[i] + rssi[i]) * 0.5f;
+        if (smooth_[i] >= threshold_) {
+            quiet = false;
+            ++hot_[i];
+        } else {
+            hot_[i] = 0;
+        }
+        const int value = smoothed_dbm(i);
+        if (hot_[i] >= kHitPasses && value > best_dbm) {
             best = i;
-            best_excess = static_cast<int>(excess);
+            best_dbm = value;
         }
     }
 
@@ -231,11 +250,11 @@ FinderHit FinderDetector::update(const int8_t *rssi, uint32_t now_ms)
         ((quiet_ && now_ms - quiet_since_ms_ >= kQuietRearmMs) || now_ms - hit_ms_ >= kMaxHoldMs))
         armed_ = true;
 
-    if (armed_ && warmed_up() && best >= 0 && best_excess >= kMarginDb && rssi[best] >= kMinHitDbm) {
+    if (armed_ && best >= 0) {
         armed_ = false;
         hit_ms_ = now_ms;
         result.hit = true;
-        result.channel = best;
+        result.slot = best;
         result.rssi_dbm = rssi[best];
     }
     return result;

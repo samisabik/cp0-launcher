@@ -82,12 +82,16 @@ struct CaptureStatus {
 };
 
 struct FinderStatus {
+    // Only the fitted antenna's channels are active.
+    int count = 0;
+    std::size_t antenna = 1;
+    int threshold_dbm = spectrum::FinderDetector::kDefaultThresholdDbm;
+    std::array<uint32_t, spectrum::kFinderChannels.size()> hz{};
     std::array<int8_t, spectrum::kFinderChannels.size()> rssi{};
-    std::array<int8_t, spectrum::kFinderChannels.size()> floor{};
     uint32_t sequence = 0;
     int passes_per_second = 0;
     struct Hit {
-        int channel = -1;
+        uint32_t hz = 0;
         int rssi_dbm = spectrum::kMinDbm;
         int64_t at_ms = 0;
     };
@@ -118,6 +122,10 @@ public:
     void set_auto_capture(bool enabled) { auto_capture_.store(enabled); }
     bool auto_capture() const { return auto_capture_.load(); }
     FinderStatus finder_status();
+
+    // Absolute RSSI (dBm) a channel must hold above to fire an auto-capture.
+    void adjust_finder_threshold(int delta_db);
+    int finder_threshold_dbm() const { return finder_threshold_.load(); }
 
     // Only the selected band is swept, so the antenna on the hat can match it.
     void set_band(std::size_t index) { band_.store(index < spectrum::kBands.size() ? index : 0); }
@@ -191,6 +199,9 @@ private:
     std::atomic<bool> auto_capture_{true};
     FinderStatus finder_;
     spectrum::FinderDetector detector_;
+    std::atomic<int> finder_threshold_{spectrum::FinderDetector::kDefaultThresholdDbm};
+    std::size_t finder_antenna_ = 99; // forces configure on the first pass
+    int finder_threshold_applied_ = 0;
     bool finder_ready_ = false;
     bool floors_measured_ = false;
     std::array<int, spectrum::kBands.size()> capture_floor_{};

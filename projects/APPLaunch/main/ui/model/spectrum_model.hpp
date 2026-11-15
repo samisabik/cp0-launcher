@@ -80,8 +80,8 @@ struct Capture {
     std::vector<int32_t> durations;
 };
 
-// True for the licence-exempt short-range bands that permit transmission:
-// 433.05-434.79 MHz and 863-870 MHz. 315 MHz is receive-only here.
+// True where the CC1101 synthesiser can key a carrier (300-348, 387-464,
+// 779-928 MHz). Regulatory limits on a given frequency are the operator's call.
 bool tx_allowed(uint32_t hz);
 
 // Parse a Flipper Sub-GHz RAW file (the format sub_file_header/sub_raw_lines
@@ -113,37 +113,44 @@ inline constexpr std::array<FinderChannel, 10> kFinderChannels = {{
 
 struct FinderHit {
     bool hit = false;
-    int channel = -1;
+    int slot = -1; // index into the active channel list
     int rssi_dbm = kMinDbm;
 };
 
-// Learns a noise floor per channel and reports one hit per burst: the channel
-// furthest above its floor, once it clears the margin. It re-arms after the
-// band has been quiet for a moment, or after a while for continuous carriers.
+// Fires when a channel's smoothed RSSI holds above a fixed absolute threshold
+// for a few consecutive passes, the model the Flipper Zero frequency analyser
+// uses. A near-field press (tens of dB above ambient) crosses the threshold; a
+// busy band's ambient chatter does not. No adaptive floor to drift down and
+// turn ordinary ISM traffic into a false hit.
 class FinderDetector
 {
 public:
-    static constexpr int kChannels = static_cast<int>(kFinderChannels.size());
-    static constexpr int kMarginDb = 12;
-    static constexpr int kQuietDb = 6;
-    static constexpr int kWarmupPasses = 20;
-    static constexpr int kMinHitDbm = -95;
-    static constexpr uint32_t kQuietRearmMs = 250;
+    static constexpr int kMaxChannels = static_cast<int>(kFinderChannels.size());
+    static constexpr int kHitPasses = 3;
+    // A strong signal held right next to the device; comfortably above the
+    // busiest ISM ambient (around -66 dBm) and far below a pressed remote.
+    static constexpr int kMinThresholdDbm = -90;
+    static constexpr int kMaxThresholdDbm = -30;
+    static constexpr int kDefaultThresholdDbm = -50;
+    static constexpr uint32_t kQuietRearmMs = 400;
     static constexpr uint32_t kMaxHoldMs = 1500;
 
+    void configure(int count, int threshold_dbm);
     FinderHit update(const int8_t *rssi, uint32_t now_ms);
-    int floor_dbm(int channel) const;
-    bool warmed_up() const { return passes_ >= kWarmupPasses; }
+    int smoothed_dbm(int slot) const;
+    int threshold_dbm() const { return threshold_; }
     void reset();
 
 private:
-    std::array<float, kFinderChannels.size()> floor_{};
-    bool floor_set_ = false;
-    int passes_ = 0;
+    int count_ = 0;
+    int threshold_ = kDefaultThresholdDbm;
+    bool seeded_ = false;
     bool armed_ = true;
+    bool quiet_ = true;
     uint32_t hit_ms_ = 0;
     uint32_t quiet_since_ms_ = 0;
-    bool quiet_ = true;
+    std::array<float, kMaxChannels> smooth_{};
+    std::array<int, kMaxChannels> hot_{};
 };
 
 } // namespace spectrum
