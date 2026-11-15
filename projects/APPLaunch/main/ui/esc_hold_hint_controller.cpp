@@ -85,7 +85,7 @@ void EscHoldHintController::poll(lv_timer_t *timer)
         return_home_enabled_);
     if (decision.hide_hint) launcher_toast().hide();
     if (decision.show_hint)
-        launcher_toast().show_persistent("Hold ESC 3s to return home");
+        launcher_toast().show_persistent("Hold ESC 3s to return home", true);
     if (decision.force_home) {
         ForceHomeCallback callback = force_home_callback_;
         void *user_data = force_home_user_data_;

@@ -100,9 +100,10 @@ void LauncherToast::show(const char *text) noexcept
     }
 }
 
-void LauncherToast::show_persistent(const char *text) noexcept
+void LauncherToast::show_persistent(const char *text, bool centered) noexcept
 {
     show(text);
+    if (centered && container_) lv_obj_align(container_, LV_ALIGN_CENTER, 0, 0);
     if (hide_timer_) lv_timer_pause(hide_timer_);
 }
 

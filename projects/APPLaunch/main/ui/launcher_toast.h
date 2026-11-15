@@ -12,7 +12,7 @@ class LauncherToast
 {
 public:
     void show(const char *text) noexcept;
-    void show_persistent(const char *text) noexcept;
+    void show_persistent(const char *text, bool centered = false) noexcept;
     void hide();
     void shutdown();
 
