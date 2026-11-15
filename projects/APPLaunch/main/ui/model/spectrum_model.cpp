@@ -181,4 +181,64 @@ Capture parse_sub(const std::string &contents)
     return capture;
 }
 
+void FinderDetector::reset()
+{
+    floor_set_ = false;
+    passes_ = 0;
+    armed_ = true;
+    quiet_ = true;
+}
+
+int FinderDetector::floor_dbm(int channel) const
+{
+    if (!floor_set_ || channel < 0 || channel >= kChannels) return kMinDbm;
+    return static_cast<int>(floor_[channel] + (floor_[channel] < 0 ? -0.5f : 0.5f));
+}
+
+FinderHit FinderDetector::update(const int8_t *rssi, uint32_t now_ms)
+{
+    FinderHit result;
+    if (!floor_set_) {
+        for (int i = 0; i < kChannels; ++i) floor_[i] = rssi[i];
+        floor_set_ = true;
+    }
+    ++passes_;
+
+    int best = -1;
+    int best_excess = 0;
+    bool quiet = true;
+    for (int i = 0; i < kChannels; ++i) {
+        const float excess = rssi[i] - floor_[i];
+        if (excess < kQuietDb) {
+            // Track the floor only from quiet readings so bursts do not raise it.
+            floor_[i] += (rssi[i] - floor_[i]) * (passes_ < kWarmupPasses ? 0.3f : 0.05f);
+        } else {
+            quiet = false;
+        }
+        if (best < 0 || excess > best_excess) {
+            best = i;
+            best_excess = static_cast<int>(excess);
+        }
+    }
+
+    if (quiet) {
+        if (!quiet_) quiet_since_ms_ = now_ms;
+        quiet_ = true;
+    } else {
+        quiet_ = false;
+    }
+    if (!armed_ &&
+        ((quiet_ && now_ms - quiet_since_ms_ >= kQuietRearmMs) || now_ms - hit_ms_ >= kMaxHoldMs))
+        armed_ = true;
+
+    if (armed_ && warmed_up() && best >= 0 && best_excess >= kMarginDb && rssi[best] >= kMinHitDbm) {
+        armed_ = false;
+        hit_ms_ = now_ms;
+        result.hit = true;
+        result.channel = best;
+        result.rssi_dbm = rssi[best];
+    }
+    return result;
+}
+
 } // namespace spectrum

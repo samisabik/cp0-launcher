@@ -92,5 +92,49 @@ int main()
     assert(multi.freq_hz == 868000000);
     assert((multi.durations == std::vector<int32_t>{100, -200, 300, -400}));
     assert(parse_sub("Protocol: RAW\n").durations.empty());
+
+    // Finder channels are synthesizable by the CC1101 and tagged with a valid
+    // band index for their capture floor.
+    for (const FinderChannel &channel : kFinderChannels) {
+        const bool low = channel.hz >= 300000000 && channel.hz <= 348000000;
+        const bool mid = channel.hz >= 387000000 && channel.hz <= 464000000;
+        const bool high = channel.hz >= 779000000 && channel.hz <= 928000000;
+        assert(low || mid || high);
+        assert(channel.band < kBands.size());
+    }
+
+    // Detector: quiet warm-up, one hit per burst, re-arm after quiet.
+    FinderDetector detector;
+    int8_t quiet[FinderDetector::kChannels];
+    for (int8_t &value : quiet) value = -100;
+    uint32_t t = 0;
+    for (int i = 0; i < 40; ++i, t += 15) assert(!detector.update(quiet, t).hit);
+    assert(detector.warmed_up());
+    assert(detector.floor_dbm(3) == -100);
+
+    int8_t burst[FinderDetector::kChannels];
+    for (int i = 0; i < FinderDetector::kChannels; ++i) burst[i] = quiet[i];
+    burst[3] = -50; // 433.92
+    burst[2] = -80; // leakage into the neighbour
+    const FinderHit hit = detector.update(burst, t += 15);
+    assert(hit.hit && hit.channel == 3 && hit.rssi_dbm == -50);
+    // Still transmitting: no second hit, and the floor is not dragged up.
+    for (int i = 0; i < 10; ++i) assert(!detector.update(burst, t += 15).hit);
+    assert(detector.floor_dbm(3) == -100);
+    // Quiet long enough re-arms; the next burst is a new hit.
+    for (int i = 0; i < 20; ++i) assert(!detector.update(quiet, t += 15).hit);
+    assert(detector.update(burst, t += 15).hit);
+    // A carrier that never stops re-triggers after the hold time.
+    bool again = false;
+    for (int i = 0; i < 120 && !again; ++i) again = detector.update(burst, t += 15).hit;
+    assert(again);
+
+    // Too weak in absolute terms is ignored even if it clears the margin.
+    FinderDetector deaf;
+    int8_t low[FinderDetector::kChannels];
+    for (int8_t &value : low) value = -120;
+    for (int i = 0; i < 30; ++i) deaf.update(low, i * 15);
+    low[0] = -100;
+    assert(!deaf.update(low, 1000).hit);
     return 0;
 }

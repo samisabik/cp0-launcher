@@ -20,6 +20,12 @@
 //    y 137..148  marker frequency and level, key hints (1px bottom margin)
 //
 //  Keys:
+//    Finder view (default): hops over common remote and sensor channels and
+//    shows hits; with auto capture on, a hit records that channel until the
+//    transmitter goes quiet. V switches to the band view, A toggles auto
+//    capture, ENTER captures at the last hit.
+//
+//  Band view:
 //    TAB, UP/DOWN, 1/2/3   select band (match the antenna on the hat)
 //    LEFT/RIGHT            move the marker
 //    ENTER                 start / stop a pulse capture at the marker frequency
@@ -63,6 +69,10 @@ private:
     uint32_t shown_capture_sequence_ = 0;
     bool capture_view_ = false;
     bool band_changed_ = false;
+    bool finder_view_ = true;
+    bool finder_shown_ = false;
+    uint32_t shown_finder_sequence_ = 0;
+    uint32_t last_hit_hz_ = 433920000;
     CaptureStatus capture_;
     std::string message_;
     uint32_t message_until_ = 0;
@@ -83,9 +93,22 @@ private:
     lv_obj_t *marker_label_ = nullptr;
     lv_obj_t *hint_label_ = nullptr;
     lv_obj_t *list_label_ = nullptr;
+    lv_obj_t *finder_panel_ = nullptr;
+    std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_freq_{};
+    std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_bar_{};
+    std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_value_{};
+    lv_obj_t *hit_title_ = nullptr;
+    lv_obj_t *hit_freq_ = nullptr;
+    lv_obj_t *hit_detail_ = nullptr;
+    lv_obj_t *hit_history_ = nullptr;
+    lv_obj_t *auto_label_ = nullptr;
     lv_timer_t *timer_ = nullptr;
 
     void create_ui();
+    void create_finder_ui();
+    void show_finder(bool shown);
+    void render_finder();
+    void set_view(bool finder);
     lv_obj_t *make_label(int x, int y, uint32_t color);
     void select_band(std::size_t index);
     void reset_view();

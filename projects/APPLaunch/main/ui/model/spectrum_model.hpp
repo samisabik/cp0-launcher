@@ -88,4 +88,62 @@ bool tx_allowed(uint32_t hz);
 // write) back into a frequency and signed durations.
 Capture parse_sub(const std::string &contents);
 
+// Frequency finder: a short list of channels that remotes, doorbells and
+// sensors actually use, checked with a wide filter many times a second.
+struct FinderChannel {
+    uint32_t hz;
+    std::size_t band; // index into kBands
+};
+
+// band is the index into kBands whose capture noise floor is reused when
+// auto-capturing this channel; it is the chip band the channel sits in, not a
+// narrow span. 390/418 share the mid band with 433.
+inline constexpr std::array<FinderChannel, 10> kFinderChannels = {{
+    {315000000, 0}, // US remotes, some TPMS
+    {345000000, 0}, // US alarm sensors (Honeywell)
+    {390000000, 1}, // older US/UK gate and alarm gear
+    {418000000, 1}, // older UK remotes
+    {433420000, 1}, // multi-channel remotes
+    {433920000, 1}, // the common EU/worldwide remote channel
+    {434420000, 1}, // multi-channel remotes
+    {868350000, 2}, // EU sensors and alarms
+    {868950000, 2},
+    {869525000, 2}, // EU high-power alarm sub-band
+}};
+
+struct FinderHit {
+    bool hit = false;
+    int channel = -1;
+    int rssi_dbm = kMinDbm;
+};
+
+// Learns a noise floor per channel and reports one hit per burst: the channel
+// furthest above its floor, once it clears the margin. It re-arms after the
+// band has been quiet for a moment, or after a while for continuous carriers.
+class FinderDetector
+{
+public:
+    static constexpr int kChannels = static_cast<int>(kFinderChannels.size());
+    static constexpr int kMarginDb = 12;
+    static constexpr int kQuietDb = 6;
+    static constexpr int kWarmupPasses = 20;
+    static constexpr int kMinHitDbm = -95;
+    static constexpr uint32_t kQuietRearmMs = 250;
+    static constexpr uint32_t kMaxHoldMs = 1500;
+
+    FinderHit update(const int8_t *rssi, uint32_t now_ms);
+    int floor_dbm(int channel) const;
+    bool warmed_up() const { return passes_ >= kWarmupPasses; }
+    void reset();
+
+private:
+    std::array<float, kFinderChannels.size()> floor_{};
+    bool floor_set_ = false;
+    int passes_ = 0;
+    bool armed_ = true;
+    uint32_t hit_ms_ = 0;
+    uint32_t quiet_since_ms_ = 0;
+    bool quiet_ = true;
+};
+
 } // namespace spectrum

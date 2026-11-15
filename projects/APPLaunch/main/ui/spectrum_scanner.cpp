@@ -64,6 +64,13 @@ constexpr std::size_t kPacketMinDurations = 32;
 // 650 kHz capture filter sees a much higher floor than the sweep filters.
 constexpr int kAutoThresholdMarginDb = 12;
 constexpr int kFloorSamples = 50;
+// Settle time for the RSSI estimate after entering RX on a finder hop.
+constexpr int kFinderSettleUs = 250;
+// Automatic captures stop this long after the last packet, or after this long
+// if nothing decodes at all.
+constexpr int64_t kAutoQuietNs = 1200000000LL;
+constexpr int64_t kAutoGiveUpNs = 2500000000LL;
+constexpr int kAutoCaptureMarginDb = 10;
 // Synthetic trailing gap when a packet ends on a high level.
 constexpr int32_t kTrailingGapUs = 10000;
 
@@ -300,17 +307,17 @@ bool Cc1101::sweep(const spectrum::Band &band, int8_t *dbm)
     return true;
 }
 
-bool Cc1101::begin_capture(uint32_t hz)
+bool Cc1101::begin_capture(uint32_t hz, uint8_t mdmcfg4, uint8_t test2, uint8_t test1)
 {
     if (fd_ < 0) return false;
-    static const struct { uint8_t address, value; } kCapture[] = {
-        {0x10, 0x17}, // MDMCFG4: 650 kHz receive filter
+    const struct { uint8_t address, value; } kCapture[] = {
+        {0x10, mdmcfg4}, // MDMCFG4: receive filter bandwidth in the high nibble
         {0x1B, 0x07}, // AGCCTRL2
         {0x1C, 0x00}, // AGCCTRL1
         {0x1D, 0x91}, // AGCCTRL0
         {0x21, 0xB6}, // FREND1
-        {0x2C, 0x81}, // TEST2: values for filters over 325 kHz
-        {0x2D, 0x35}, // TEST1
+        {0x2C, test2}, // TEST2: narrower filters need the under-325 kHz values
+        {0x2D, test1}, // TEST1
         {REG_IOCFG0, 0x0D}, // GDO0: asynchronous serial data output
     };
     if (!strobe(SIDLE)) return false;
@@ -358,6 +365,37 @@ void Cc1101::end_transmit()
     configure();
 }
 
+bool Cc1101::begin_finder()
+{
+    if (fd_ < 0) return false;
+    static const struct { uint8_t address, value; } kFinder[] = {
+        {0x10, 0x07}, // MDMCFG4: 812 kHz receive filter tolerates off-centre remotes
+        {0x18, 0x18}, // MCSM0: calibrate on every IDLE -> RX, needed when hopping bands
+        {0x1B, 0x07}, // AGCCTRL2
+        {0x1C, 0x00}, // AGCCTRL1
+        {0x1D, 0x91}, // AGCCTRL0
+        {0x21, 0xB6}, // FREND1
+        {0x2C, 0x81}, // TEST2: values for filters over 325 kHz
+        {0x2D, 0x35}, // TEST1
+        {REG_IOCFG0, 0x2E},
+    };
+    if (!strobe(SIDLE)) return false;
+    for (const auto &entry : kFinder)
+        if (!write_reg(entry.address, entry.value)) return false;
+    return true;
+}
+
+int Cc1101::finder_read(uint32_t hz)
+{
+    if (fd_ < 0) return spectrum::kMinDbm;
+    strobe(SIDLE);
+    set_frequency(hz);
+    strobe(SRX);
+    wait_state(STATE_RX, 2000);
+    usleep(kFinderSettleUs);
+    return read_rssi_dbm();
+}
+
 bool SpectrumScanner::start(std::string &error)
 {
     if (running_.load()) return true;
@@ -387,12 +425,20 @@ void SpectrumScanner::adjust_threshold(int delta_db)
     threshold_dbm_.store(std::clamp(threshold_dbm_.load() + delta_db, -105, -40));
 }
 
+void SpectrumScanner::cycle_capture_bandwidth()
+{
+    capture_bw_index_.store((capture_bw_index_.load() + 1) % static_cast<int>(kCaptureProfiles.size()));
+    // The noise floor depends on the filter, so the finder re-measures it.
+    floors_dirty_.store(true);
+}
+
 CaptureStatus SpectrumScanner::capture_status()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     CaptureStatus status = capture_;
     status.active = capture_active_.load();
     status.threshold_dbm = threshold_dbm_.load();
+    status.automatic = auto_session_;
     return status;
 }
 
@@ -423,6 +469,8 @@ void SpectrumScanner::handle_transmit_request()
         path = transmit_path_;
     }
     run_transmit(path);
+    // Transmitting leaves the radio in its default configuration.
+    finder_ready_ = false;
 }
 
 bool SpectrumScanner::set_tx_line(bool high)
@@ -521,7 +569,7 @@ void SpectrumScanner::run_transmit(const std::string &path)
 #endif
 }
 
-bool SpectrumScanner::open_capture(uint32_t hz)
+bool SpectrumScanner::open_capture(uint32_t hz, int threshold_dbm)
 {
 #if CP0_SPECTRUM_HAS_GPIO_V2
     const char *home = std::getenv("HOME");
@@ -551,7 +599,8 @@ bool SpectrumScanner::open_capture(uint32_t hz)
     line_fd_ = request.fd;
     fcntl(line_fd_, F_SETFL, fcntl(line_fd_, F_GETFL) | O_NONBLOCK);
 
-    if (!radio_.begin_capture(hz)) {
+    const CaptureProfile profile = kCaptureProfiles[capture_bw_index_.load()];
+    if (!radio_.begin_capture(hz, profile.mdmcfg4, profile.test2, profile.test1)) {
         ::close(line_fd_);
         line_fd_ = -1;
         radio_.end_capture();
@@ -559,16 +608,21 @@ bool SpectrumScanner::open_capture(uint32_t hz)
         return false;
     }
 
-    std::vector<int> floor;
-    for (int i = 0; i < kFloorSamples; ++i) {
-        floor.push_back(radio_.read_rssi_dbm());
-        usleep(3000);
+    if (threshold_dbm > spectrum::kMinDbm) {
+        threshold_dbm_.store(std::clamp(threshold_dbm, -105, -40));
+    } else {
+        std::vector<int> floor;
+        for (int i = 0; i < kFloorSamples; ++i) {
+            floor.push_back(radio_.read_rssi_dbm());
+            usleep(3000);
+        }
+        std::nth_element(floor.begin(), floor.begin() + floor.size() / 2, floor.end());
+        threshold_dbm_.store(std::clamp(floor[floor.size() / 2] + kAutoThresholdMarginDb, -105, -40));
     }
-    std::nth_element(floor.begin(), floor.begin() + floor.size() / 2, floor.end());
-    threshold_dbm_.store(std::clamp(floor[floor.size() / 2] + kAutoThresholdMarginDb, -105, -40));
 
     const std::string stem = directory + "/capture-" + local_stamp("%Y%m%d-%H%M%S") + "-" +
                              spectrum::format_mhz(hz);
+    capture_stem_ = stem;
     ook_file_ = std::fopen((stem + ".ook").c_str(), "w");
     sub_file_ = std::fopen((stem + ".sub").c_str(), "w");
     if (!ook_file_ || !sub_file_) {
@@ -610,10 +664,21 @@ void SpectrumScanner::close_capture(bool report)
     ook_file_ = nullptr;
     sub_file_ = nullptr;
     if (was_active) radio_.end_capture();
-    if (report && was_active) {
-        CaptureStatus status = capture_status();
-        post_message("saved " + std::to_string(status.packets) + " pkts");
+    finder_ready_ = false;
+    const bool automatic = auto_session_;
+    auto_session_ = false;
+    if (!was_active) return;
+    const CaptureStatus status = capture_status();
+    // A capture that decoded nothing leaves no files behind.
+    if (status.packets == 0 && !capture_stem_.empty()) {
+        unlink((capture_stem_ + ".ook").c_str());
+        unlink((capture_stem_ + ".sub").c_str());
     }
+    if (!report) return;
+    if (status.packets == 0)
+        post_message(automatic ? "nothing decoded at " + spectrum::format_mhz(status.freq_hz) : "nothing captured");
+    else
+        post_message("saved " + std::to_string(status.packets) + " pkts @" + spectrum::format_mhz(status.freq_hz));
 }
 
 void SpectrumScanner::finish_packet(int64_t now_ns)
@@ -650,6 +715,7 @@ void SpectrumScanner::finish_packet(int64_t now_ns)
         std::fputs(spectrum::sub_raw_lines(durations).c_str(), sub_file_);
         std::fflush(sub_file_);
     }
+    last_packet_ns_ = monotonic_ns();
     std::lock_guard<std::mutex> lock(mutex_);
     ++capture_.packets;
     ++capture_.sequence;
@@ -758,6 +824,92 @@ void SpectrumScanner::handle_record_request()
     post_message("rec ~/spectrum/" + name);
 }
 
+FinderStatus SpectrumScanner::finder_status()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return finder_;
+}
+
+// The capture filter sees a different noise floor than the finder, so each
+// band's capture floor is measured once and reused for automatic captures.
+void SpectrumScanner::measure_capture_floors()
+{
+    static constexpr uint32_t kCentres[] = {315000000, 433920000, 868350000};
+    for (std::size_t band = 0; band < capture_floor_.size(); ++band) {
+        capture_floor_[band] = -80;
+        const CaptureProfile profile = kCaptureProfiles[capture_bw_index_.load()];
+        if (!radio_.begin_capture(kCentres[band], profile.mdmcfg4, profile.test2, profile.test1)) continue;
+        std::vector<int> samples;
+        for (int i = 0; i < 20; ++i) {
+            samples.push_back(radio_.read_rssi_dbm());
+            usleep(3000);
+        }
+        std::nth_element(samples.begin(), samples.begin() + samples.size() / 2, samples.end());
+        capture_floor_[band] = samples[samples.size() / 2];
+    }
+    radio_.end_capture();
+    floors_measured_ = true;
+}
+
+void SpectrumScanner::finder_step()
+{
+    if (floors_dirty_.exchange(false)) floors_measured_ = false;
+    if (!floors_measured_) measure_capture_floors();
+    if (!finder_ready_) {
+        if (!radio_.begin_finder()) {
+            post_message("radio read failed");
+            usleep(200000);
+            return;
+        }
+        finder_ready_ = true;
+    }
+    std::array<int8_t, spectrum::kFinderChannels.size()> rssi{};
+    for (std::size_t i = 0; i < rssi.size(); ++i)
+        rssi[i] = static_cast<int8_t>(radio_.finder_read(spectrum::kFinderChannels[i].hz));
+    const int64_t now_ns = monotonic_ns();
+    const spectrum::FinderHit hit = detector_.update(rssi.data(), static_cast<uint32_t>(now_ns / 1000000));
+
+    ++rate_passes_;
+    int rate = -1;
+    if (now_ns - rate_window_ns_ >= 1000000000LL) {
+        rate = static_cast<int>(rate_passes_ * 1000000000LL / std::max<int64_t>(1, now_ns - rate_window_ns_));
+        rate_window_ns_ = now_ns;
+        rate_passes_ = 0;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        finder_.rssi = rssi;
+        for (int i = 0; i < spectrum::FinderDetector::kChannels; ++i)
+            finder_.floor[i] = static_cast<int8_t>(detector_.floor_dbm(i));
+        ++finder_.sequence;
+        if (rate >= 0) finder_.passes_per_second = rate;
+        if (hit.hit) {
+            finder_.hits.insert(finder_.hits.begin(), {hit.channel, hit.rssi_dbm, now_ms()});
+            if (finder_.hits.size() > 4) finder_.hits.resize(4);
+        }
+    }
+
+    if (hit.hit && auto_capture_.load()) {
+        const spectrum::FinderChannel &channel = spectrum::kFinderChannels[hit.channel];
+        // Remotes repeat their frame while the button is held, so the capture
+        // starts on the next repeat of the burst the finder just saw.
+        if (open_capture(channel.hz, capture_floor_[channel.band] + kAutoCaptureMarginDb)) {
+            auto_session_ = true;
+            auto_started_ns_ = monotonic_ns();
+            last_packet_ns_ = 0;
+        }
+    }
+}
+
+void SpectrumScanner::check_auto_session()
+{
+    if (!auto_session_ || !capture_active_.load()) return;
+    const int64_t now = monotonic_ns();
+    const bool decoded = last_packet_ns_ > 0;
+    if ((decoded && now - last_packet_ns_ > kAutoQuietNs) || (!decoded && now - auto_started_ns_ > kAutoGiveUpNs))
+        close_capture(true);
+}
+
 void SpectrumScanner::run()
 {
     std::array<int8_t, spectrum::kBins> sweep{};
@@ -767,11 +919,20 @@ void SpectrumScanner::run()
         handle_transmit_request();
         if (capture_active_.load()) {
             capture_step();
+            check_auto_session();
             continue;
         }
         if (paused_.load()) {
             usleep(50000);
             continue;
+        }
+        if (mode_.load() == Mode::Finder) {
+            finder_step();
+            continue;
+        }
+        if (finder_ready_) {
+            radio_.end_capture();
+            finder_ready_ = false;
         }
         const std::size_t index = band_.load();
         const spectrum::Band &band = spectrum::kBands[index];

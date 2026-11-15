@@ -28,7 +28,8 @@ public:
 
     // OOK receiver with the demodulated signal on GDO0 (header G15), using the
     // register set behind the Flipper "Ook650Async" preset named in .sub files.
-    bool begin_capture(uint32_t hz);
+    // mdmcfg4 high nibble selects the receive filter; test regs follow it.
+    bool begin_capture(uint32_t hz, uint8_t mdmcfg4 = 0x17, uint8_t test2 = 0x81, uint8_t test1 = 0x35);
     void end_capture();
     int read_rssi_dbm();
 
@@ -37,6 +38,11 @@ public:
     // chip's GDO0 driver and enters TX; end_transmit restores the receiver.
     bool begin_transmit(uint32_t hz);
     void end_transmit();
+
+    // Frequency finder: wide 812 kHz filter and calibration on every hop, so
+    // channels in different bands can be visited back to back.
+    bool begin_finder();
+    int finder_read(uint32_t hz);
 
 private:
     int fd_ = -1;
@@ -52,6 +58,17 @@ private:
     bool configure();
 };
 
+// Receive filter bandwidth options for capture, narrow to wide.
+struct CaptureProfile {
+    int khz;
+    uint8_t mdmcfg4, test2, test1;
+};
+inline constexpr std::array<CaptureProfile, 3> kCaptureProfiles = {{
+    {162, 0x97, 0x88, 0x31},
+    {325, 0x57, 0x88, 0x31},
+    {650, 0x17, 0x81, 0x35},
+}};
+
 struct CaptureStatus {
     bool active = false;
     uint32_t freq_hz = 0;
@@ -61,6 +78,21 @@ struct CaptureStatus {
     uint32_t sequence = 0;
     std::vector<int32_t> last;
     std::string name;
+    bool automatic = false;
+};
+
+struct FinderStatus {
+    std::array<int8_t, spectrum::kFinderChannels.size()> rssi{};
+    std::array<int8_t, spectrum::kFinderChannels.size()> floor{};
+    uint32_t sequence = 0;
+    int passes_per_second = 0;
+    struct Hit {
+        int channel = -1;
+        int rssi_dbm = spectrum::kMinDbm;
+        int64_t at_ms = 0;
+    };
+    // Most recent first.
+    std::vector<Hit> hits;
 };
 
 struct SpectrumFrame {
@@ -75,6 +107,17 @@ public:
 
     bool start(std::string &error);
     void stop();
+
+    // Finder hops over the common channels; Band sweeps the selected band.
+    enum class Mode { Finder, Band };
+    void set_mode(Mode mode) { mode_.store(mode); }
+    Mode mode() const { return mode_.load(); }
+
+    // With auto capture on, a finder hit starts a capture at that channel,
+    // which ends once the transmitter has been quiet for a moment.
+    void set_auto_capture(bool enabled) { auto_capture_.store(enabled); }
+    bool auto_capture() const { return auto_capture_.load(); }
+    FinderStatus finder_status();
 
     // Only the selected band is swept, so the antenna on the hat can match it.
     void set_band(std::size_t index) { band_.store(index < spectrum::kBands.size() ? index : 0); }
@@ -94,6 +137,11 @@ public:
     bool capturing() const { return capture_active_.load(); }
     void adjust_threshold(int delta_db);
     CaptureStatus capture_status();
+
+    // Steps the capture receive filter 162 -> 325 -> 650 kHz and re-measures
+    // the noise floors. Takes effect on the next capture, not one in progress.
+    void cycle_capture_bandwidth();
+    int capture_bandwidth_khz() const { return kCaptureProfiles[capture_bw_index_.load()].khz; }
 
     // Replay a saved .sub capture over the transmitter. The worker parses the
     // file, refuses frequencies outside the licence-exempt TX bands, and keys
@@ -126,6 +174,8 @@ private:
     std::atomic<uint32_t> capture_request_hz_{0};
     std::atomic<bool> capture_active_{false};
     std::atomic<int> threshold_dbm_{-80};
+    std::atomic<int> capture_bw_index_{2};
+    std::atomic<bool> floors_dirty_{false};
     CaptureStatus capture_;
     int line_fd_ = -1;
     std::FILE *ook_file_ = nullptr;
@@ -137,8 +187,27 @@ private:
     int64_t last_strong_ns_ = 0;
     int packet_peak_dbm_ = spectrum::kMinDbm;
 
+    std::atomic<Mode> mode_{Mode::Finder};
+    std::atomic<bool> auto_capture_{true};
+    FinderStatus finder_;
+    spectrum::FinderDetector detector_;
+    bool finder_ready_ = false;
+    bool floors_measured_ = false;
+    std::array<int, spectrum::kBands.size()> capture_floor_{};
+    bool auto_session_ = false;
+    int64_t auto_started_ns_ = 0;
+    int64_t last_packet_ns_ = 0;
+    int64_t rate_window_ns_ = 0;
+    int rate_passes_ = 0;
+    std::string capture_stem_;
+    void measure_capture_floors();
+    void finder_step();
+    void check_auto_session();
+
     void handle_capture_request();
-    bool open_capture(uint32_t hz);
+    // A threshold above kMinDbm skips the noise-floor sampling, so an
+    // automatic capture starts listening at once.
+    bool open_capture(uint32_t hz, int threshold_dbm = spectrum::kMinDbm);
     void close_capture(bool report);
     void capture_step();
     void finish_packet(int64_t now_ns);

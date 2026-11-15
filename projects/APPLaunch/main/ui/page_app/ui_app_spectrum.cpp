@@ -28,6 +28,7 @@ constexpr const char *kBandConfigKey = "spectrum_band";
 constexpr int kActivityDbm = -85;
 constexpr uint32_t kRefreshMs = 50;
 constexpr uint32_t kMessageMs = 3000;
+constexpr int kFinderBarW = 120;
 
 uint16_t rgb565(uint32_t rgb)
 {
@@ -104,8 +105,10 @@ UISpectrumPage::UISpectrumPage() : AppPage()
     band_ = static_cast<std::size_t>(std::clamp(config_band(), 0, static_cast<int>(spectrum::kBands.size()) - 1));
     band_peak_.fill(spectrum::kMinDbm);
     create_ui();
+    create_finder_ui();
 
     scanner_.set_band(band_);
+    scanner_.set_mode(SpectrumScanner::Mode::Finder);
     std::string error;
     scanner_ok_ = scanner_.start(error);
     if (!scanner_ok_) show_message(error);
@@ -248,6 +251,7 @@ void UISpectrumPage::refresh_send_list()
 
 void UISpectrumPage::enter_send_view()
 {
+    show_finder(false);
     build_send_entries();
     send_selection_ = 0;
     send_view_ = true;
@@ -264,6 +268,162 @@ void UISpectrumPage::exit_send_view()
     if (canvas_) lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_HIDDEN);
     draw_trace();
     update_labels();
+}
+
+void UISpectrumPage::create_finder_ui()
+{
+    if (!ui_APP_Container) return;
+    finder_panel_ = lv_obj_create(ui_APP_Container);
+    if (!finder_panel_) return;
+    lv_obj_remove_style_all(finder_panel_);
+    lv_obj_clear_flag(finder_panel_, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+    lv_obj_set_pos(finder_panel_, 0, kCanvasTop);
+    lv_obj_set_size(finder_panel_, kWidth, kCanvasH);
+    lv_obj_add_flag(finder_panel_, LV_OBJ_FLAG_HIDDEN);
+
+    auto label = [this](int x, int y, int px, uint32_t color) {
+        lv_obj_t *obj = lv_label_create(finder_panel_);
+        if (!obj) return obj;
+        lv_obj_set_style_text_font(obj, launcher_fonts().get_chrome(px), 0);
+        lv_obj_set_style_text_color(obj, lv_color_hex(color), 0);
+        lv_obj_set_pos(obj, x, y);
+        lv_label_set_text(obj, "");
+        return obj;
+    };
+    for (std::size_t i = 0; i < spectrum::kFinderChannels.size(); ++i) {
+        const int y = static_cast<int>(i) * 12;
+        finder_freq_[i] = label(4, y, 11, kColorIdle);
+        if (finder_freq_[i]) {
+            std::string text = spectrum::format_mhz(spectrum::kFinderChannels[i].hz);
+            lv_label_set_text(finder_freq_[i], text.substr(0, text.size() - 1).c_str());
+        }
+        lv_obj_t *track = lv_obj_create(finder_panel_);
+        if (track) {
+            lv_obj_remove_style_all(track);
+            lv_obj_set_pos(track, 52, y + 4);
+            lv_obj_set_size(track, kFinderBarW, 5);
+            lv_obj_set_style_bg_color(track, lv_color_hex(kColorGrid), 0);
+            lv_obj_set_style_bg_opa(track, LV_OPA_COVER, 0);
+            finder_bar_[i] = lv_obj_create(track);
+            if (finder_bar_[i]) {
+                lv_obj_remove_style_all(finder_bar_[i]);
+                lv_obj_set_size(finder_bar_[i], 0, 5);
+                lv_obj_set_style_bg_color(finder_bar_[i], lv_color_hex(kColorIdle), 0);
+                lv_obj_set_style_bg_opa(finder_bar_[i], LV_OPA_COVER, 0);
+            }
+        }
+        finder_value_[i] = label(52 + kFinderBarW + 6, y, 11, kColorDim);
+    }
+    hit_title_ = label(216, 2, 11, kColorDim);
+    if (hit_title_) lv_label_set_text(hit_title_, "last hit");
+    hit_freq_ = label(216, 14, 22, kColorText);
+    hit_detail_ = label(216, 42, 11, kColorIdle);
+    hit_history_ = label(216, 60, 11, kColorDim);
+    if (hit_history_) lv_obj_set_style_text_line_space(hit_history_, 2, 0);
+    auto_label_ = label(216, 104, 11, kColorDim);
+}
+
+void UISpectrumPage::show_finder(bool shown)
+{
+    if (shown == finder_shown_) return;
+    finder_shown_ = shown;
+    if (finder_panel_) {
+        if (shown) lv_obj_clear_flag(finder_panel_, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(finder_panel_, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (canvas_) {
+        if (shown) lv_obj_add_flag(canvas_, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(canvas_, LV_OBJ_FLAG_HIDDEN);
+    }
+    for (lv_obj_t *band_label : band_labels_) {
+        if (!band_label) continue;
+        if (shown) lv_obj_add_flag(band_label, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(band_label, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (hint_label_) {
+        lv_obj_set_pos(hint_label_, shown ? 4 : 150, kFooterY);
+        lv_obj_set_width(hint_label_, shown ? 312 : 166);
+        lv_obj_set_style_text_align(hint_label_, shown ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_RIGHT, 0);
+    }
+    if (!shown) {
+        draw_trace();
+        shown_finder_sequence_ = 0;
+    }
+}
+
+static std::string age_text(int64_t ms)
+{
+    const int64_t seconds = ms / 1000;
+    if (seconds < 60) return std::to_string(seconds) + "s";
+    if (seconds < 3600) return std::to_string(seconds / 60) + "m";
+    return std::to_string(seconds / 3600) + "h";
+}
+
+void UISpectrumPage::render_finder()
+{
+    const FinderStatus status = scanner_.finder_status();
+    const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::system_clock::now().time_since_epoch())
+                            .count();
+    if (status.sequence != shown_finder_sequence_) {
+        shown_finder_sequence_ = status.sequence;
+        for (std::size_t i = 0; i < spectrum::kFinderChannels.size(); ++i) {
+            const int rssi = status.rssi[i];
+            const bool above = rssi - status.floor[i] >= spectrum::FinderDetector::kMarginDb;
+            if (lv_obj_t *bar = finder_bar_[i]) {
+                const int width = spectrum::level_index(rssi) * kFinderBarW / (spectrum::kLevels - 1);
+                if (lv_obj_get_width(bar) != width) lv_obj_set_width(bar, width);
+                const lv_color_t color = lv_color_hex(above ? kColorAccent : kColorIdle);
+                if (!lv_color_eq(lv_obj_get_style_bg_color(bar, LV_PART_MAIN), color))
+                    lv_obj_set_style_bg_color(bar, color, LV_PART_MAIN);
+            }
+            set_text(finder_value_[i], std::to_string(rssi).c_str());
+            set_color(finder_freq_[i], above ? kColorText : kColorIdle);
+        }
+    }
+
+    if (status.hits.empty()) {
+        set_text(hit_freq_, "--");
+        set_text(hit_detail_, "press a remote");
+        set_text(hit_history_, "");
+    } else {
+        const FinderStatus::Hit &hit = status.hits.front();
+        const uint32_t hz = spectrum::kFinderChannels[hit.channel].hz;
+        last_hit_hz_ = hz;
+        std::string mhz = spectrum::format_mhz(hz);
+        set_text(hit_freq_, mhz.substr(0, mhz.size() - 1).c_str());
+        set_text(hit_detail_, (std::to_string(hit.rssi_dbm) + " dBm  " + age_text(now - hit.at_ms) + " ago").c_str());
+        std::string history;
+        for (std::size_t i = 1; i < status.hits.size(); ++i) {
+            const FinderStatus::Hit &older = status.hits[i];
+            std::string older_mhz = spectrum::format_mhz(spectrum::kFinderChannels[older.channel].hz);
+            history += older_mhz.substr(0, older_mhz.size() - 1) + " " + std::to_string(older.rssi_dbm) + " " +
+                       age_text(now - older.at_ms) + "\n";
+        }
+        set_text(hit_history_, history.c_str());
+    }
+
+    std::string auto_text;
+    uint32_t auto_color = kColorDim;
+    if (capture_.active && capture_.automatic) {
+        std::string mhz = spectrum::format_mhz(capture_.freq_hz);
+        auto_text = "rec " + mhz.substr(0, mhz.size() - 1) + "  " + std::to_string(capture_.packets) + " pkts";
+        auto_color = 0xFF5F56;
+    } else {
+        auto_text = (scanner_.auto_capture() ? "auto on" : "auto off") +
+                    std::string("  ") + std::to_string(scanner_.capture_bandwidth_khz()) + " khz";
+        auto_color = scanner_.auto_capture() ? kColorAccent : kColorDim;
+    }
+    set_text(auto_label_, auto_text.c_str());
+    set_color(auto_label_, auto_color);
+}
+
+void UISpectrumPage::set_view(bool finder)
+{
+    if (finder == finder_view_) return;
+    finder_view_ = finder;
+    scanner_.set_mode(finder ? SpectrumScanner::Mode::Finder : SpectrumScanner::Mode::Band);
+    if (!finder) reset_view();
 }
 
 void UISpectrumPage::show_message(const std::string &text)
@@ -293,6 +453,15 @@ void UISpectrumPage::on_timer()
     }
 
     capture_ = scanner_.capture_status();
+    // Automatic captures stay on the finder screen; a manual one shows its waveform.
+    if (finder_view_ && !(capture_.active && !capture_.automatic)) {
+        capture_view_ = false;
+        show_finder(true);
+        render_finder();
+        update_labels();
+        return;
+    }
+    show_finder(false);
     if (capture_.active) {
         capture_view_ = true;
         if (capture_.sequence != shown_capture_sequence_) {
@@ -394,6 +563,19 @@ void UISpectrumPage::push_waterfall_row()
 
 void UISpectrumPage::update_labels()
 {
+    if (finder_shown_ && !send_view_) {
+        if (status_label_) {
+            const bool message = lv_tick_get() < message_until_ || !scanner_ok_;
+            const FinderStatus status = scanner_.finder_status();
+            const std::string text =
+                message ? message_ : "finder " + std::to_string(status.passes_per_second) + "/s";
+            set_text(status_label_, text.c_str());
+            set_color(status_label_, message ? (scanner_ok_ ? kColorText : 0xFF5F56) : kColorIdle);
+        }
+        set_text(marker_label_, "");
+        set_text(hint_label_, "a auto  b filter  ent cap  v band");
+        return;
+    }
     for (std::size_t i = 0; i < band_labels_.size(); ++i) {
         if (!band_labels_[i]) continue;
         const bool selected = i == band_;
@@ -443,7 +625,7 @@ void UISpectrumPage::update_labels()
     if (hint_label_)
         set_text(hint_label_, send_view_      ? "up/dn pick  ent send  esc"
                                        : capture_view_ ? "ent stop  -/= thr"
-                                                       : "tab band  ent cap  p send");
+                                                       : "tab band ent cap b filt v find");
     if (marker_label_ && send_view_) {
         if (send_entries_.empty()) {
             set_text(marker_label_, "");
@@ -529,9 +711,27 @@ void UISpectrumPage::handle_key(uint32_t key)
         return;
     }
     if (key == KEY_ENTER || key == KEY_KPENTER) {
-        if (scanner_ok_) scanner_.toggle_capture(spectrum::bin_frequency(spectrum::kBands[band_], marker_));
+        const uint32_t hz = finder_view_ ? last_hit_hz_ : spectrum::bin_frequency(spectrum::kBands[band_], marker_);
+        if (scanner_ok_) scanner_.toggle_capture(hz);
         return;
     }
+    if (key == KEY_V && !scanner_.capturing()) {
+        set_view(!finder_view_);
+        update_labels();
+        return;
+    }
+    if (key == KEY_A) {
+        scanner_.set_auto_capture(!scanner_.auto_capture());
+        show_message(scanner_.auto_capture() ? "auto capture on" : "auto capture off");
+        return;
+    }
+    if (key == KEY_B) {
+        scanner_.cycle_capture_bandwidth();
+        show_message("filter " + std::to_string(scanner_.capture_bandwidth_khz()) + " khz");
+        return;
+    }
+    // The finder has no band or marker to move.
+    if (finder_view_ && key != KEY_P && key != KEY_ESC) return;
     if (key == KEY_MINUS || key == KEY_EQUAL) {
         scanner_.adjust_threshold(key == KEY_MINUS ? -3 : 3);
         update_labels();
