@@ -73,5 +73,24 @@ int main()
     const std::string lines = sub_raw_lines(many);
     assert(lines.find("\nRAW_Data: 100") != std::string::npos);
     assert(std::count(lines.begin(), lines.end(), '\n') == 2);
+
+    assert(tx_allowed(433920000));
+    assert(tx_allowed(433050000));
+    assert(tx_allowed(434790000));
+    assert(tx_allowed(868000000));
+    assert(!tx_allowed(315000000));
+    assert(!tx_allowed(433000000));
+    assert(!tx_allowed(434800000));
+    assert(!tx_allowed(862000000));
+
+    const std::string sub = sub_file_header(433920000) + sub_raw_lines({320, -800, 350, -9000});
+    const Capture round_trip = parse_sub(sub);
+    assert(round_trip.freq_hz == 433920000);
+    assert((round_trip.durations == std::vector<int32_t>{320, -800, 350, -9000}));
+    // Multiple RAW_Data lines concatenate in order; a CRLF file still parses.
+    const Capture multi = parse_sub("Frequency: 868000000\r\nRAW_Data: 100 -200\r\nRAW_Data: 300 -400\r\n");
+    assert(multi.freq_hz == 868000000);
+    assert((multi.durations == std::vector<int32_t>{100, -200, 300, -400}));
+    assert(parse_sub("Protocol: RAW\n").durations.empty());
     return 0;
 }

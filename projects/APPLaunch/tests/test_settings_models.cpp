@@ -52,8 +52,8 @@ int main()
     assert(entries[3].label == "ZClaw" && entries[3].config_key == "app_desktop_zclaw");
     using settings_t12b::boot_actions::Action;
     using settings_t12b::boot_actions::Operation;
-    assert(settings_t12b::boot_actions::presentation(Action::Reboot).confirmation_title == "Reboot?");
-    assert(settings_t12b::boot_actions::presentation(Action::Shutdown).confirmation_title == "Shutdown?");
+    assert(settings_t12b::boot_actions::presentation(Action::Reboot).confirmation_title == "reboot?");
+    assert(settings_t12b::boot_actions::presentation(Action::Shutdown).confirmation_title == "power off?");
     const std::vector<Operation> factory_plan = {
         Operation::RemoveLauncherSettings,
         Operation::Reboot,
@@ -74,8 +74,8 @@ int main()
     const auto about = settings_t12b::about_help::about("1.2.3", "2026-08-24", "stable", "abc123");
     const auto credit = settings_t12b::about_help::credit();
     assert(!about.title.empty() && about.lines.size() >= 4);
-    assert(credit.title == "Third-Party Licenses & Credits");
-    assert(credit.lines.size() > 300);
+    assert(credit.title == "licenses");
+    assert(credit.lines.size() > 60);
     assert(credit.lines.front().find("Kickstarter backers") != std::string::npos);
-    assert(credit.lines.back() == "CC0-1.0");
+    assert(credit.lines.back() == "https://github.com/JulietaUla/Montserrat");
 }

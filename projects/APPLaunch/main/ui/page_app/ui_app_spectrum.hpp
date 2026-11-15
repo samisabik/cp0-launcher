@@ -25,9 +25,14 @@
 //    ENTER                 start / stop a pulse capture at the marker frequency
 //    - / =                 lower / raise the capture threshold by 3 dB
 //    R                     start / stop recording to ~/spectrum/*.csv
+//    P                     open the send list; replay a saved .sub capture
 //    SPACE                 pause / resume sweeping
 //    H                     clear peak hold
 //    ESC                   back to home
+//
+//  Send list (P): UP/DOWN pick a saved capture, ENTER transmits it on 433 or
+//  868 MHz at or below the licence-exempt power limit, ESC returns. Captures
+//  outside those bands are marked and refused.
 // ============================================================
 class UISpectrumPage : public AppPage
 {
@@ -57,21 +62,37 @@ private:
     std::vector<uint16_t> pixels_;
     uint32_t shown_capture_sequence_ = 0;
     bool capture_view_ = false;
+    bool band_changed_ = false;
     CaptureStatus capture_;
     std::string message_;
     uint32_t message_until_ = 0;
+
+    struct SendEntry {
+        std::string path;
+        std::string label;
+        uint32_t freq_hz = 0;
+        bool allowed = false;
+    };
+    bool send_view_ = false;
+    int send_selection_ = 0;
+    std::vector<SendEntry> send_entries_;
 
     lv_obj_t *canvas_ = nullptr;
     std::array<lv_obj_t *, spectrum::kBands.size()> band_labels_{};
     lv_obj_t *status_label_ = nullptr;
     lv_obj_t *marker_label_ = nullptr;
     lv_obj_t *hint_label_ = nullptr;
+    lv_obj_t *list_label_ = nullptr;
     lv_timer_t *timer_ = nullptr;
 
     void create_ui();
     lv_obj_t *make_label(int x, int y, uint32_t color);
     void select_band(std::size_t index);
     void reset_view();
+    void enter_send_view();
+    void exit_send_view();
+    void build_send_entries();
+    void refresh_send_list();
     void on_timer();
     void draw_trace();
     void push_waterfall_row();

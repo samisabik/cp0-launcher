@@ -532,9 +532,9 @@ static void test_screensaver_battery_interaction()
     assert(visible());
     enter_lockscreen();
     assert(!visible());
-    const lv_opa_t hidden_opacity = lv_obj_get_style_bg_opa(tint, LV_PART_MAIN);
+    const bool hidden_frame = frame_bright;
     advance(1000);
-    assert(!visible() && lv_obj_get_style_bg_opa(tint, LV_PART_MAIN) == hidden_opacity);
+    assert(!visible() && frame_bright == hidden_frame);
     set_battery(3);
     advance(3000);
     assert(flow.warning() == LowBatteryWarning::ShutdownCountdown && !visible());
@@ -743,7 +743,7 @@ int main()
     set_battery(19);
     advance(3000);
     assert(std::strcmp(lv_label_get_text(countdown_label), "Battery: 19%") == 0);
-    assert(lv_obj_get_style_bg_opa(tint, LV_PART_MAIN) == LV_OPA_TRANSP);
+    assert(lv_obj_has_flag(tint, LV_OBJ_FLAG_HIDDEN));
     assert(sound_plays("applaunch-arcade-refund.mp3") == 1);
     key(KEY_ESC, KBD_KEY_PRESSED, true);
     key(KEY_ESC, KBD_KEY_RELEASED, true);
@@ -801,10 +801,11 @@ int main()
     set_battery(4);
     advance(3000);
     assert(visible());
-    assert(lv_obj_get_style_bg_opa(tint, LV_PART_MAIN) == LV_OPA_20);
+    assert(!lv_obj_has_flag(tint, LV_OBJ_FLAG_HIDDEN) && frame_bright);
+    assert(lv_obj_get_child_count(tint) == 4);
     assert(sound_plays("applaunch-arcade-warning.mp3") == 1);
     advance(500);
-    assert(lv_obj_get_style_bg_opa(tint, LV_PART_MAIN) == LV_OPA_50);
+    assert(!frame_bright);
     key(KEY_ENTER, KBD_KEY_PRESSED, false);
     key(KEY_ENTER, KBD_KEY_RELEASED, false);
     assert(visible());

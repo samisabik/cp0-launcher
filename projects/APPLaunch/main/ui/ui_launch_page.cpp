@@ -50,9 +50,9 @@ std::string app_slug(const std::string &name)
 std::string line_icon_path(const std::string &name)
 {
     static const std::set<std::string> kKnown = {
-        "calculator", "cli", "factorytest", "files", "gps", "ip_panel",
-        "ir_chat", "ir_remote", "keyboard_guide", "lora", "micro", "nfc", "python",
-        "rec", "settings", "snake", "spectrum", "ssh", "subg_chat", "tank",
+        "cli", "factorytest", "files", "gps", "ip_panel",
+        "ir_chat", "ir_remote", "keyboard_guide", "lora", "micro", "nfc", "power", "python",
+        "rec", "settings", "spectrum", "ssh", "subg_chat",
     };
     const std::string slug = app_slug(name);
     return launcher_platform::path("line/" + (kKnown.count(slug) ? slug : std::string("app")) + ".png");
@@ -214,12 +214,6 @@ void UILaunchPage::create_grid(lv_obj_t *parent)
         if (lv_obj_t *prompt = mono_label(footer, kColorDim))
             lv_label_set_text(prompt, "$ ");
         command_label_ = mono_label(footer, kColorText);
-        if (lv_obj_t *cursor = plain_obj(footer)) {
-            lv_obj_set_size(cursor, 7, 11);
-            lv_obj_set_style_margin_left(cursor, 2, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(cursor, lv_color_hex(kColorAccent), LV_PART_MAIN);
-            lv_obj_set_style_bg_opa(cursor, LV_OPA_COVER, LV_PART_MAIN);
-        }
         if (lv_obj_t *spacer = plain_obj(footer)) {
             lv_obj_set_height(spacer, 1);
             lv_obj_set_flex_grow(spacer, 1);
@@ -287,8 +281,10 @@ void UILaunchPage::apply_selection()
 
     for (size_t i = 0; i < kTilesPerPage; ++i) {
         if (!tiles_[i].icon) continue;
-        lv_obj_set_style_image_recolor(tiles_[i].icon, lv_color_hex(i == slot ? kColorAccent : kColorIdle),
-                                       LV_PART_MAIN);
+        // Only the previous and new selection change colour; skip the rest.
+        const lv_color_t color = lv_color_hex(i == slot ? kColorAccent : kColorIdle);
+        if (lv_color_eq(lv_obj_get_style_image_recolor(tiles_[i].icon, LV_PART_MAIN), color)) continue;
+        lv_obj_set_style_image_recolor(tiles_[i].icon, color, LV_PART_MAIN);
     }
     if (selector_) {
         lv_obj_set_pos(selector_, kGridLeft + static_cast<lv_coord_t>(slot % kColumns) * kColumnStep,

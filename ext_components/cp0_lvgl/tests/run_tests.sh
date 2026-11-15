@@ -96,12 +96,19 @@ trap 'rm -f "$binary" "$init_plan_object" "$esc_state_object"' EXIT HUP INT TERM
     "$root/tests/test_wifi_error_policy.cpp" -o "$binary"
 "$binary"
 
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$root/include" -I"$root/../../SDK/github_source/eventpp/include" \
-    "$root/src/cp0/cp0_network_policy.cpp" \
-    "$root/src/cp0_network_api_contract.cpp" \
-    "$root/tests/test_wifi_connection.cpp" -o "$binary"
-"$binary"
+# The network service talks to NetworkManager over GDBus, so this test needs gio.
+if pkg-config --exists gio-2.0 2>/dev/null; then
+    # shellcheck disable=SC2046 # pkg-config output is a list of flags
+    "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
+        -I"$root/include" -I"$root/../../SDK/github_source/eventpp/include" \
+        $(pkg-config --cflags gio-2.0) \
+        "$root/src/cp0/cp0_network_policy.cpp" \
+        "$root/src/cp0_network_api_contract.cpp" \
+        "$root/tests/test_wifi_connection.cpp" $(pkg-config --libs gio-2.0) -o "$binary"
+    "$binary"
+else
+    echo "skipped test_wifi_connection: gio-2.0 not found by pkg-config"
+fi
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
     -I"$root/include" \

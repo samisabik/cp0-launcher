@@ -31,17 +31,18 @@ public:
         PanelX       = 120,
         PanelW       = 200,
         PanelH       = 150,
-        RowH         = 21,
-        CenterRow    = 3,
-        EdgePadding  = RowH * CenterRow,
-        BarH         = 21,
-        BarY         = 66,
+        RowH         = 26,
+        CenterRow    = 2,
+        EdgePadding  = 62,
+        BarH         = 26,
+        BarY         = 62,
         LabelCenterX = 40,
-        LabelBoxX    = 0,
-        LabelBoxW    = 80,
-        StatusIconX  = 100,
+        LabelBoxX    = 8,
+        LabelBoxW    = 170,
+        CompactBoxW  = 84,
+        StatusIconX  = 186,
         PageWidth    = 320,
-        Page3AnimMs  = 200,
+        Page3AnimMs  = 170,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -95,7 +96,6 @@ public:
 
     void set_compact_mode(bool enabled);
 
-    void update_arrow_visibility();
 
 private:
     struct StatusQueryResult {
@@ -171,15 +171,11 @@ private:
     lv_group_t *input_group_                    = nullptr;
     bool compact_mode_                          = false;
     bool page3_hides_network_time_icon_         = false;
-    int arrow_up_base_x_                        = 0;
-    int arrow_down_base_x_                      = 0;
     int right_arrow_base_x_                     = 0;
     int hint_base_x_                            = 0;
     lv_obj_t *selection_bg_                     = nullptr;
     lv_obj_t *right_arrow_                      = nullptr;
     lv_obj_t *hint_                             = nullptr;
-    lv_obj_t *arrow_up_                         = nullptr;
-    lv_obj_t *arrow_down_                       = nullptr;
     lv_obj_t *utility_obj_                      = nullptr;
     lv_obj_t *power_warning_              = nullptr;
     std::function<void()> on_destroy_;

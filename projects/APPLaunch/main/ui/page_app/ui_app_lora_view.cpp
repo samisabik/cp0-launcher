@@ -11,7 +11,6 @@ namespace lora_app_detail {
 
 constexpr lv_coord_t kScreenWidth         = 320;
 constexpr lv_coord_t kContentHeight       = 150;
-constexpr uint32_t kViewTransitionMs      = 150;
 constexpr uint32_t kMessageTitleHoldMs    = 3200;
 constexpr uint32_t kMessageTitleHideMs    = 340;
 constexpr lv_coord_t kMessageTitleShownY  = -8;
@@ -45,7 +44,8 @@ lv_obj_t *UILoraPage::make_panel(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, l
     lv_obj_set_size(panel, width, height);
     lv_obj_set_style_bg_color(panel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(panel, opacity, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(panel, radius, LV_PART_MAIN | LV_STATE_DEFAULT);
+    (void)radius;
+    lv_obj_set_style_radius(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_shadow_width(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -69,7 +69,7 @@ lv_obj_t *UILoraPage::make_label(lv_obj_t *parent, const char *text, lv_coord_t 
     lv_label_set_text(label, text ? text : "");
     lv_obj_set_pos(label, x, y);
     lv_obj_set_size(label, width, height);
-    lv_obj_set_style_text_font(label, font ? font : &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(label, font ? font : launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label, color, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(label, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(label, align, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -268,28 +268,17 @@ void UILoraPage::cancel_view_animations()
 
 void UILoraPage::animate_view_opacity(lv_obj_t *view, lv_opa_t start, lv_opa_t end, bool hide_after_fade)
 {
+    // Views swap instantly: an opacity fade forces full-area blending on every frame.
+    (void)start;
     if (!view) return;
     cancel_view_animation(view);
-    set_visible(view, true);
-    view_opa_exec_cb(view, start);
-    lv_anim_t animation;
-    lv_anim_init(&animation);
-    lv_anim_set_var(&animation, view);
-    lv_anim_set_values(&animation, start, end);
-    lv_anim_set_time(&animation, lora_app_detail::kViewTransitionMs);
-    lv_anim_set_path_cb(&animation, lv_anim_path_ease_in_out);
-    lv_anim_set_exec_cb(&animation, view_opa_exec_cb);
     if (hide_after_fade) {
-        lv_anim_set_user_data(&animation, view);
-        lv_anim_set_completed_cb(&animation, hide_view_after_fade_cb);
+        set_visible(view, false);
+        view_opa_exec_cb(view, LV_OPA_COVER);
+        return;
     }
-    if (!lv_anim_start(&animation)) {
-        view_opa_exec_cb(view, end);
-        if (hide_after_fade) {
-            set_visible(view, false);
-            view_opa_exec_cb(view, LV_OPA_COVER);
-        }
-    }
+    set_visible(view, true);
+    view_opa_exec_cb(view, end);
 }
 
 void UILoraPage::transition_to_view(lv_obj_t *target)
@@ -366,14 +355,14 @@ void UILoraPage::create_messages_view()
     lv_obj_set_scroll_dir(message_list_, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(message_list_, LV_SCROLLBAR_MODE_OFF);
 
-    empty_message_label_      = make_label(messages_view_, "No messages yet", 0, 50, 320, 16, &lv_font_montserrat_12,
+    empty_message_label_      = make_label(messages_view_, "No messages yet", 0, 50, 320, 16, launcher_fonts().get_chrome(11),
                                            lv_color_hex(0xB2B2B2), LV_TEXT_ALIGN_CENTER);
     empty_message_hint_label_ = make_label(messages_view_, "Type anything to send", 0, 68, 320, 14,
-                                           &lv_font_montserrat_12, lv_color_hex(0x5FE492), LV_TEXT_ALIGN_CENTER);
+                                           launcher_fonts().get_chrome(11), lv_color_hex(0x5FE492), LV_TEXT_ALIGN_CENTER);
     messages_title_           = make_panel(messages_view_, 108, lora_app_detail::kMessageTitleShownY, 104, 28,
                                            lv_color_hex(0x0B0C0E), LV_OPA_COVER, 8);
     if (messages_title_)
-        make_label(messages_title_, "Messages", 0, 8, 104, 18, &lv_font_montserrat_14, lv_color_hex(0xE4E4E4),
+        make_label(messages_title_, "Messages", 0, 8, 104, 18, launcher_fonts().get_chrome(11), lv_color_hex(0xE4E4E4),
                    LV_TEXT_ALIGN_CENTER);
 }
 
@@ -382,31 +371,31 @@ void UILoraPage::create_info_view()
     info_view_ = make_plain_container(page_root_, 0, 0, 320, 150);
     if (!info_view_) return;
     lv_obj_add_event_cb(info_view_, static_owned_obj_delete_cb, LV_EVENT_DELETE, this);
-    make_label(info_view_, "LoRa Info", 0, 0, 320, 18, &lv_font_montserrat_14, lv_color_hex(0xE4E4E4),
+    make_label(info_view_, "LoRa Info", 0, 0, 320, 18, launcher_fonts().get_chrome(11), lv_color_hex(0xE4E4E4),
                LV_TEXT_ALIGN_CENTER);
     info_status_dot_ = make_panel(info_view_, 8, 23, 6, 6, lv_color_hex(0x69AD80), LV_OPA_COVER, LV_RADIUS_CIRCLE);
     info_status_label_ =
-        make_label(info_view_, "", 20, 20, 180, 16, &lv_font_montserrat_10, lv_color_hex(0xAEB2B8), LV_TEXT_ALIGN_LEFT);
-    make_label(info_view_, "CLIENT", 240, 20, 72, 16, &lv_font_montserrat_10, lv_color_hex(0x777B82),
+        make_label(info_view_, "", 20, 20, 180, 16, launcher_fonts().get_chrome(11), lv_color_hex(0xAEB2B8), LV_TEXT_ALIGN_LEFT);
+    make_label(info_view_, "CLIENT", 240, 20, 72, 16, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82),
                LV_TEXT_ALIGN_RIGHT);
     make_divider(info_view_, 41);
-    make_label(info_view_, "DEVICE", 8, 48, 148, 11, &lv_font_montserrat_10, lv_color_hex(0x777B82),
+    make_label(info_view_, "DEVICE", 8, 48, 148, 11, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82),
                LV_TEXT_ALIGN_LEFT);
-    make_label(info_view_, "RSSI", 166, 48, 66, 11, &lv_font_montserrat_10, lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
-    make_label(info_view_, "SNR", 240, 48, 72, 11, &lv_font_montserrat_10, lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
+    make_label(info_view_, "RSSI", 166, 48, 66, 11, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
+    make_label(info_view_, "SNR", 240, 48, 72, 11, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
     info_device_value_ =
-        make_label(info_view_, "", 8, 60, 148, 17, &lv_font_montserrat_12, lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
+        make_label(info_view_, "", 8, 60, 148, 17, launcher_fonts().get_chrome(11), lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
     info_rssi_value_ =
-        make_label(info_view_, "", 166, 60, 66, 17, &lv_font_montserrat_12, lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
+        make_label(info_view_, "", 166, 60, 66, 17, launcher_fonts().get_chrome(11), lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
     info_snr_value_ =
-        make_label(info_view_, "", 240, 60, 72, 17, &lv_font_montserrat_12, lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
+        make_label(info_view_, "", 240, 60, 72, 17, launcher_fonts().get_chrome(11), lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
     if (info_device_value_) lv_label_set_long_mode(info_device_value_, LV_LABEL_LONG_DOT);
     make_divider(info_view_, 81);
-    make_label(info_view_, "LINK", 8, 88, 304, 11, &lv_font_montserrat_10, lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
+    make_label(info_view_, "LINK", 8, 88, 304, 11, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
     info_link_value_ =
-        make_label(info_view_, "", 8, 100, 304, 16, &lv_font_montserrat_12, lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
+        make_label(info_view_, "", 8, 100, 304, 16, launcher_fonts().get_chrome(11), lv_color_hex(0xDDE0E4), LV_TEXT_ALIGN_LEFT);
     info_diag_value_ =
-        make_label(info_view_, "", 8, 120, 304, 13, &lv_font_montserrat_10, lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
+        make_label(info_view_, "", 8, 120, 304, 13, launcher_fonts().get_chrome(11), lv_color_hex(0x777B82), LV_TEXT_ALIGN_LEFT);
     if (info_link_value_) lv_label_set_long_mode(info_link_value_, LV_LABEL_LONG_DOT);
     if (info_diag_value_) lv_label_set_long_mode(info_diag_value_, LV_LABEL_LONG_DOT);
 }
@@ -416,13 +405,13 @@ void UILoraPage::create_send_view()
     send_view_ = make_plain_container(page_root_, 0, 0, 320, 150);
     if (!send_view_) return;
     lv_obj_add_event_cb(send_view_, static_owned_obj_delete_cb, LV_EVENT_DELETE, this);
-    make_label(send_view_, "New Message", 0, 0, 320, 18, &lv_font_montserrat_14, lv_color_hex(0xE4E4E4),
+    make_label(send_view_, "New Message", 0, 0, 320, 18, launcher_fonts().get_chrome(11), lv_color_hex(0xE4E4E4),
                LV_TEXT_ALIGN_CENTER);
     send_input_bubble_ = make_panel(send_view_, 0, 0, 286, 80, lv_color_hex(0x555555), LV_OPA_COVER, 8);
     if (send_input_bubble_) lv_obj_align(send_input_bubble_, LV_ALIGN_CENTER, 0, -12);
-    send_input_label_  = make_label(send_input_bubble_, "", 10, 8, 266, 64, &lv_font_montserrat_14,
+    send_input_label_  = make_label(send_input_bubble_, "", 10, 8, 266, 64, launcher_fonts().get_chrome(11),
                                     lv_color_hex(0xFFFFFF), LV_TEXT_ALIGN_LEFT);
-    send_status_label_ = make_label(send_input_bubble_, "", 10, 54, 266, 16, &lv_font_montserrat_14,
+    send_status_label_ = make_label(send_input_bubble_, "", 10, 54, 266, 16, launcher_fonts().get_chrome(11),
                                     lv_color_hex(0xFED40D), LV_TEXT_ALIGN_RIGHT);
     set_visible(send_status_label_, false);
     send_cancel_button_  = make_action_button(send_view_, 83, 113, 110, "ESC: Cancel", lv_color_hex(0x6D6D6D),
@@ -439,7 +428,7 @@ lv_obj_t *UILoraPage::make_action_button(lv_obj_t *parent, lv_coord_t x, lv_coor
     if (!button) return nullptr;
     lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, this);
-    lv_obj_t *label = make_label(button, text, 0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT, &lv_font_montserrat_14,
+    lv_obj_t *label = make_label(button, text, 0, 0, LV_SIZE_CONTENT, LV_SIZE_CONTENT, launcher_fonts().get_chrome(11),
                                  foreground, LV_TEXT_ALIGN_CENTER);
     if (label) lv_obj_center(label);
     return button;
@@ -630,11 +619,11 @@ lv_obj_t *UILoraPage::append_message_row(const LoraChatMessage &message)
     static constexpr int32_t MAX_TEXT_WIDTH     = 224;
     static constexpr int32_t MAX_BUBBLE_WIDTH   = 244;
     lv_point_t text_size{};
-    lv_text_get_size(&text_size, message.text.c_str(), &lv_font_montserrat_12, 0, 0, MAX_TEXT_WIDTH, LV_TEXT_FLAG_NONE);
+    lv_text_get_size(&text_size, message.text.c_str(), launcher_fonts().get_chrome(11), 0, 0, MAX_TEXT_WIDTH, LV_TEXT_FLAG_NONE);
     int32_t content_width = text_size.x;
     if (metadata[0]) {
         lv_point_t metadata_size{};
-        lv_text_get_size(&metadata_size, metadata, &lv_font_montserrat_10, 0, 0, MAX_TEXT_WIDTH, LV_TEXT_FLAG_NONE);
+        lv_text_get_size(&metadata_size, metadata, launcher_fonts().get_chrome(11), 0, 0, MAX_TEXT_WIDTH, LV_TEXT_FLAG_NONE);
         content_width = std::max(content_width, metadata_size.x);
     }
     int32_t bubble_width =
@@ -665,9 +654,9 @@ lv_obj_t *UILoraPage::append_message_row(const LoraChatMessage &message)
     lv_obj_set_style_pad_row(bubble, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     make_label(bubble, message.text.c_str(), 0, 0, bubble_width - HORIZONTAL_PADDING * 2, LV_SIZE_CONTENT,
-               &lv_font_montserrat_12, lv_color_hex(0x000000), LV_TEXT_ALIGN_LEFT);
+               launcher_fonts().get_chrome(11), lv_color_hex(0x000000), LV_TEXT_ALIGN_LEFT);
     if (metadata[0])
         make_label(bubble, metadata, 0, 0, bubble_width - HORIZONTAL_PADDING * 2, LV_SIZE_CONTENT,
-                   &lv_font_montserrat_10, lv_color_hex(0x7E7E7E), LV_TEXT_ALIGN_RIGHT);
+                   launcher_fonts().get_chrome(11), lv_color_hex(0x7E7E7E), LV_TEXT_ALIGN_RIGHT);
     return row;
 }

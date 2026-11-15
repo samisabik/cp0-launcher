@@ -60,8 +60,8 @@ void UISTPage::create_ui()
                      0, BIG_VIEW_ROWS * CHAR_H, 0x8B949E);
 
     static constexpr const char *BOTTOM_TEXT[BOTTOM_BAR_SLOTS] = {
-        "F4 " LV_SYMBOL_LEFT, "F5 " LV_SYMBOL_UP, "F6 normal",
-        "F7 " LV_SYMBOL_DOWN, "F8 " LV_SYMBOL_RIGHT,
+        "F4 <", "F5 ^", "F6 normal",
+        "F7 v", "F8 >",
     };
     constexpr int SLOT_WIDTH = TERM_W / BOTTOM_BAR_SLOTS;
     for (int index = 0; index < BOTTOM_BAR_SLOTS; ++index) {
@@ -71,8 +71,8 @@ void UISTPage::create_ui()
             lv_obj_add_event_cb(bottom_labels_[slot], static_renderer_delete_cb, LV_EVENT_DELETE, this);
             lv_obj_set_pos(bottom_labels_[slot], index * SLOT_WIDTH, TERM_H - BIG_BOTTOM_H);
             lv_obj_set_size(bottom_labels_[slot], SLOT_WIDTH, BIG_BOTTOM_H);
-            lv_obj_set_style_text_font(bottom_labels_[slot], &lv_font_montserrat_12, 0);
-            lv_obj_set_style_text_color(bottom_labels_[slot], lv_color_hex(0xF0F6FC), 0);
+            lv_obj_set_style_text_font(bottom_labels_[slot], launcher_fonts().get_chrome(11), 0);
+            lv_obj_set_style_text_color(bottom_labels_[slot], lv_color_hex(0xE6E6E6), 0);
             lv_obj_set_style_text_align(bottom_labels_[slot], LV_TEXT_ALIGN_CENTER, 0);
             lv_obj_set_style_pad_top(bottom_labels_[slot], 1, 0);
             lv_label_set_text(bottom_labels_[slot], BOTTOM_TEXT[index]);
@@ -84,8 +84,8 @@ void UISTPage::create_ui()
             lv_obj_add_event_cb(bottom_indicators_[slot], static_renderer_delete_cb, LV_EVENT_DELETE, this);
             lv_obj_set_pos(bottom_indicators_[slot], index * SLOT_WIDTH, TERM_H - 4);
             lv_obj_set_size(bottom_indicators_[slot], SLOT_WIDTH, 4);
-            lv_obj_set_style_text_font(bottom_indicators_[slot], &lv_font_montserrat_12, 0);
-            lv_obj_set_style_text_color(bottom_indicators_[slot], lv_color_hex(0x8B949E), 0);
+            lv_obj_set_style_text_font(bottom_indicators_[slot], launcher_fonts().get_chrome(11), 0);
+            lv_obj_set_style_text_color(bottom_indicators_[slot], lv_color_hex(0x5F7A66), 0);
             lv_obj_set_style_text_align(bottom_indicators_[slot], LV_TEXT_ALIGN_CENTER, 0);
             lv_label_set_text(bottom_indicators_[slot], "|");
             lv_obj_add_flag(bottom_indicators_[slot], LV_OBJ_FLAG_HIDDEN);

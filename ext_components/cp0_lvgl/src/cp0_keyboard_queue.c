@@ -11,8 +11,10 @@
 
 #include <stdlib.h>
 
-/* Defined by the LVGL runner; weak so binaries without it still link. */
-extern void cp0_lvgl_wake_from_c(void) __attribute__((weak));
+/* Default no-op for builds without the app runner (unit tests); the runner's
+ * strong definition replaces it. A weak definition rather than a weak
+ * reference, because Mach-O does not resolve undefined weak references. */
+__attribute__((weak)) void cp0_lvgl_wake_from_c(void) {}
 
 static pthread_once_t queue_once = PTHREAD_ONCE_INIT;
 
@@ -42,7 +44,7 @@ int cp0_keyboard_queue_push(const struct key_item *item)
     pthread_mutex_lock(&keyboard_mutex);
     STAILQ_INSERT_TAIL(&keyboard_queue, copy, entries);
     pthread_mutex_unlock(&keyboard_mutex);
-    if (cp0_lvgl_wake_from_c) cp0_lvgl_wake_from_c();
+    cp0_lvgl_wake_from_c();
     return 0;
 }
 

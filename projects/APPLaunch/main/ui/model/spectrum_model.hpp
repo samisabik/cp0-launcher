@@ -73,4 +73,19 @@ std::string ook_packet(const std::vector<int32_t> &durations, uint32_t freq_hz,
 std::string sub_file_header(uint32_t freq_hz);
 std::string sub_raw_lines(const std::vector<int32_t> &durations);
 
+// A saved capture ready for playback: a carrier frequency and the signed
+// microsecond durations that drive the OOK transmitter.
+struct Capture {
+    uint32_t freq_hz = 0;
+    std::vector<int32_t> durations;
+};
+
+// True for the licence-exempt short-range bands that permit transmission:
+// 433.05-434.79 MHz and 863-870 MHz. 315 MHz is receive-only here.
+bool tx_allowed(uint32_t hz);
+
+// Parse a Flipper Sub-GHz RAW file (the format sub_file_header/sub_raw_lines
+// write) back into a frequency and signed durations.
+Capture parse_sub(const std::string &contents);
+
 } // namespace spectrum

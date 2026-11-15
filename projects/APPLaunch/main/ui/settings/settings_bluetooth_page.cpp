@@ -1450,7 +1450,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                                         CP0_ENUM_CAST_INT(LayoutMetric::ScreenW) - 8,
                                         CP0_ENUM_CAST_INT(LayoutMetric::RowH) - 1);
                         lv_obj_set_pos(background, 4, y);
-                        lv_obj_set_style_radius(background, 2, LV_PART_MAIN);
+                        lv_obj_set_style_radius(background, 0, LV_PART_MAIN);
                         lv_obj_set_style_bg_color(background, lv_color_hex(0x1F3A5F), LV_PART_MAIN);
                         lv_obj_set_style_bg_opa(background, LV_OPA_COVER, LV_PART_MAIN);
                         lv_obj_set_style_border_width(background, 0, LV_PART_MAIN);
@@ -1608,7 +1608,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
         }
         lv_obj_set_size(dialog, 300, 128);
         lv_obj_center(dialog);
-        lv_obj_set_style_radius(dialog, 4, LV_PART_MAIN);
+        lv_obj_set_style_radius(dialog, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(dialog, 1, LV_PART_MAIN);
         lv_obj_set_style_border_color(dialog, lv_color_hex(0x58A6FF), LV_PART_MAIN);
         lv_obj_set_style_bg_color(dialog, lv_color_hex(0x171717), LV_PART_MAIN);
@@ -1655,7 +1655,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                 lv_obj_set_style_bg_opa(agent_input_textarea_, LV_OPA_COVER, LV_PART_MAIN);
                 lv_obj_set_style_border_color(agent_input_textarea_, lv_color_hex(0x58A6FF), LV_PART_MAIN);
                 lv_obj_set_style_border_width(agent_input_textarea_, 1, LV_PART_MAIN);
-                lv_obj_set_style_radius(agent_input_textarea_, 3, LV_PART_MAIN);
+                lv_obj_set_style_radius(agent_input_textarea_, 0, LV_PART_MAIN);
                 lv_obj_set_style_pad_left(agent_input_textarea_, 6, LV_PART_MAIN);
                 lv_obj_set_style_pad_right(agent_input_textarea_, 6, LV_PART_MAIN);
                 lv_obj_set_style_pad_top(agent_input_textarea_, 3, LV_PART_MAIN);
@@ -1836,7 +1836,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
         if (!dialog) return;
         lv_obj_set_size(dialog, 280, 92);
         lv_obj_center(dialog);
-        lv_obj_set_style_radius(dialog, 4, LV_PART_MAIN);
+        lv_obj_set_style_radius(dialog, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(dialog, 1, LV_PART_MAIN);
         lv_obj_set_style_border_color(dialog, lv_color_hex(0xFFAA00), LV_PART_MAIN);
         lv_obj_set_style_bg_color(dialog, lv_color_hex(0x171717), LV_PART_MAIN);
@@ -2266,7 +2266,7 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
             lv_obj_set_style_bg_opa(alias_input_, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_color(alias_input_, lv_color_hex(0x58A6FF), LV_PART_MAIN);
             lv_obj_set_style_border_width(alias_input_, 1, LV_PART_MAIN);
-            lv_obj_set_style_radius(alias_input_, 3, LV_PART_MAIN);
+            lv_obj_set_style_radius(alias_input_, 0, LV_PART_MAIN);
             lv_obj_set_style_pad_left(alias_input_, 6, LV_PART_MAIN);
             lv_obj_set_style_pad_right(alias_input_, 6, LV_PART_MAIN);
             lv_obj_set_style_pad_top(alias_input_, 3, LV_PART_MAIN);
@@ -2321,7 +2321,7 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
         }
         lv_obj_set_size(dialog, 280, 92);
         lv_obj_center(dialog);
-        lv_obj_set_style_radius(dialog, 4, LV_PART_MAIN);
+        lv_obj_set_style_radius(dialog, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(dialog, 1, LV_PART_MAIN);
         lv_obj_set_style_border_color(dialog, lv_color_hex(0xFFAA00), LV_PART_MAIN);
         lv_obj_set_style_bg_color(dialog, lv_color_hex(0x171717), LV_PART_MAIN);

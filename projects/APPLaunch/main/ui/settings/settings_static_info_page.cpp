@@ -5,6 +5,7 @@
  */
 
 #include "settings_static_info_page.hpp"
+#include "settings_extras.hpp"
 #include "settings_fonts.hpp"
 #include "settings_storage_model.hpp"
 
@@ -13,6 +14,9 @@
 #include "keyboard_input.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <sys/statvfs.h>
+#include <sys/sysinfo.h>
 #include <cstdio>
 #include <utility>
 
@@ -187,6 +191,7 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
                                 &LvSettingStaticInfoPage3::scroll_event_cb,
                                 LV_EVENT_SCROLL_END,
                                 this);
+            settings_quick_scroll(scroll_body_);
 
             std::string body_text;
             for (std::size_t index = 0; index < content_.lines.size(); ++index) {
@@ -371,12 +376,12 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_t12b_about_page_factory(
     const NodeIter &page_node,
     std::function<void()> on_back)
 {
-    return std::make_unique<LvSettingStaticInfoPage3>(
-        parent,
-        page_node,
-        std::move(on_back),
-        settings_t12b::about_help::about(
-            build_version(), build_date(), build_channel(), build_commit()));
+    settings_t12b::about_help::Content content{"about", {}};
+    content.lines.push_back(std::string("launcher   ") + build_version());
+    content.lines.push_back(std::string("commit     ") + build_commit());
+    content.lines.push_back(std::string("built      ") + build_date());
+    for (std::string &line : settings_system_lines()) content.lines.push_back(std::move(line));
+    return std::make_unique<LvSettingStaticInfoPage3>(parent, page_node, std::move(on_back), std::move(content));
 }
 
 std::unique_ptr<DComponens::LvglComponensBase> settings_storage_page_factory(
@@ -384,16 +389,28 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_storage_page_factory(
     const NodeIter &page_node,
     std::function<void()> on_back)
 {
-    const SettingsStorageInfo storage = SettingsStorageModel::read();
-    settings_t12b::about_help::Content content{"Storage", {}};
-    if (storage.valid) {
+    // The root filesystem is the SD card on this device; report it directly
+    // rather than probing for removable media.
+    settings_t12b::about_help::Content content{"storage", {}};
+    struct statvfs root{};
+    if (statvfs("/", &root) == 0) {
+        const uint64_t total = static_cast<uint64_t>(root.f_blocks) * root.f_frsize;
+        const uint64_t available = static_cast<uint64_t>(root.f_bavail) * root.f_frsize;
+        const uint64_t used = total - static_cast<uint64_t>(root.f_bfree) * root.f_frsize;
         content.lines = {
-            "SD card",
-            "Total: " + SettingsStorageModel::format_bytes(storage.total_bytes),
-            "Available: " + SettingsStorageModel::format_bytes(storage.available_bytes),
+            "disk       " + SettingsStorageModel::format_bytes(total),
+            "used       " + SettingsStorageModel::format_bytes(used),
+            "free       " + SettingsStorageModel::format_bytes(available),
         };
     } else {
-        content.lines = {"SD card information unavailable."};
+        content.lines = {"disk usage unavailable"};
+    }
+    struct sysinfo memory{};
+    if (sysinfo(&memory) == 0) {
+        const uint64_t unit = memory.mem_unit ? memory.mem_unit : 1;
+        content.lines.push_back("ram        " + SettingsStorageModel::format_bytes(memory.totalram * unit));
+        content.lines.push_back("ram free   " +
+                                SettingsStorageModel::format_bytes((memory.freeram + memory.bufferram) * unit));
     }
     return std::make_unique<LvSettingStaticInfoPage3>(
         parent, page_node, std::move(on_back), std::move(content));

@@ -52,7 +52,7 @@ launcher/
 │   ├── Miniaudio/ RadioLib/ Sigslot/ SmoothUI/ Spdlog/ bluectl/ nmtui/
 │   └── THIRD_PARTY_NOTICES.md
 ├── projects/
-│   ├── APPLaunch/             # ★ core: on-device launcher (carousel home + built-in pages + .desktop app management)
+│   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
 │   │   ├── SConstruct         #   project entry: pick config → invoke SDK build
 │   │   ├── *_config_defaults.mk  # 7 build profiles (see §4.1)
 │   │   ├── main/              #   main/{src,ui,ui/{animation,model,page_app,settings},include}/ + main/SConstruct
@@ -117,7 +117,7 @@ Dependency install is documented in the "编译程序" (Build) section of [`READ
 
 | Project | Purpose | Build | Artifacts | Host SDL2 | Repo nature |
 | --- | --- | --- | --- | --- | --- |
-| **APPLaunch** | Launcher: carousel home, built-in pages, `.desktop` app management | SCons | `M5CardputerZero-APPLaunch` + `APPLaunch/` resource tree | ✅ | plain directory |
+| **APPLaunch** | Launcher: grid home, built-in pages, `.desktop` app management | SCons | `M5CardputerZero-APPLaunch` + `APPLaunch/` resource tree | ✅ | plain directory |
 | ZClaw | Chat/config frontend (WS or webhook) | SCons | `ZClaw` + `dist/APPLaunch/` | ✅ | plain directory |
 | LaunchWizard | OOBE first-boot wizard | SCons (GUI) / CMake `ctest --preset dev` (tests) | `LaunchWizard` (CI copies it into `APPLaunch/bin/`) | ✅ | plain directory |
 | HelloWorld / UserDemo | Minimal example / official demo | SCons | `HelloWorld` / `M5CardputerZero-UserDemo` | ✅ | plain directory |
@@ -240,10 +240,8 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Terminal rendering / escape sequences | `main/ui/page_app/ui_app_st_parser.cpp`, `ui_app_st_renderer.cpp` | parsing and rendering are separated |
 | Terminal key encoding | `main/ui/model/st_key_encoder.cpp` + `tests/test_st_key_encoder.cpp` | — |
 | CLI / Python help overlay text | `main/ui/cli_terminal_help.cpp`, `python_terminal_help.cpp` | static text only |
-| Carousel geometry (slot positions/sizes) | `main/ui/animation/launcher_carousel_layout.h` | `kSlots` (editing it trips `static_assert`; sync `UILaunchPage::LauncherCarouselElement`) |
-| Carousel animation curve | `main/ui/animation/ui_launcher_animation.cpp` | `kLauncherAnimationTimeMs`, `launcher_home_animate` |
-| Carousel left/right switching | `main/ui/ui_launch_page.cpp` | `switch_right` / `switch_left` ⚠️ see §10.2 |
-| Card/title/progress-bar appearance | `main/ui/ui_launch_page_carousel_view.cpp` | constrained by `tests/test_carousel_border_contract.py` |
+| Home grid layout, icons and selection | `main/ui/ui_launch_page.cpp` | `create_grid`, `fill_page`, `apply_selection`, `move_selection` (4x2 tiles per page, no animation) |
+| Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white Pixelarticons, recoloured at runtime; slugs listed in `kKnown` |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
 | Boot logo / GIF / startup sound | `main/ui/ui_launch_page_startup.cpp` | — |
 | Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `kIconSize`, `rebuild`, `find` |
@@ -258,7 +256,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Volume/brightness OSD | `main/ui/launcher_media_osd.cpp` | `model/launcher_media_model.hpp` |
 | Toast styling | `main/ui/launcher_toast.cpp` | `kShowDurationMs` |
 | Loading overlay | `main/ui/ui_loading.cpp` | `show` / `hide` |
-| Lock screen (timeout/unlock/wallpaper) | `main/ui/ui_screensaver.cpp` + `model/lockscreen_state_model.hpp`, `model/screensaver_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
+| Lock screen (timeout/unlock/Game of Life/status card) | `main/ui/ui_screensaver.cpp` + `model/lockscreen_state_model.hpp`, `model/screensaver_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
 | Low-battery policy / appearance / sound cues | `main/ui/low_battery_flow.hpp` / `ui_low_battery.cpp` | the policy is pure logic and unit-tested; cues register with `RegisterSystemSounds` and play via `cp0_signal_system_play` |
 | Settings menu structure | `main/ui/settings/settings_page.cpp` | `create_page_detail` (node order = menu order), `UISettingTreePage` |
 | Settings entry policy/gating | `main/ui/settings/settings_tree_types.hpp` | `SettingEntry`, `SettingActivationPolicy`, `activation_gate` |
@@ -404,7 +402,6 @@ Known **branch-dependent points** (never treat these as fixed facts):
 
 ### 10.2 Semantic traps
 
-- **`switch_right()` selects the previous item**: `UILaunchPage::switch_right` (`ui/ui_launch_page.cpp`) moves cards visually right and selects the **previous** entry, triggered by **←**; `switch_left()` is the one that advances. This is the easiest thing to get backwards when editing carousel navigation.
 - **`page_app.h` is a build artifact**: hand edits are overwritten by the next `scons` run, and it must not be committed.
 - **A `page_app/*.cpp` missing `#define APP_PAGE_IMPLEMENTATION_UNIT`** pulls in conflicting headers.
 - **There is no `ui_app_page.hpp` in `main/ui/`**: the page base classes live in `ext_components/cp0_lvgl/include/`.
@@ -437,7 +434,7 @@ Likewise, submodule pointers (`M SDK`, `M projects/AppStore`, etc.) are often le
 
 | Location | Problem |
 | --- | --- |
-| `docs/launcher工程详细说明/12-*` and the en/ja versions | The `BUILTIN_APPS[]` sample is outdated (actual: Settings/Store/CLI/Python/SSH/IP Panel/Calculator/Snake/Tank); the referenced `ui_app_setup.hpp`, `main/ui/ui_app_page.hpp`, and old `page_app.h` paths do not exist |
+| `docs/launcher工程详细说明/12-*` and the en/ja versions | The `BUILTIN_APPS[]` sample is outdated (actual: Settings/CLI/Python/SSH/IP Panel/Spectrum/Rec); the referenced `ui_app_setup.hpp`, `main/ui/ui_app_page.hpp`, and old `page_app.h` paths do not exist |
 | Several guides | Hardcoded absolute paths such as `/home/nihao/w2T/...` and `/home/pi/launcher` |
 | `docs/.../08-build-and-compilation-guide.md` | Still says `static_lib_v0.0.6` (actual: `v0.0.7`); some FLAGS descriptions do not match the real `config_tmp.mk` |
 | `docs/.../09-packaging-deployment-and-systemd.md` | Claims packaging prefers the source tree (it actually uses `dist/APPLaunch`); says nothing about the updater systemd unit / polkit / `/usr/libexec/applaunch-updater` |
@@ -501,7 +498,7 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 | Produce device/release artifacts | §4.4 of this file + `docs/.../09-*.md` (mind the outdated parts) | `scripts/build_cardputerzero_release_local.sh` → `scripts/debian_packager.py` |
 | Add a home-screen app (built-in page) | §6.2 of this file + `docs/.../10-extension-development-guide.md` | `main/ui/page_app/` + `builtin_app_registry.cpp` |
 | Add an external app (`.desktop`) | §6.3 of this file | `projects/APPLaunch/APPLaunch/applications/` |
-| Change the carousel / home UI | `docs/.../03-ui-framework-and-home-carousel.md` | `main/ui/ui_launch_page*.cpp`, `animation/` |
+| Change the home UI | `docs/.../03-ui-framework-and-home-carousel.md` (describes the old carousel) | `main/ui/ui_launch_page*.cpp` |
 | Change the settings page | §5.3 of this file, "Settings menu structure" | `main/ui/settings/` |
 | Change keys/input | `docs/.../07-input-system-and-key-mapping.md` | `main/ui/ui_launch_page_input.cpp`, `model/global_hint_policy.cpp` |
 | Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.md` | `ext_components/cp0_lvgl/`, syncing the trilingual docs + contracts + tests |

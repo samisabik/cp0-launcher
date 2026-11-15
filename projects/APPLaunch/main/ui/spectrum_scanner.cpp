@@ -37,8 +37,14 @@ constexpr uint32_t kSpiHz = 4000000;
 // Time for the RSSI estimate to settle after entering RX with a 58-102 kHz filter.
 constexpr int kRssiSettleUs = 300;
 
-constexpr uint8_t SRES = 0x30, SCAL = 0x33, SRX = 0x34, SIDLE = 0x36, SPWD = 0x39;
-constexpr uint8_t REG_FREQ2 = 0x0D, REG_MDMCFG4 = 0x10;
+constexpr uint8_t SRES = 0x30, SCAL = 0x33, SRX = 0x34, STX = 0x35, SIDLE = 0x36, SPWD = 0x39;
+constexpr uint8_t REG_FREQ2 = 0x0D, REG_MDMCFG4 = 0x10, REG_PATABLE = 0x3E;
+// OOK output level for PATABLE index 1. 0xC0 is about +10 dBm, the 433 MHz
+// limit and well inside the 868 MHz allowance.
+constexpr uint8_t kTxPower = 0xC0;
+// A saved frame is sent this many times with a gap, as fixed-code remotes do.
+constexpr int kTxRepeats = 3;
+constexpr int64_t kTxGapNs = 20000000;
 constexpr uint8_t STATUS_VERSION = 0x31, STATUS_RSSI = 0x34, STATUS_MARCSTATE = 0x35;
 constexpr uint8_t STATE_IDLE = 0x01, STATE_RX = 0x0D;
 constexpr uint8_t REG_IOCFG0 = 0x02;
@@ -330,6 +336,28 @@ int Cc1101::read_rssi_dbm()
     return raw < 0 ? spectrum::kMinDbm : spectrum::rssi_dbm(static_cast<uint8_t>(raw));
 }
 
+bool Cc1101::begin_transmit(uint32_t hz)
+{
+    if (fd_ < 0) return false;
+    if (!strobe(SIDLE)) return false;
+    if (!set_frequency(hz)) return false;
+    // OOK uses two PATABLE entries: index 0 keys the carrier off, index 1 on.
+    const uint8_t pa[2] = {0x00, kTxPower};
+    if (!write_burst(REG_PATABLE, pa, sizeof(pa))) return false;
+    // Tri-state the chip's GDO0 driver so the Pi can drive it as the TX input.
+    if (!write_reg(REG_IOCFG0, 0x2E)) return false;
+    strobe(SCAL);
+    if (!wait_state(STATE_IDLE, 2000)) return false;
+    return strobe(STX);
+}
+
+void Cc1101::end_transmit()
+{
+    if (fd_ < 0) return;
+    strobe(SIDLE);
+    configure();
+}
+
 bool SpectrumScanner::start(std::string &error)
 {
     if (running_.load()) return true;
@@ -375,6 +403,122 @@ void SpectrumScanner::handle_capture_request()
         close_capture(true);
     else
         open_capture(capture_request_hz_.load());
+}
+
+void SpectrumScanner::request_transmit(const std::string &path)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        transmit_path_ = path;
+    }
+    transmit_request_.store(true);
+}
+
+void SpectrumScanner::handle_transmit_request()
+{
+    if (!transmit_request_.exchange(false)) return;
+    std::string path;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        path = transmit_path_;
+    }
+    run_transmit(path);
+}
+
+bool SpectrumScanner::set_tx_line(bool high)
+{
+#if CP0_SPECTRUM_HAS_GPIO_V2
+    gpio_v2_line_values values{};
+    values.mask = 1;
+    values.bits = high ? 1 : 0;
+    return ioctl(line_fd_, GPIO_V2_LINE_SET_VALUES_IOCTL, &values) >= 0;
+#else
+    (void)high;
+    return false;
+#endif
+}
+
+void SpectrumScanner::run_transmit(const std::string &path)
+{
+#if CP0_SPECTRUM_HAS_GPIO_V2
+    std::string contents;
+    if (std::FILE *file = std::fopen(path.c_str(), "r")) {
+        char buffer[4096];
+        std::size_t read_count = 0;
+        while ((read_count = std::fread(buffer, 1, sizeof(buffer), file)) > 0)
+            contents.append(buffer, read_count);
+        std::fclose(file);
+    } else {
+        post_message("cannot read capture");
+        return;
+    }
+
+    const spectrum::Capture capture = spectrum::parse_sub(contents);
+    if (capture.durations.empty()) {
+        post_message("empty capture");
+        return;
+    }
+    if (!spectrum::tx_allowed(capture.freq_hz)) {
+        post_message("tx blocked on this band");
+        return;
+    }
+
+    const int chip = ::open(kGpioChip, O_RDWR | O_CLOEXEC);
+    if (chip < 0) {
+        post_message("cannot open gpiochip0");
+        return;
+    }
+    gpio_v2_line_request request{};
+    request.offsets[0] = kGdo0Line;
+    request.num_lines = 1;
+    std::snprintf(request.consumer, sizeof(request.consumer), "cc1101-tx");
+    request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
+    const int result = ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &request);
+    ::close(chip);
+    if (result < 0) {
+        post_message("G15 is busy");
+        return;
+    }
+    line_fd_ = request.fd;
+    set_tx_line(false);
+
+    if (!radio_.begin_transmit(capture.freq_hz)) {
+        radio_.end_transmit();
+        ::close(line_fd_);
+        line_fd_ = -1;
+        post_message("tx setup failed");
+        return;
+    }
+
+    transmit_active_.store(true);
+    post_message("sending " + spectrum::format_mhz(capture.freq_hz));
+
+    // Busy-wait against an absolute schedule so pulse edges do not drift; the
+    // worker owns the radio, so blocking here is fine for the short burst.
+    int64_t target = monotonic_ns();
+    for (int pass = 0; pass < kTxRepeats && running_.load(); ++pass) {
+        for (int32_t value : capture.durations) {
+            set_tx_line(value > 0);
+            target += static_cast<int64_t>(value > 0 ? value : -value) * 1000;
+            while (monotonic_ns() < target) {
+            }
+        }
+        set_tx_line(false);
+        target += kTxGapNs;
+        while (monotonic_ns() < target) {
+        }
+    }
+    set_tx_line(false);
+
+    radio_.end_transmit();
+    ::close(line_fd_);
+    line_fd_ = -1;
+    transmit_active_.store(false);
+    post_message("sent");
+#else
+    (void)path;
+    post_message("GPIO output is not available");
+#endif
 }
 
 bool SpectrumScanner::open_capture(uint32_t hz)
@@ -620,6 +764,7 @@ void SpectrumScanner::run()
     while (running_.load()) {
         handle_record_request();
         handle_capture_request();
+        handle_transmit_request();
         if (capture_active_.load()) {
             capture_step();
             continue;

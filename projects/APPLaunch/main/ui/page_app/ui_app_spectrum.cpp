@@ -11,7 +11,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <dirent.h>
 
 namespace {
 
@@ -51,10 +53,45 @@ int config_band()
     return value;
 }
 
-void save_config_band(int value)
+// Save writes and fsyncs the config file, so it waits until the page closes.
+void set_config_band(int value)
 {
     cp0_signal_config_api({"SetInt", kBandConfigKey, std::to_string(value)}, nullptr);
+}
+
+void save_config()
+{
     cp0_signal_config_api({"Save"}, nullptr);
+}
+
+// The timer refreshes labels 20 times a second; unchanged text or colour must
+// not invalidate them.
+void set_text(lv_obj_t *label, const char *text)
+{
+    if (!label) return;
+    const char *current = lv_label_get_text(label);
+    if (current && std::strcmp(current, text) == 0) return;
+    lv_label_set_text(label, text);
+}
+
+void set_color(lv_obj_t *obj, uint32_t color)
+{
+    if (!obj) return;
+    const lv_color_t value = lv_color_hex(color);
+    if (!lv_color_eq(lv_obj_get_style_text_color(obj, LV_PART_MAIN), value))
+        lv_obj_set_style_text_color(obj, value, LV_PART_MAIN);
+}
+
+std::string read_file(const std::string &path)
+{
+    std::string out;
+    if (std::FILE *file = std::fopen(path.c_str(), "r")) {
+        char buffer[4096];
+        std::size_t count = 0;
+        while ((count = std::fread(buffer, 1, sizeof(buffer), file)) > 0) out.append(buffer, count);
+        std::fclose(file);
+    }
+    return out;
 }
 
 } // namespace
@@ -85,6 +122,7 @@ UISpectrumPage::~UISpectrumPage()
     timer_ = nullptr;
     if (root_screen_) lv_obj_remove_event_cb_with_user_data(root_screen_, event_cb, this);
     scanner_.stop();
+    if (band_changed_) save_config();
 }
 
 lv_obj_t *UISpectrumPage::make_label(int x, int y, uint32_t color)
@@ -118,6 +156,13 @@ void UISpectrumPage::create_ui()
         lv_obj_set_pos(canvas_, 0, kCanvasTop);
     }
 
+    list_label_ = make_label(4, kCanvasTop + 2, kColorText);
+    if (list_label_) {
+        lv_obj_set_width(list_label_, 312);
+        lv_label_set_long_mode(list_label_, LV_LABEL_LONG_CLIP);
+        lv_obj_add_flag(list_label_, LV_OBJ_FLAG_HIDDEN);
+    }
+
     marker_label_ = make_label(4, kFooterY, kColorText);
     hint_label_ = make_label(150, kFooterY, kColorDim);
     if (hint_label_) {
@@ -142,8 +187,83 @@ void UISpectrumPage::select_band(std::size_t index)
     if (index >= spectrum::kBands.size() || index == band_) return;
     band_ = index;
     scanner_.set_band(band_);
-    save_config_band(static_cast<int>(band_));
+    set_config_band(static_cast<int>(band_));
+    band_changed_ = true;
     reset_view();
+}
+
+void UISpectrumPage::build_send_entries()
+{
+    send_entries_.clear();
+    const char *home = std::getenv("HOME");
+    const std::string directory = std::string(home && home[0] ? home : "/tmp") + "/spectrum";
+    DIR *dir = opendir(directory.c_str());
+    if (!dir) return;
+    std::vector<std::string> names;
+    while (dirent *entry = readdir(dir)) {
+        const std::string name = entry->d_name;
+        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".sub") == 0) names.push_back(name);
+    }
+    closedir(dir);
+    std::sort(names.begin(), names.end(), [](const std::string &a, const std::string &b) { return a > b; });
+    constexpr std::size_t kMaxEntries = 24;
+    if (names.size() > kMaxEntries) names.resize(kMaxEntries);
+    for (const std::string &name : names) {
+        const std::string path = directory + "/" + name;
+        const spectrum::Capture capture = spectrum::parse_sub(read_file(path));
+        SendEntry entry;
+        entry.path = path;
+        entry.freq_hz = capture.freq_hz;
+        entry.allowed = spectrum::tx_allowed(capture.freq_hz) && !capture.durations.empty();
+        std::string label = name;
+        if (label.rfind("capture-", 0) == 0) label = label.substr(8);
+        if (label.size() > 4) label.resize(label.size() - 4);
+        entry.label = std::move(label);
+        send_entries_.push_back(std::move(entry));
+    }
+}
+
+void UISpectrumPage::refresh_send_list()
+{
+    if (!list_label_) return;
+    if (send_entries_.empty()) {
+        lv_label_set_text(list_label_, "no captures in ~/spectrum\n\nrecord one with r, then esc");
+        return;
+    }
+    send_selection_ = std::clamp(send_selection_, 0, static_cast<int>(send_entries_.size()) - 1);
+    constexpr int kRows = 9;
+    int first = std::max(0, send_selection_ - kRows / 2);
+    if (first + kRows > static_cast<int>(send_entries_.size()))
+        first = std::max(0, static_cast<int>(send_entries_.size()) - kRows);
+    std::string text;
+    for (int i = first; i < static_cast<int>(send_entries_.size()) && i < first + kRows; ++i) {
+        const SendEntry &entry = send_entries_[i];
+        text += i == send_selection_ ? ">" : " ";
+        text += entry.allowed ? " " : "x";
+        text += entry.label;
+        text += "\n";
+    }
+    lv_label_set_text(list_label_, text.c_str());
+}
+
+void UISpectrumPage::enter_send_view()
+{
+    build_send_entries();
+    send_selection_ = 0;
+    send_view_ = true;
+    if (canvas_) lv_obj_add_flag(canvas_, LV_OBJ_FLAG_HIDDEN);
+    if (list_label_) lv_obj_remove_flag(list_label_, LV_OBJ_FLAG_HIDDEN);
+    refresh_send_list();
+    update_labels();
+}
+
+void UISpectrumPage::exit_send_view()
+{
+    send_view_ = false;
+    if (list_label_) lv_obj_add_flag(list_label_, LV_OBJ_FLAG_HIDDEN);
+    if (canvas_) lv_obj_remove_flag(canvas_, LV_OBJ_FLAG_HIDDEN);
+    draw_trace();
+    update_labels();
 }
 
 void UISpectrumPage::show_message(const std::string &text)
@@ -166,6 +286,11 @@ void UISpectrumPage::on_timer()
 {
     const std::string message = scanner_.take_message();
     if (!message.empty()) show_message(message);
+
+    if (send_view_) {
+        update_labels();
+        return;
+    }
 
     capture_ = scanner_.capture_status();
     if (capture_.active) {
@@ -277,10 +402,9 @@ void UISpectrumPage::update_labels()
             std::snprintf(text, sizeof(text), "[%s]", spectrum::kBands[i].label);
         else
             std::snprintf(text, sizeof(text), " %s ", spectrum::kBands[i].label);
-        lv_label_set_text(band_labels_[i], text);
+        set_text(band_labels_[i], text);
         const bool active = band_peak_[i] > kActivityDbm;
-        lv_obj_set_style_text_color(band_labels_[i],
-                                    lv_color_hex(selected ? (active ? kColorAccent : kColorText) : kColorDim), 0);
+        set_color(band_labels_[i], selected ? (active ? kColorAccent : kColorText) : kColorDim);
     }
 
     if (status_label_) {
@@ -294,6 +418,8 @@ void UISpectrumPage::update_labels()
         } else if (lv_tick_get() < message_until_ || !scanner_ok_) {
             status = message_;
             color = scanner_ok_ ? kColorText : 0xFF5F56;
+        } else if (send_view_) {
+            status = "send";
         } else if (scanner_.recording()) {
             const int64_t seconds = (std::chrono::duration_cast<std::chrono::milliseconds>(
                                          std::chrono::system_clock::now().time_since_epoch()).count() -
@@ -310,22 +436,35 @@ void UISpectrumPage::update_labels()
             std::snprintf(text, sizeof(text), "peak %d", band_peak_[band_]);
             status = text;
         }
-        lv_label_set_text(status_label_, status.c_str());
-        lv_obj_set_style_text_color(status_label_, lv_color_hex(color), 0);
+        set_text(status_label_, status.c_str());
+        set_color(status_label_, color);
     }
 
     if (hint_label_)
-        lv_label_set_text(hint_label_, capture_view_ ? "ent stop  -/= thr" : "tab band ent cap r rec");
-    if (marker_label_ && capture_view_) {
+        set_text(hint_label_, send_view_      ? "up/dn pick  ent send  esc"
+                                       : capture_view_ ? "ent stop  -/= thr"
+                                                       : "tab band  ent cap  p send");
+    if (marker_label_ && send_view_) {
+        if (send_entries_.empty()) {
+            set_text(marker_label_, "");
+        } else {
+            const SendEntry &entry =
+                send_entries_[std::clamp(send_selection_, 0, static_cast<int>(send_entries_.size()) - 1)];
+            char text[48];
+            std::snprintf(text, sizeof(text), "%s MHz  %s", spectrum::format_mhz(entry.freq_hz).c_str(),
+                          entry.allowed ? "ok" : "blocked");
+            set_text(marker_label_, text);
+        }
+    } else if (marker_label_ && capture_view_) {
         char text[48];
         std::snprintf(text, sizeof(text), "%s MHz %u pkts", spectrum::format_mhz(capture_.freq_hz).c_str(),
                       capture_.packets);
-        lv_label_set_text(marker_label_, text);
+        set_text(marker_label_, text);
     } else if (marker_label_) {
         const uint32_t hz = spectrum::bin_frequency(spectrum::kBands[band_], marker_);
         char text[40];
         std::snprintf(text, sizeof(text), "%s MHz %d dBm", spectrum::format_mhz(hz).c_str(), latest_[marker_]);
-        lv_label_set_text(marker_label_, text);
+        set_text(marker_label_, text);
     }
 }
 
@@ -347,6 +486,44 @@ void UISpectrumPage::event_cb(lv_event_t *event) noexcept
 
 void UISpectrumPage::handle_key(uint32_t key)
 {
+    if (send_view_) {
+        switch (key) {
+        case KEY_ESC:
+            exit_send_view();
+            return;
+        case KEY_UP:
+            if (send_selection_ > 0) {
+                --send_selection_;
+                refresh_send_list();
+                update_labels();
+            }
+            return;
+        case KEY_DOWN:
+        case KEY_TAB:
+            if (send_selection_ + 1 < static_cast<int>(send_entries_.size())) {
+                ++send_selection_;
+                refresh_send_list();
+                update_labels();
+            }
+            return;
+        case KEY_ENTER:
+        case KEY_KPENTER:
+            if (!send_entries_.empty() && !scanner_.transmitting()) {
+                const SendEntry &entry = send_entries_[send_selection_];
+                if (entry.allowed) {
+                    scanner_.request_transmit(entry.path);
+                    show_message("sending...");
+                } else {
+                    show_message("tx blocked on this band");
+                }
+                update_labels();
+            }
+            return;
+        default:
+            return;
+        }
+    }
+
     if (key == KEY_ESC) {
         if (navigate_home) navigate_home();
         return;
@@ -388,6 +565,9 @@ void UISpectrumPage::handle_key(uint32_t key)
         return;
     case KEY_R:
         if (scanner_ok_) scanner_.toggle_recording();
+        return;
+    case KEY_P:
+        if (scanner_ok_) enter_send_view();
         return;
     case KEY_SPACE:
         scanner_.set_paused(!scanner_.paused());

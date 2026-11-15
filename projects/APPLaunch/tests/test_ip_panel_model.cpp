@@ -80,4 +80,7 @@ int main()
     assert(model.interfaces()[model.selected_index()].name == "wlan0");
     assert(model.apply_refresh(true, {interface("usb0"), interface("wlan0")}));
     assert(model.interfaces()[model.selected_index()].name == "wlan0");
+    // An identical list (in any order) reports no change, so the view skips its rebuild.
+    assert(!model.apply_refresh(true, {interface("wlan0"), interface("usb0")}));
+    assert(model.interfaces().size() == 2);
 }

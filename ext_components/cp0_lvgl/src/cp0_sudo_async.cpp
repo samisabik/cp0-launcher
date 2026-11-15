@@ -5,6 +5,7 @@
  */
 
 #include "cp0_lvgl_app.h"
+#include "cp0_font_service.hpp"
 #include "input_keys.h"
 #include "hal_lvgl_bsp.h"
 #include "keyboard_input.h"
@@ -358,7 +359,7 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_obj_set_style_bg_opa(g_box, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(g_box, lv_color_hex(kPromptBorder), 0);
     lv_obj_set_style_border_width(g_box, 1, 0);
-    lv_obj_set_style_radius(g_box, 14, 0);
+    lv_obj_set_style_radius(g_box, 0, 0);
     lv_obj_set_style_pad_all(g_box, 0, 0);
     lv_obj_clear_flag(g_box, LV_OBJ_FLAG_SCROLLABLE);
     g_title_label = lv_label_create(g_box);
@@ -367,10 +368,10 @@ void create_prompt(const std::shared_ptr<Request> &request)
         return;
     }
     lv_obj_add_event_cb(g_title_label, prompt_object_delete_cb, LV_EVENT_DELETE, nullptr);
-    lv_label_set_text(g_title_label, "Authentication");
+    lv_label_set_text(g_title_label, "authentication");
     lv_obj_align(g_title_label, LV_ALIGN_TOP_MID, 0, 14);
     lv_obj_set_style_text_color(g_title_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(g_title_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(g_title_label, cp0_fonts().get_chrome(11), 0);
     g_subtitle_label = lv_label_create(g_box);
     if (!g_subtitle_label) {
         fail_prompt_creation();
@@ -380,7 +381,7 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_obj_set_width(g_subtitle_label, 220);
     lv_obj_set_style_text_align(g_subtitle_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(g_subtitle_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_font(g_subtitle_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(g_subtitle_label, cp0_fonts().get_chrome(11), 0);
     lv_obj_align(g_subtitle_label, LV_ALIGN_TOP_MID, 0, 36);
     g_input_box = lv_obj_create(g_box);
     if (!g_input_box) {
@@ -395,7 +396,7 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_obj_set_style_bg_opa(g_input_box, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(g_input_box, lv_color_hex(0x3A3A3C), 0);
     lv_obj_set_style_border_width(g_input_box, 1, 0);
-    lv_obj_set_style_radius(g_input_box, 9, 0);
+    lv_obj_set_style_radius(g_input_box, 0, 0);
     lv_obj_set_style_pad_all(g_input_box, 0, 0);
     lv_obj_clear_flag(g_input_box, LV_OBJ_FLAG_SCROLLABLE);
     g_password_label = lv_label_create(g_input_box);
@@ -406,7 +407,7 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_obj_add_event_cb(g_password_label, prompt_object_delete_cb, LV_EVENT_DELETE, nullptr);
     lv_obj_set_width(g_password_label, 200);
     lv_obj_set_style_text_align(g_password_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(g_password_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(g_password_label, cp0_fonts().get_chrome(22), 0);
     lv_obj_align(g_password_label, LV_ALIGN_CENTER, 0, 0);
     g_auth_spinner = lv_spinner_create(g_box);
     if (!g_auth_spinner) {
@@ -428,7 +429,7 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_obj_add_event_cb(g_hint_label, prompt_object_delete_cb, LV_EVENT_DELETE, nullptr);
     lv_obj_set_width(g_hint_label, 220);
     lv_obj_set_style_text_align(g_hint_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(g_hint_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_font(g_hint_label, cp0_fonts().get_chrome(11), 0);
     lv_obj_align(g_hint_label, LV_ALIGN_BOTTOM_MID, 0, -14);
     update_password_label();
     set_authenticating(false);
@@ -476,6 +477,8 @@ void coordinator_timer_cb(lv_timer_t *)
     DispatchScope dispatch_scope;
     cp0::callback::invoke_direct([] {
         execute_actions(g_coordinator.tick(now_ms(), {}));
+        // Nothing left to drive: stop the 50 Hz tick until the next submission.
+        if (g_timer && g_coordinator.idle()) lv_timer_pause(g_timer);
     });
 }
 
@@ -653,6 +656,7 @@ void run_worker(std::shared_ptr<Request> request, std::string password)
 
 void execute_actions(std::vector<Action> actions)
 {
+    if (g_timer) lv_timer_resume(g_timer);
     if (!g_timer) {
         g_timer = lv_timer_create(coordinator_timer_cb, 20, nullptr);
         if (!g_timer) {
@@ -1009,6 +1013,36 @@ extern "C" void init_sudo_signals(void)
             argv = {cp0_file_path("adb_helper"), "clear-authorizations"};
         } else if (command == "NtpSet") {
             argv = {"timedatectl", "set-ntp", value == "1" ? "true" : "false"};
+        } else if (command == "TimezoneSet") {
+            // Zone names are paths under /usr/share/zoneinfo such as Europe/London.
+            const bool valid = !value.empty() && value.size() <= 64 && value.front() != '/' &&
+                value.find("..") == std::string::npos &&
+                std::all_of(value.begin(), value.end(), [](unsigned char c) {
+                    return std::isalnum(c) || c == '/' || c == '_' || c == '-' || c == '+';
+                });
+            if (args.size() != 2 || !valid) {
+                if (started) started(-EINVAL, 0);
+                return;
+            }
+            argv = {"timedatectl", "set-timezone", value};
+        } else if (command == "TailscaleSet") {
+            if (args.size() != 2 || (value != "0" && value != "1")) {
+                if (started) started(-EINVAL, 0);
+                return;
+            }
+            argv = {"tailscale", value == "1" ? "up" : "down"};
+        } else if (command == "MicGainSet") {
+            // ES8389 ADC PGA steps of 3 dB, 0..14 (0 to +42 dB); stored so it survives a reboot.
+            const bool valid = !value.empty() && value.size() <= 2 &&
+                std::all_of(value.begin(), value.end(), [](unsigned char c) { return std::isdigit(c); }) &&
+                std::stoi(value) <= 14;
+            if (args.size() != 2 || !valid) {
+                if (started) started(-EINVAL, 0);
+                return;
+            }
+            argv = {"/bin/sh", "-c",
+                    "amixer -c0 -q sset 'ADCL PGA' " + value + " && amixer -c0 -q sset 'ADCR PGA' " + value +
+                        " && alsactl store 0"};
         } else if (command == "TimeSet") {
             const bool valid_shape = value.size() == 19 && value[4] == '-' && value[7] == '-' &&
                 value[10] == ' ' && value[13] == ':' && value[16] == ':';

@@ -5,6 +5,7 @@
 import hashlib
 import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,15 @@ spec.loader.exec_module(packager)
 def executable(path: Path, text: str) -> None:
     path.write_text("#!/bin/sh\nset -eu\n" + text, encoding="utf-8")
     path.chmod(0o755)
+
+
+def fake_gnu_tools(fake_bin: Path) -> None:
+    # util-linux flock and coreutils timeout are missing on macOS hosts; the
+    # lock and the time limits are not under test.
+    if not shutil.which("flock"):
+        executable(fake_bin / "flock", "exit 0\n")
+    if not shutil.which("timeout"):
+        executable(fake_bin / "timeout", 'shift\nexec "$@"\n')
 
 
 def ar_members(data: bytes) -> dict[str, bytes]:
@@ -61,6 +71,7 @@ def run_update(fail_install: bool = False,
         cache = root / "cache"
         proc = root / "proc"
         fake_bin.mkdir()
+        fake_gnu_tools(fake_bin)
         release.mkdir()
         old_release.mkdir(parents=True)
         (proc / "4242").mkdir(parents=True)
@@ -374,6 +385,7 @@ def run_apps_update(fail_install_for: str = "",
         cache = root / "cache"
         for directory in (fake_bin, releases, json_dir, installed):
             directory.mkdir()
+        fake_gnu_tools(fake_bin)
 
         installed_versions = {
             "m5cardputerzero-recorder": "0.1.9" if install_latest else "0.1.8",

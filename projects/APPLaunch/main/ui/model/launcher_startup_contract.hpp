@@ -41,7 +41,7 @@ template <typename CallbackTimerHandle, typename ActiveTimerHandle>
 constexpr bool launcher_startup_timer_is_current(CallbackTimerHandle callback_timer,
                                                  ActiveTimerHandle active_timer)
 {
-    return callback_timer && callback_timer == active_timer;
+    return callback_timer != nullptr && callback_timer == active_timer;
 }
 
 struct LauncherStartupOneShotDecision

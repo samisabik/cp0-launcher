@@ -59,10 +59,9 @@ def test_native_probe_requires_linux_and_sd_sysfs_type():
 
 
 def test_storage_page_labels_available_capacity_as_available():
-    assert '"SD card"' in PAGE
-    assert '"Total: " + SettingsStorageModel::format_bytes' in PAGE
-    assert '"Available: " + SettingsStorageModel::format_bytes' in PAGE
-    assert '"Free: " + SettingsStorageModel::format_bytes' not in PAGE
+    assert 'statvfs("/", &root)' in PAGE
+    assert '"disk       " + SettingsStorageModel::format_bytes' in PAGE
+    assert '"free       " + SettingsStorageModel::format_bytes' in PAGE
 
 
 if __name__ == "__main__":

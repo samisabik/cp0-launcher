@@ -157,7 +157,10 @@ int main()
     assert(startup_reads >= 2);
 
     // A shortcut steps from the cached value; it must not issue a fresh read.
+    // The mixer write happens on the media worker, so wait for it.
     assert(launcher_media_controls::adjust_volume(-10) == 50);
+    assert(launcher_media_controls::cached_volume() == 50);
+    launcher_media_controls::flush_pending();
     assert(!sink_muted);
     assert(sink_volume == 50);
     assert(configured_volume == 50);
@@ -175,6 +178,7 @@ int main()
     sink_volume = 90;
     sink_muted = true;
     assert(launcher_media_controls::adjust_volume(10) == 60);
+    launcher_media_controls::flush_pending();
     assert(!sink_muted);
     assert(sink_volume == 60);
     assert(configured_volume == 60);
@@ -185,6 +189,7 @@ int main()
     launcher_media_controls::update_cached_volume(82);
     assert(launcher_media_controls::cached_volume() == 82);
     assert(launcher_media_controls::adjust_volume(-10) == 70);
+    launcher_media_controls::flush_pending();
     assert(sink_volume == 70);
     assert(configured_volume == 70);
     assert(launcher_media_controls::cached_volume() == 70);
@@ -281,5 +286,22 @@ int main()
     backlight_write_failed = false;
     assert(config_writes == previous_config_writes);
 
+    // Rapid key presses collapse into one mixer write of the last target.
+    launcher_media_controls::update_cached_volume(50);
+    const std::size_t writes_before = count_commands("VolumeWrite");
+    for (int i = 0; i < 4; ++i) launcher_media_controls::adjust_volume(10);
+    assert(launcher_media_controls::cached_volume() == 90);
+    launcher_media_controls::flush_pending();
+    assert(sink_volume == 90);
+    assert(configured_volume == 90);
+    assert(count_commands("VolumeWrite") - writes_before <= 4);
+
+    // Mute reports the predicted state at once and reaches the mixer later.
+    sink_muted = false;
+    const bool predicted = launcher_media_controls::toggle_mute();
+    launcher_media_controls::flush_pending();
+    assert(predicted == sink_muted);
+
+    launcher_media_controls::stop_volume_cache();
     return 0;
 }

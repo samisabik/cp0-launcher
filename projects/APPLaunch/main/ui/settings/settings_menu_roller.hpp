@@ -11,6 +11,7 @@
 #include <iterator>
 #include <list>
 #include <memory>
+#include <string>
 
 #include "settings_fonts.hpp"
 #include "cp0_lvgl_app_page_assets.h"
@@ -38,12 +39,15 @@
 class LvSettingRoller : public DComponens::LvglComponensBase {
 public:
     enum class LayoutMetric : int {
-        RowH         = 21,
-        CenterRow    = 3,
-        EdgePadding  = RowH * CenterRow,
-        LabelCenterX = 60,
+        RowH         = 26,
+        CenterRow    = 2,
+        PanelH       = 150,
+        EdgePadding  = 62,
+        LabelX       = 10,
+        IconX        = 12,
+        IconLabelX   = 44,
         LabelBoxX    = 4,
-        LabelBoxW    = 90,
+        LabelBoxW    = 104,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -130,22 +134,54 @@ public:
      * The top-level entries are no longer centered around LABEL_CENTER_X; they are fixed in the left-side area
      * from LABEL_BOX_X to LABEL_BOX_X + LABEL_BOX_W.
      */
+    // Pixelarticons glyph for a top-level category, or nullptr.
+    static const lv_image_dsc_t *category_icon(const std::string &label)
+    {
+        static const struct { const char *label; const lv_image_dsc_t *icon; } kIcons[] = {
+            {"screen", &settings_icon_screen},     {"sound", &settings_icon_sound},
+            {"wi-fi", &settings_icon_wifi},         {"bluetooth", &settings_icon_bluetooth},
+            {"ethernet", &settings_icon_ethernet}, {"tailscale", &settings_icon_tailscale},
+            {"ext port", &settings_icon_ext_port}, {"battery", &settings_icon_battery},
+            {"apps", &settings_icon_apps},          {"time", &settings_icon_time},
+            {"system", &settings_icon_system},
+        };
+        for (const auto &entry : kIcons)
+            if (label == entry.label) return entry.icon;
+        return nullptr;
+    }
+
     static void style_label(lv_obj_t *label, int distance, bool left_aligned = false)
     {
         if (!label) return;
 
-        // One pixel-font size for every row; distance from the selection only dims the colour.
-        uint32_t color = 0x3A4A3F;
+        // The selected row uses the 22 px grid of the pixel font so it reads at a
+        // glance; the others stay at 11 px and dim with distance. While a submenu
+        // is open this column is context only, so every row drops to 11 px.
+        const int font_px = distance == 0 && !left_aligned ? 22 : kCp0ChromeFontSize;
+        uint32_t color = 0x3C3C3C;
         if (distance == 0) {
             color = 0xE6E6E6;
         } else if (distance == 1) {
             color = 0x8A8A8A;
         } else if (distance == 2) {
-            color = 0x5F7A66;
+            color = 0x5C5C5C;
+        }
+
+        lv_obj_t *row  = lv_obj_get_parent(label);
+        lv_obj_t *icon = row && lv_obj_get_child_count(row) > 1 ? lv_obj_get_child(row, 1) : nullptr;
+        if (icon) {
+            // Icons on every row, dimmed like the text; the context column hides them.
+            if (left_aligned)
+                lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
+            else
+                lv_obj_remove_flag(icon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_set_style_image_recolor(icon, lv_color_hex(distance == 0 ? 0x3DDC84 : color), LV_PART_MAIN);
+            lv_obj_set_style_image_recolor_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_pos(icon, metric(LayoutMetric::IconX), (metric(LayoutMetric::RowH) - 24) / 2);
         }
 
         // Set the current row font and colour first, then recalculate the text width using the final font.
-        lv_obj_set_style_text_font(label, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+        lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
         lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -161,20 +197,16 @@ public:
             // Top-level entries on the left side of a second-level page use a fixed width and left alignment.
             lv_obj_set_width(label, metric(LayoutMetric::LabelBoxW));
             lv_label_set_long_mode(label, focused ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
+            // One whole pixel per frame keeps the 1-bit font from judder-stepping.
+            lv_obj_set_style_anim_duration(label, lv_anim_speed(60), LV_PART_MAIN);
             lv_obj_set_x(label, metric(LayoutMetric::LabelBoxX));
         } else {
-            // Normal entries that do not exceed the width are centered around the midpoint without crossing the minimum
-            // left margin.
-            lv_obj_set_width(label, LV_SIZE_CONTENT);
-            lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-            lv_obj_update_layout(label);
-            const int label_x = metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(label) / 2;
-            lv_obj_set_x(label, label_x < metric(LayoutMetric::LabelBoxX) ? metric(LayoutMetric::LabelBoxX) : label_x);
+            lv_obj_set_x(label, icon ? metric(LayoutMetric::IconLabelX) : metric(LayoutMetric::LabelX));
         }
 
-        // Vertically center the text within the 21-pixel row; if the font is too tall, start at the top.
+        // Vertically center the text within the row; if the font is too tall, start at the top.
         const int label_y = (metric(LayoutMetric::RowH) - lv_obj_get_height(label)) / 2;
-        lv_obj_set_y(label, label_y < 0 ? 0 : label_y);
+        lv_obj_set_y(label, label_y);
     }
 
     /**
@@ -279,22 +311,6 @@ public:
             }
             lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
             ++item_index;
-        }
-
-        if (enabled) {
-            if (arrow_up_) {
-                lv_obj_add_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-            }
-            if (arrow_down_) {
-                lv_obj_add_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
-            }
-        } else {
-            if (arrow_up_) {
-                lv_obj_remove_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-            }
-            if (arrow_down_) {
-                lv_obj_remove_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
-            }
         }
 
         if (ComponensObj) {
@@ -438,7 +454,6 @@ public:
      * Create all LVGL objects for the top-level roller:
      * - selection_bg：Background bar for the centered selection area;
      * - ComponensObj：Entry container supporting vertical scrolling and snapping;
-     * - arrow_up_/arrow_down_：Up and Down hint arrows;
      * - item_containers_：Storage for each top-level entry container, allowing styles to be adjusted together later.
      */
     void create_ui(lv_obj_t *parent) override
@@ -459,14 +474,14 @@ public:
         selection_bg_          = lv_obj_create(page_container);
         lv_obj_t *selection_bg = selection_bg_;
         if (!selection_bg) return;
-        lv_obj_set_size(selection_bg, 312, 21);
-        lv_obj_set_pos(selection_bg, 4, 66);
+        lv_obj_set_size(selection_bg, 312, metric(LayoutMetric::RowH));
+        lv_obj_set_pos(selection_bg, 4, metric(LayoutMetric::EdgePadding));
         selection_bg_base_x_ = lv_obj_get_x(selection_bg);
         lv_obj_set_style_bg_color(selection_bg, lv_color_hex(0x13261B), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(selection_bg, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_side(selection_bg, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
         lv_obj_set_style_border_color(selection_bg, lv_color_hex(0x3DDC84), LV_PART_MAIN);
-        lv_obj_set_style_border_width(selection_bg, 2, LV_PART_MAIN);
+        lv_obj_set_style_border_width(selection_bg, 0, LV_PART_MAIN);
         lv_obj_set_style_radius(selection_bg, 0, LV_PART_MAIN);
         lv_obj_remove_flag(selection_bg, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(selection_bg, LV_OBJ_FLAG_SCROLLABLE);
@@ -487,26 +502,6 @@ public:
         lv_obj_set_style_pad_bottom(ComponensObj, metric(LayoutMetric::EdgePadding), LV_PART_MAIN);
         lv_obj_set_style_pad_row(ComponensObj, 0, LV_PART_MAIN);
 
-        // Create and position the scrolling hint arrows.
-        // Arrows sit right of the label column so they never overlap a row.
-        constexpr lv_coord_t kArrowX = 106;
-        auto make_arrow = [page_container](const char *glyph) {
-            lv_obj_t *arrow = lv_label_create(page_container);
-            if (!arrow) return arrow;
-            lv_label_set_text(arrow, glyph);
-            lv_obj_set_style_text_font(arrow, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
-            lv_obj_set_style_text_color(arrow, lv_color_hex(0x5F7A66), LV_PART_MAIN);
-            lv_obj_update_layout(arrow);
-            return arrow;
-        };
-        arrow_up_ = make_arrow("\u25B2");
-        if (arrow_up_)
-            lv_obj_set_pos(arrow_up_, kArrowX, 2);
-
-        arrow_down_ = make_arrow("\u25BC");
-        if (arrow_down_)
-            lv_obj_set_pos(arrow_down_, kArrowX, 150 - lv_obj_get_height(arrow_down_) - 4);
-
         // Refresh each row's font and color while scrolling; forward key events to the member function through the
         // bound callback.
         lv_obj_add_event_cb(ComponensObj, scroll_event_cb, LV_EVENT_SCROLL, this);
@@ -514,9 +509,9 @@ public:
         DComponens::lvgl_bind_event(ComponensObj, LV_EVENT_KEY, NULL,
                                     std::bind(&LvSettingRoller::handle_key_event, this, std::placeholders::_1));
         lv_obj_set_style_radius(ComponensObj, 0, 0);
-        lv_obj_set_style_clip_corner(ComponensObj, true, 0);
         lv_obj_set_scroll_dir(ComponensObj, LV_DIR_VER);
         lv_obj_set_scroll_snap_y(ComponensObj, LV_SCROLL_SNAP_CENTER);
+        settings_quick_scroll(ComponensObj);
         lv_obj_set_scrollbar_mode(ComponensObj, LV_SCROLLBAR_MODE_OFF);
         lv_obj_remove_flag(ComponensObj, LV_OBJ_FLAG_SCROLL_WITH_ARROW);
         // Create entries in NodeIter traversal order so the UI order matches the tree node order.
@@ -524,7 +519,7 @@ public:
         for (auto it = parent_node_.begin(); it != parent_node_.end(); ++it) {
             lv_obj_t *item_container = lv_obj_create(ComponensObj);
             item_containers_.push_back(item_container);
-            lv_obj_set_size(item_container, 320, 21);
+            lv_obj_set_size(item_container, 320, metric(LayoutMetric::RowH));
             lv_obj_set_style_bg_opa(item_container, LV_OPA_TRANSP, LV_PART_MAIN);
             lv_obj_set_style_border_width(item_container, 0, LV_PART_MAIN);
             lv_obj_set_style_radius(item_container, 0, LV_PART_MAIN);
@@ -533,6 +528,10 @@ public:
             lv_obj_remove_flag(item_container, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_t *label = lv_label_create(item_container);
             lv_label_set_text(label, it->label.c_str());
+            if (const lv_image_dsc_t *glyph = category_icon(it->label)) {
+                lv_obj_t *icon = lv_image_create(item_container);
+                if (icon) lv_image_set_src(icon, glyph);
+            }
         }
 
         // Use the number of successfully created entry containers as the selectable item count.
@@ -614,7 +613,4 @@ private:
     std::function<void()> page_animation_over_ = nullptr;
     std::atomic_bool leave_pending_{false};
 
-    // Up and Down scrolling hint arrows.
-    lv_obj_t *arrow_up_   = nullptr;
-    lv_obj_t *arrow_down_ = nullptr;
 };

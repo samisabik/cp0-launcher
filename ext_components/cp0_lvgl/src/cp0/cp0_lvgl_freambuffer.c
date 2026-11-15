@@ -14,6 +14,28 @@
 #include "cp0_lvgl.h"
 #include "../cp0_display_screenshot_contract.hpp"
 #include <pthread.h>
+#include <fcntl.h>
+#include <stdbool.h>
+
+/* The panel sits behind DRM fbdev emulation, which pushes mmap writes to the
+ * SPI panel from deferred I/O on a timer. fsync runs that pending flush right
+ * away, so each finished frame reaches the panel without waiting for the timer. */
+static int s_fb_sync_fd = -1;
+static bool s_fb_frame_flushed = false;
+
+static void fb_flush_finish_cb(lv_event_t *e)
+{
+    (void)e;
+    s_fb_frame_flushed = true;
+}
+
+static void fb_refr_ready_cb(lv_event_t *e)
+{
+    (void)e;
+    if (!s_fb_frame_flushed || s_fb_sync_fd < 0) return;
+    s_fb_frame_flushed = false;
+    fsync(s_fb_sync_fd);
+}
 
 static int find_st7789v_fbdev(char *dev_path, size_t buf_size)
 {
@@ -110,8 +132,11 @@ void init_freambuffer_disp()
     setenv("LV_LINUX_FBDEV_DEVICE", device, 1);
     printf("Using framebuffer device: %s\n", device);
     lv_linux_fbdev_set_file(disp, device);
-    if(0)
-        lv_linux_fbdev_set_force_refresh(disp, true);
+    s_fb_sync_fd = open(device, O_RDWR | O_CLOEXEC);
+    if (s_fb_sync_fd >= 0) {
+        lv_display_add_event_cb(disp, fb_flush_finish_cb, LV_EVENT_FLUSH_FINISH, NULL);
+        lv_display_add_event_cb(disp, fb_refr_ready_cb, LV_EVENT_REFR_READY, NULL);
+    }
 
     lv_coord_t w = lv_display_get_horizontal_resolution(disp);
     lv_coord_t h = lv_display_get_vertical_resolution(disp);

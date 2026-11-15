@@ -70,10 +70,11 @@ assert '"hold tab 3s to lock"' in SOURCE
 assert "hold.hide_hint" in SOURCE
 assert "hold.fire" in SOURCE
 
-# The panel geometry has a single source of truth in the page shell, and the
-# visible lock states clear the top bar so the status bar stays part of the layout.
+# The visible lock states cover the whole display, top bar included: the card
+# carries the time and status, and the simulation fills the screen.
 assert "kTopBarHeightPx" in PAGE_SHELL
-assert "AppPageRoot::kTopBarHeightPx" in SOURCE
+assert "AppPageRoot::kTopBarHeightPx" not in SOURCE
+assert "refresh_status(true)" in SOURCE
 
 # The locked state paints pure black over the whole display, so the black screen
 # never depends on the backlight actually dimming: the simulator, web and win32

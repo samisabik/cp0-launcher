@@ -30,7 +30,7 @@ template <typename Target, typename CurrentTarget>
 constexpr bool lora_owned_delete_callback_allowed(
     Target target, CurrentTarget current_target) noexcept
 {
-    return target && target == current_target;
+    return target != nullptr && target == current_target;
 }
 
 template <typename CurrentTarget, typename OwnedControl>
@@ -38,7 +38,7 @@ constexpr bool lora_send_action_callback_allowed(
     CurrentTarget current_target, OwnedControl owned_control,
     bool app_active, bool send_view_active) noexcept
 {
-    return current_target && current_target == owned_control &&
+    return current_target != nullptr && current_target == owned_control &&
            app_active && send_view_active;
 }
 
@@ -46,14 +46,14 @@ template <typename CurrentTarget, typename PageRoot>
 constexpr bool lora_page_event_callback_allowed(
     CurrentTarget current_target, PageRoot page_root, bool app_active) noexcept
 {
-    return current_target && current_target == page_root && app_active;
+    return current_target != nullptr && current_target == page_root && app_active;
 }
 
 template <typename Handle>
 bool lora_page_ui_ready(Handle page_root, Handle messages_view, Handle message_list,
                         Handle info_view, Handle send_view, Handle page_indicator)
 {
-    return page_root && messages_view && message_list && info_view && send_view && page_indicator;
+    return page_root != nullptr && messages_view != nullptr && message_list != nullptr && info_view != nullptr && send_view != nullptr && page_indicator != nullptr;
 }
 
 template <typename... Handles>

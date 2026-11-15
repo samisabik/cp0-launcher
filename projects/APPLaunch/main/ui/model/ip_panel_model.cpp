@@ -35,6 +35,11 @@ void IpPanelModel::replace(std::vector<IpInterfaceInfo> interfaces)
 bool IpPanelModel::apply_refresh(bool loaded, std::vector<IpInterfaceInfo> interfaces)
 {
     if (!loaded) return false;
+    std::sort(interfaces.begin(), interfaces.end(),
+              [](const IpInterfaceInfo &left, const IpInterfaceInfo &right) {
+                  return left.name < right.name;
+              });
+    if (interfaces == interfaces_) return false;
     replace(std::move(interfaces));
     return true;
 }

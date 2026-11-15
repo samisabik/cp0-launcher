@@ -366,6 +366,13 @@ bool Coordinator::accepting() const
     return accepting_;
 }
 
+bool Coordinator::idle() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return requests_.empty() && reservations_.empty() && queue_.empty() && !current_ &&
+           controls_.empty() && callbacks_.empty() && terminal_completions_pending_ == 0;
+}
+
 bool Coordinator::resume()
 {
     std::lock_guard<std::mutex> lock(mutex_);

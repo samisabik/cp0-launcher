@@ -135,10 +135,10 @@ def test_nested_roller_page_rests_in_the_right_hand_column():
 def test_confirm_page_title_fits_the_title_box():
     title_box_width = metric(COMPONENTS_HPP, "TitleBoxW")
     # Only the short label is used; the long one was clipped to "Write hardv".
-    assert 'SettingEntry{"Write RTC?", settings_rtc_confirm_page_factory}' in PAGE_CPP
+    assert 'SettingEntry{"write rtc?", settings_rtc_confirm_page_factory}' in PAGE_CPP
     assert "Write hardware RTC?" not in PAGE_CPP
     # 16px CJK text: "Write RTC?" measures ~80px, leaving headroom in the box.
-    assert len("Write RTC?") * 8 <= title_box_width
+    assert len("write rtc?") * 8 <= title_box_width
 
 
 def test_local_time_read_moves_its_callback_exactly_once():
@@ -180,7 +180,7 @@ def test_day_options_are_rebuilt_from_the_selected_month():
     body = normalized(
         function_body(PAGE_CPP, "static std::unique_ptr<DComponens::LvglComponensBase> rtc_page3_factory")
     )
-    assert 'page_node->label == "Day"' in body
+    assert 'page_node->label == "day"' in body
     assert "settings_tree_factory_context()" in body
     assert "erase_children(page_node)" in body
     assert "settings_rtc_days_in_current_month()" in body
@@ -209,7 +209,7 @@ def test_manual_entry_is_gated_while_network_time_is_on():
     assert "show_blocked_warning(block->title, block->message)" in handler
 
     # Set Manually carries a gate, and the reason is chosen per NTP state.
-    assert 'SettingEntry manual_entry{"Set Manually", roller_page_factory};' in PAGE_CPP
+    assert 'SettingEntry manual_entry{"set manually", roller_page_factory};' in PAGE_CPP
     assert (
         "manual_entry.activation_gate = [] { return settings_rtc_manual_edit_block(); };"
         in PAGE_CPP
@@ -217,7 +217,7 @@ def test_manual_entry_is_gated_while_network_time_is_on():
     # Set Manually is a nested roller workflow.  Only the Network Time status
     # icon from its parent menu is hidden while the manual editor is open.
     submenu = normalized(SUBMENU_CPP)
-    assert 'page3_hides_network_time_icon_ = selected_node->label == "Set Manually";' in submenu
+    assert 'page3_hides_network_time_icon_ = selected_node->label == "set manually";' in submenu
     transition = normalized(
         function_body(
             SUBMENU_CPP,
@@ -239,7 +239,7 @@ def test_manual_entry_is_gated_while_network_time_is_on():
             "void LvSettingRollerPage2::set_network_time_icon_hidden(bool hidden)",
         )
     )
-    assert 'node->label != "Network Time"' in icon
+    assert 'node->label != "network time"' in icon
     assert "lv_obj_get_child(row, 1)" in icon
     assert "lv_obj_add_flag(status_icon, LV_OBJ_FLAG_HIDDEN)" in icon
 
@@ -393,7 +393,7 @@ def test_set_manually_does_not_offer_seconds():
             )
         ]
     )
-    for label in ('"Year"', '"Month"', '"Day"', '"Hour"', '"Minute"'):
+    for label in ('"year"', '"month"', '"day"', '"hour"', '"minute"'):
         assert f"SettingEntry{{{label}, rtc_page3_factory}}" in body, label
     assert 'SettingEntry{"Second"' not in body
     assert 'SettingEntry{"Second"' not in PAGE_CPP

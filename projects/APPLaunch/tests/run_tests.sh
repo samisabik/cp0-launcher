@@ -14,7 +14,6 @@ python3 "$test_root/test_settings_rtc_layout_contract.py"
 python3 "$test_root/test_settings_volume_initial_selection.py"
 python3 "$test_root/test_preinstalled_app_packaging.py"
 python3 "$test_root/test_settings_storage_build_contract.py"
-python3 "$test_root/test_settings_software_page_contract.py"
 python3 "$test_root/test_static_resource_staging.py"
 python3 "$test_root/test_lockscreen_contract.py"
 python3 "$test_root/test_home_icon_fallback_contract.py"
@@ -35,15 +34,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$test_root/test_page_timer_lifecycle.cpp" \
     -o "$build_dir/test_page_timer_lifecycle"
 "$build_dir/test_page_timer_lifecycle"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_settings_software_model.cpp" \
-    "$settings_ui_root/settings_software_model.cpp" \
-    -o "$build_dir/test_settings_software_model"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
-    "$test_root/test_settings_software_updater.cpp" \
-    -o "$build_dir/test_settings_software_updater"
-"$build_dir/test_settings_software_updater"
-"$build_dir/test_settings_software_model"
 python3 "$test_root/test_updater_packaging.py"
 python3 "$test_root/test_appstore_packaging.py"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
@@ -72,20 +62,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/app_display_order.cpp" \
     -o "$build_dir/test_app_display_order"
 "$build_dir/test_app_display_order"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_snake_game_model.cpp" \
-    "$test_root/../main/ui/model/snake_game_model.cpp" \
-    -o "$build_dir/test_snake_game_model"
-"$build_dir/test_snake_game_model"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    -I"$test_root/../../../ext_components/cp0_lvgl/include" \
-    "$test_root/test_game_input_action.cpp" \
-    -o "$build_dir/test_game_input_action"
-"$build_dir/test_game_input_action"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_snake_view_contract.cpp" \
-    -o "$build_dir/test_snake_view_contract"
-"$build_dir/test_snake_view_contract"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_ip_panel_model.cpp" \
     "$test_root/../main/ui/model/ip_panel_model.cpp" \
@@ -129,11 +105,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/model/lora_page_model.cpp" \
     -o "$build_dir/test_lora_page_model"
 "$build_dir/test_lora_page_model"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_tank_battle_model.cpp" \
-    "$test_root/../main/ui/model/tank_battle_model.cpp" \
-    -o "$build_dir/test_tank_battle_model"
-"$build_dir/test_tank_battle_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_setup_value_policy.cpp" \
     "$test_root/../main/ui/model/setup_value_policy.cpp" \
@@ -199,6 +170,21 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/model/spectrum_model.cpp" \
     -o "$build_dir/test_spectrum_model"
 "$build_dir/test_spectrum_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_rec_model.cpp" \
+    "$test_root/../main/ui/model/rec_model.cpp" \
+    -o "$build_dir/test_rec_model"
+"$build_dir/test_rec_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_life_model.cpp" \
+    "$test_root/../main/ui/model/life_model.cpp" \
+    -o "$build_dir/test_life_model"
+"$build_dir/test_life_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_lockscreen_status_model.cpp" \
+    "$test_root/../main/ui/model/lockscreen_status_model.cpp" \
+    -o "$build_dir/test_lockscreen_status_model"
+"$build_dir/test_lockscreen_status_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../../../ext_components/cp0_lvgl/include" \
     "$test_root/test_lockscreen_state_model.cpp" \

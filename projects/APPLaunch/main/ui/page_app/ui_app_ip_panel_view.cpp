@@ -15,7 +15,7 @@ void UIIpPanelPage::create_ui()
     lv_obj_set_size(background, 320, 150);
     lv_obj_set_pos(background, 0, 0);
     lv_obj_set_style_radius(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(background, lv_color_hex(0x0D1117), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(background, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(background, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -26,7 +26,7 @@ void UIIpPanelPage::create_ui()
     lv_obj_set_size(title_bar, 320, TITLE_H);
     lv_obj_set_pos(title_bar, 0, 0);
     lv_obj_set_style_radius(title_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(title_bar, lv_color_hex(0x1F3A5F), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(title_bar, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(title_bar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(title_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(title_bar, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -34,18 +34,18 @@ void UIIpPanelPage::create_ui()
 
     lv_obj_t *title = lv_label_create(title_bar);
     if (!title) { lv_obj_delete(background); return; }
-    lv_label_set_text(title, LV_SYMBOL_WIFI "  IP Panel");
+    lv_label_set_text(title, "ip panel");
     lv_obj_set_align(title, LV_ALIGN_LEFT_MID);
-    lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(title, lv_color_hex(0x3DDC84), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(title, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *hint = lv_label_create(title_bar);
     if (!hint) { lv_obj_delete(background); return; }
-    lv_label_set_text(hint, "Fn+H:Help");
+    lv_label_set_text(hint, "fn+h help");
     lv_obj_set_align(hint, LV_ALIGN_RIGHT_MID);
     lv_obj_set_x(hint, -4);
-    lv_obj_set_style_text_color(hint, lv_color_hex(0x7EA8D8), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(hint, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(hint, lv_color_hex(0x5F7A66), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(hint, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *list_container = lv_obj_create(background);
     if (!list_container) { lv_obj_delete(background); return; }
@@ -79,7 +79,7 @@ bool UIIpPanelPage::build_help_view()
     lv_obj_set_size(candidate, 320, 150);
     lv_obj_set_pos(candidate, 0, 0);
     lv_obj_set_style_radius(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(candidate, lv_color_hex(0x0D1117), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(candidate, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(candidate, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -101,10 +101,10 @@ bool UIIpPanelPage::build_help_view()
         return true;
     };
 
-    if (!add_label("Help", 6, 0x58A6FF, &lv_font_montserrat_16) ||
-        !add_label("Display the device's Wi-Fi and Ethernet IP addresses.", 31,
-                   0xE6EDF3, &lv_font_montserrat_12, true) ||
-        !add_label("ESC: back", 132, 0x46DC87, &lv_font_montserrat_10)) {
+    const lv_font_t *font = launcher_fonts().get_chrome(11);
+    if (!add_label("help", 6, 0x3DDC84, font) ||
+        !add_label("shows the wi-fi and ethernet ip addresses of this device.", 31, 0xE6E6E6, font, true) ||
+        !add_label("esc back", 135, 0x5F7A66, font)) {
         lv_obj_delete(candidate);
         return false;
     }
@@ -136,10 +136,10 @@ void UIIpPanelPage::build_list_rows()
     if (interfaces.empty()) {
         lv_obj_t *label = lv_label_create(list_container_);
         if (!label) return;
-        lv_label_set_text(label, "No network interface found.");
+        lv_label_set_text(label, "no network interface found");
         lv_obj_set_pos(label, 10, 50);
-        lv_obj_set_style_text_color(label, lv_color_hex(0x555555), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(label, lv_color_hex(0x5C5C5C), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(label, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
         return;
     }
 
@@ -160,26 +160,13 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
     if (!row) return;
     lv_obj_set_size(row, 318, ITEM_H - 2);
     lv_obj_set_pos(row, 1, visual_row * ITEM_H + 1);
-    lv_obj_set_style_radius(row, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(row, lv_color_hex(selected ? 0x1F3A5F : 0x161B22),
+    lv_obj_set_style_bg_color(row, lv_color_hex(selected ? 0x13261B : 0x000000),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(row, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    if (selected) {
-        lv_obj_t *bar = lv_obj_create(row);
-        if (bar) {
-        lv_obj_set_size(bar, 3, ITEM_H - 8);
-        lv_obj_set_pos(bar, 2, 3);
-        lv_obj_set_style_radius(bar, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_color(bar, lv_color_hex(0x1F6FEB), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(bar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-        }
-    }
 
     if (index + 1 < interfaces.size()) {
         lv_obj_t *divider = lv_obj_create(parent);
@@ -187,8 +174,8 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
         lv_obj_set_size(divider, 310, 1);
         lv_obj_set_pos(divider, 5, (visual_row + 1) * ITEM_H);
         lv_obj_set_style_radius(divider, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_color(divider, lv_color_hex(0x21262D), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(divider, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(divider, lv_color_hex(0x1E2B23), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(divider, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_border_width(divider, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_clear_flag(divider, LV_OBJ_FLAG_SCROLLABLE);
         }
@@ -198,8 +185,8 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
     if (status_dot) {
     lv_obj_set_size(status_dot, 6, 6);
     lv_obj_set_pos(status_dot, 8, (ITEM_H - 8) / 2);
-    lv_obj_set_style_radius(status_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(status_dot, lv_color_hex(info.up ? 0x2ECC71 : 0x444444),
+    lv_obj_set_style_radius(status_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(status_dot, lv_color_hex(info.up ? 0x3DDC84 : 0x3C3C3C),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(status_dot, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(status_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -212,9 +199,9 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
     lv_obj_set_pos(name, 20, 2);
     lv_obj_set_width(name, 72);
     lv_label_set_long_mode(name, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(name, lv_color_hex(selected ? 0x58A6FF : 0x4A7ABF),
+    lv_obj_set_style_text_color(name, lv_color_hex(selected ? 0x3DDC84 : 0x8A8A8A),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(name, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(name, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 
     lv_obj_t *address = lv_label_create(row);
@@ -223,9 +210,9 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
     lv_obj_set_pos(address, 96, 2);
     lv_obj_set_width(address, 130);
     lv_label_set_long_mode(address, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(address, lv_color_hex(selected ? 0xFFFFFF : 0xCCCCCC),
+    lv_obj_set_style_text_color(address, lv_color_hex(selected ? 0xE6E6E6 : 0x8A8A8A),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(address, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(address, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 
     lv_obj_t *netmask = lv_label_create(row);
@@ -234,16 +221,16 @@ void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, b
     lv_obj_set_pos(netmask, 96, 17);
     lv_obj_set_width(netmask, 130);
     lv_label_set_long_mode(netmask, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(netmask, lv_color_hex(0x555555), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(netmask, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(netmask, lv_color_hex(0x5F7A66), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(netmask, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 
     lv_obj_t *state = lv_label_create(row);
     if (state) {
-    lv_label_set_text(state, info.up ? "UP" : "DOWN");
+    lv_label_set_text(state, info.up ? "up" : "down");
     lv_obj_set_pos(state, 266, 2);
-    lv_obj_set_style_text_color(state, lv_color_hex(info.up ? 0x2ECC71 : 0x555555),
+    lv_obj_set_style_text_color(state, lv_color_hex(info.up ? 0x3DDC84 : 0x5C5C5C),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(state, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(state, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }

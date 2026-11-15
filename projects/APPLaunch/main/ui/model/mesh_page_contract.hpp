@@ -59,12 +59,12 @@ template <typename Target, typename CurrentTarget>
 constexpr bool mesh_owned_delete_callback_allowed(
     Target target, CurrentTarget current_target) noexcept
 {
-    return target && target == current_target;
+    return target != nullptr && target == current_target;
 }
 
 template <typename CurrentTarget, typename RootScreen>
 constexpr bool mesh_root_event_callback_allowed(CurrentTarget current_target,
                                                 RootScreen root_screen) noexcept
 {
-    return current_target && current_target == root_screen;
+    return current_target != nullptr && current_target == root_screen;
 }

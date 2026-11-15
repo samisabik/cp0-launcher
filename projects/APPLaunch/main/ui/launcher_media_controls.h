@@ -23,11 +23,16 @@ int cached_volume();
 /* Read the mixer once, off the LVGL thread, and publish the settled value.
  * Safe to call once at launcher startup; a later call restarts the read. */
 void start_volume_cache();
-/* Join the startup reader so teardown cannot race a signal call. */
+/* Join the startup reader and the media worker so teardown cannot race a
+ * signal call; any pending mixer write and config save complete first. */
 void stop_volume_cache();
+/* Wait for queued mixer writes and write a pending config save now. */
+void flush_pending();
 /* Record a value that was just written to the mixer, or read back from it. */
 void update_cached_volume(int percent);
 
+/* These return the new value for the OSD immediately. Volume and mute reach
+ * the mixer on a worker thread, and the config is saved once keys go idle. */
 int adjust_volume(int delta_percent);
 int adjust_brightness(int delta_percent);
 bool toggle_mute();

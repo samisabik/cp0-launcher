@@ -488,7 +488,7 @@ void AppTopBarBatteryComponent::on_create(lv_obj_t *obj)
     lv_obj_set_pos(charge_wave_, -8, 1);
     lv_obj_clear_flag(charge_wave_, static_cast<lv_obj_flag_t>(
         LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
-    lv_obj_set_style_radius(charge_wave_, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(charge_wave_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(charge_wave_, lv_color_hex(0xFFF176),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(charge_wave_, 190, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -516,7 +516,7 @@ void AppTopBarBatteryComponent::update(const cp0_battery_info_t &battery)
 {
     if (!label_) return;
     if (!battery.valid) {
-        lv_label_set_text(label_, "--");
+        if (std::strcmp(lv_label_get_text(label_), "--") != 0) lv_label_set_text(label_, "--");
         set_charging(false);
         set_low_battery_blink(false);
         return;
@@ -524,7 +524,8 @@ void AppTopBarBatteryComponent::update(const cp0_battery_info_t &battery)
     int charge = battery.soc < 0 ? 0 : (battery.soc > 100 ? 100 : battery.soc);
     char text[16];
     std::snprintf(text, sizeof(text), "%d%%", charge);
-    lv_label_set_text(label_, text);
+    // Unchanged text would still invalidate the label on every publish.
+    if (std::strcmp(lv_label_get_text(label_), text) != 0) lv_label_set_text(label_, text);
     const bool charging = (battery.flags & 1) != 0;
     set_charging(charging);
     set_low_battery_blink(charge < 3);
@@ -536,14 +537,20 @@ void AppTopBarBatteryComponent::deactivate()
     set_low_battery_blink(false);
 }
 
-void AppTopBarBatteryComponent::blink_cb(void *object, int32_t opacity)
+void AppTopBarBatteryComponent::blink_timer_cb(lv_timer_t *timer)
 {
-    lv_obj_set_style_opa(static_cast<lv_obj_t *>(object), static_cast<lv_opa_t>(opacity), 0);
+    auto *self = static_cast<AppTopBarBatteryComponent *>(lv_timer_get_user_data(timer));
+    if (!self || !self->obj()) return;
+    self->blink_dim_ = !self->blink_dim_;
+    lv_obj_set_style_opa(self->obj(), self->blink_dim_ ? LV_OPA_20 : LV_OPA_COVER,
+                         LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 void AppTopBarBatteryComponent::set_charging(bool charging)
 {
     if (!obj() || !battery_bar_ || !label_ || !charge_wave_) return;
+    if (charging_styled_ && charging == charging_) return;
+    charging_styled_ = true;
     lv_obj_set_style_bg_opa(obj(), LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -562,23 +569,14 @@ void AppTopBarBatteryComponent::set_low_battery_blink(bool enabled)
 {
     if (!obj() || enabled == low_battery_blink_) return;
     low_battery_blink_ = enabled;
-    lv_anim_del(obj(), blink_cb);
-    if (!enabled) {
-        lv_obj_set_style_opa(obj(), LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-        return;
+    if (blink_timer_) {
+        lv_timer_delete(blink_timer_);
+        blink_timer_ = nullptr;
     }
-
+    blink_dim_ = false;
     lv_obj_set_style_opa(obj(), LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_anim_t animation;
-    lv_anim_init(&animation);
-    lv_anim_set_var(&animation, obj());
-    lv_anim_set_values(&animation, LV_OPA_COVER, LV_OPA_20);
-    lv_anim_set_time(&animation, 450);
-    lv_anim_set_playback_time(&animation, 450);
-    lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_path_cb(&animation, lv_anim_path_linear);
-    lv_anim_set_exec_cb(&animation, blink_cb);
-    lv_anim_start(&animation);
+    // Two discrete steps a second; an opacity animation would redraw every frame.
+    if (enabled) blink_timer_ = lv_timer_create(blink_timer_cb, 500, this);
 }
 
 void AppTopBarBatteryComponent::on_object_deleted()
@@ -587,7 +585,11 @@ void AppTopBarBatteryComponent::on_object_deleted()
     charge_wave_ = nullptr;
     label_ = nullptr;
     charging_ = false;
+    charging_styled_ = false;
     low_battery_blink_ = false;
+    blink_dim_ = false;
+    if (blink_timer_) lv_timer_delete(blink_timer_);
+    blink_timer_ = nullptr;
 }
 
 bool AppTopBarBatteryComponent::resources_ready() const
@@ -630,7 +632,7 @@ void AppTopBarNetworkComponent::on_create(lv_obj_t *obj)
         lv_obj_add_event_cb(wifi_bars_[index], child_delete_cb, LV_EVENT_DELETE, this);
         lv_obj_set_size(wifi_bars_[index], 4, HEIGHTS[index]);
         lv_obj_set_pos(wifi_bars_[index], index * 6, 15 - HEIGHTS[index]);
-        lv_obj_set_style_radius(wifi_bars_[index], 2, 0);
+        lv_obj_set_style_radius(wifi_bars_[index], 0, 0);
         lv_obj_set_style_bg_color(wifi_bars_[index], lv_color_hex(0x333333), 0);
         lv_obj_set_style_border_width(wifi_bars_[index], 0, 0);
         lv_obj_clear_flag(wifi_bars_[index], LV_OBJ_FLAG_SCROLLABLE);
@@ -658,8 +660,14 @@ void AppTopBarNetworkComponent::refresh()
     cp0_wifi_status_t status{};
     if (cp0_wifi_status_read(&status) != 0) status = {};
     static constexpr int THRESHOLDS[] = {1, 30, 60, 80};
+    int state = (status.ethernet ? 1 << 5 : 0) | (status.connected ? 1 << 4 : 0);
+    for (int index = 0; index < 4; ++index)
+        if (status.connected && status.signal >= THRESHOLDS[index]) state |= 1 << index;
+    // The refresh runs every few seconds; restyling unchanged bars would redraw the bar each time.
+    if (state == drawn_state_) return;
+    drawn_state_ = state;
     for (int index = 0; index < 4; ++index) {
-        bool active = status.connected && status.signal >= THRESHOLDS[index];
+        bool active = (state & (1 << index)) != 0;
         lv_obj_set_style_bg_color(wifi_bars_[index],
                                   lv_color_hex(active ? 0x3DDC84 : 0x333333), 0);
     }
@@ -677,6 +685,7 @@ void AppTopBarNetworkComponent::on_object_deleted()
     ethernet_image_ = nullptr;
     wifi_panel_ = nullptr;
     for (lv_obj_t *&bar : wifi_bars_) bar = nullptr;
+    drawn_state_ = -1;
 }
 
 bool AppTopBarNetworkComponent::resources_ready() const

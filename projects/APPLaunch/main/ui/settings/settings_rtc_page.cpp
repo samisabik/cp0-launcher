@@ -496,7 +496,7 @@ int RtcStateModel::days_in_month(int year, int month) noexcept
 std::string_view RtcStateModel::field_name(RtcField field) noexcept
 {
     static constexpr std::string_view names[] = {
-        "Year", "Month", "Day", "Hour", "Minute", "Second",
+        "year", "month", "day", "hour", "minute", "second",
     };
     const unsigned index = field_index(field);
     return index < static_cast<unsigned>(RtcField::COUNT) ? names[index] : std::string_view{};
@@ -1327,7 +1327,7 @@ void LvSettingRtcConfirmPage3::install_actions()
 {
     for (auto child = parent_node().begin(); child != parent_node().end(); ++child) {
         impl_->actions.push_back({&*child, child->Async_api, child->activation_policy});
-        const bool save = child->label == "Yes";
+        const bool save = child->label == "yes";
         child->Async_api = [this, save](int command, void *) -> SettingApiResult {
             if (command != SettingApiActivate) return SettingApiResult::NotHandled;
             return save ? begin_save() : discard_and_leave();
@@ -1388,7 +1388,7 @@ void LvSettingRtcConfirmPage3::show_factory_time_warning(const ActivationSink &s
     }
     lv_obj_set_size(impl_->factory_warning_dialog, 280, 96);
     lv_obj_center(impl_->factory_warning_dialog);
-    lv_obj_set_style_radius(impl_->factory_warning_dialog, 4, LV_PART_MAIN);
+    lv_obj_set_style_radius(impl_->factory_warning_dialog, 0, LV_PART_MAIN);
     lv_obj_set_style_border_width(impl_->factory_warning_dialog, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(impl_->factory_warning_dialog, lv_color_hex(0xFFAA00), LV_PART_MAIN);
     lv_obj_set_style_bg_color(impl_->factory_warning_dialog, lv_color_hex(0x171717), LV_PART_MAIN);

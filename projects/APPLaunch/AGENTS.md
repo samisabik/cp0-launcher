@@ -203,7 +203,7 @@ contract.
 entry points retain their legacy names, but only implement the lock screen.
 Do not remove them or the keyboard backend hooks when cleaning up the removed
 bouncing-image screensaver. `home_icon_fallback.*` is an independent embedded
-home icon; the lock screen uses its own cached `share/images/lockscreen.png`.
+home icon; the lock screen uses no image assets.
 
 Initialize the lock screen after `launcher_ui::init()` and deinitialize it in
 `launcher_ui::deinit()`. `Launch::launch_Exec()` calls
@@ -211,37 +211,37 @@ Initialize the lock screen after `launcher_ui::init()` and deinitialize it in
 process and `ui_screensaver_set_foreground(1)` after restoring home. This clears
 the lock and restarts the idle interval; it does not resume a previous lock state.
 
-`settings/settings_screen_timeout_page.*` implements Screen -> DarkTime.
+`settings/settings_screen_timeout_page.*` implements screen -> auto-lock.
 It reads and saves `dark_time` through `GetInt`, `SetInt`, and `Save`, with
-rollback on write/save failure. Never/10S/30S/60S/300S map to 0/10/30/60/300
+rollback on write/save failure. never/10 s/30 s/1 min/5 min map to 0/10/30/60/300
 seconds. The default is 30 seconds; 0 disables automatic locking only.
 The lock-screen runtime reads this setting during its idle checks.
 
 While unlocked, the filter observes TAB without consuming its press/release,
 so the page retains the short-tap behavior. After 500 ms it shows the persistent
-`Hold TAB for 3s to lock` toast; at 3000 ms it enters the lock. Release, another
+`hold tab 3s to lock` toast; at 3000 ms it enters the lock. Release, another
 key, or a lock transition clears the hold hint. Repeats must not restart the hold.
 
 `model/lockscreen_state_model.hpp` owns the three states: full-screen black,
-visible wallpaper waiting for TAB, and armed waiting for ENTER (or keypad ENTER).
-Only a fresh press changes state. Any fresh press wakes black to the wallpaper;
+visible panel waiting for TAB, and armed waiting for ENTER (or keypad ENTER).
+Only a fresh press changes state. Any fresh press wakes black to the panel;
 TAB then arms and ENTER confirms. ESC from either visible state returns to black;
 another key in the armed state returns to waiting for TAB. Press/repeat activity
 resets the 10-second visible-state timeout; release does not. All lock-state
-events and the 350 ms exit animation consume keys. Low-battery UI remains hidden
+events and the exit animation (`kExitAnimationMs`) consume keys. Low-battery UI remains hidden
 until `ui_screensaver_is_active()` becomes false, including that animation.
 
 The lock is an `lv_layer_top()` overlay, not a page. Paint the black state over
 the whole display even on backends whose backlight write is a no-op. Backlight
 suspension/restoration uses `launcher_media_controls` without persisting zero
-as the working brightness. The static wallpaper sits below the 20 px top bar;
-its black-backed yellow unlock hint is a top-layer sibling over the title.
-Cache and own the decoded wallpaper buffer until teardown. Animate exit using
-the stored panel rectangle, not potentially stale LVGL layout geometry.
+as the working brightness. The visible panel covers the whole display, top bar
+included: a Game of Life canvas (`model/life_model.*`) fills it, and a black card
+holds the clock, date, status lines (`model/lockscreen_status_model.*`: battery,
+network, Tailscale address, recordings) and the unlock prompt. The simulation
+runs only while the panel is visible and pauses in the black state. Animate exit
+using the stored panel rectangle, not potentially stale LVGL layout geometry.
 
-Keep `lock.mp3`, `select.mp3`, `blocked.mp3`, and `unlock.mp3` in `share/audio/`.
-Register them with `RegisterSystemSounds` and play them via
-`cp0_signal_system_play`, preserving the platform's startup/switch/enter slots.
-Use `lock` on entering black, `select` on advancing, `blocked` on invalid input,
-and `unlock` on confirmation. Lock entry suspends the system sound player;
-exit prepares it asynchronously and completes cleanup before exposing the working screen.
+UI sounds are removed from this launcher build: `play_lockscreen_sound` only
+records the requested asset name. Lock entry still suspends the system sound
+player, and exit prepares it asynchronously and completes cleanup before
+exposing the working screen.

@@ -40,7 +40,7 @@ void LvSettingRollerPage2::LoadNextPage()
     auto selected_node = std::next(parent_node_.begin(), selected_index);
     if (!selected_node->page_factory || page3_transitioning_ || roller3_ || !parent_) return;
 
-    page3_hides_network_time_icon_ = selected_node->label == "Set Manually";
+    page3_hides_network_time_icon_ = selected_node->label == "set manually";
 
     lv_group_t *group = ComponensObj ? lv_obj_get_group(ComponensObj) : nullptr;
 
@@ -99,8 +99,6 @@ LvSettingRollerPage2::~LvSettingRollerPage2()
     }
     selection_bg_ = nullptr;
     right_arrow_  = nullptr;
-    arrow_up_     = nullptr;
-    arrow_down_   = nullptr;
     hint_         = nullptr;
 }
 
@@ -122,27 +120,22 @@ void LvSettingRollerPage2::style_label(lv_obj_t *label, int distance, bool compa
 {
     if (!label) return;
 
-    int font_size  = 10;
-    int opa        = 130;
-    uint32_t color = 0x555555;
+    // Same scheme as the top level: the selected row at the 22 px grid of the
+    // pixel font, the rest at 11 px dimming with distance. When a value page is
+    // open this panel shrinks to context, so every row drops to 11 px.
+    uint32_t color = 0x3C3C3C;
     if (distance == 0) {
-        font_size = 16;
-        opa       = 255;
-        color     = 0xFFFFFF;
+        color = 0xE6E6E6;
     } else if (distance == 1) {
-        font_size = 12;
-        opa       = 220;
-        color     = 0xAAAAAA;
+        color = 0x8A8A8A;
     } else if (distance == 2) {
-        font_size = 12;
-        opa       = 170;
-        color     = 0x777777;
+        color = 0x5C5C5C;
     }
+    const int font_px = distance == 0 && !compact ? 22 : kCp0ChromeFontSize;
 
-    lv_obj_set_style_text_font(label, settings_fonts::sans(font_size, LV_FREETYPE_FONT_STYLE_BOLD),
-                               LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
     lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-    lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
+    lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_width(label, LV_SIZE_CONTENT);
     lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
@@ -150,24 +143,16 @@ void LvSettingRollerPage2::style_label(lv_obj_t *label, int distance, bool compa
 
     const bool focused      = distance == 0;
     const int natural_width = lv_obj_get_width(label);
-    if (compact) {
-        lv_obj_set_width(label, metric(LayoutMetric::LabelBoxW));
+    const int box_w = compact ? metric(LayoutMetric::CompactBoxW) : metric(LayoutMetric::LabelBoxW);
+    if (natural_width > box_w) {
+        lv_obj_set_width(label, box_w);
         lv_label_set_long_mode(label, focused ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
-        lv_obj_set_x(label, metric(LayoutMetric::LabelBoxX));
-    } else if (natural_width > metric(LayoutMetric::LabelBoxW)) {
-        lv_obj_set_width(label, metric(LayoutMetric::LabelBoxW));
-        lv_label_set_long_mode(label, focused ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
-        lv_obj_set_x(label, metric(LayoutMetric::LabelBoxX));
-    } else {
-        lv_obj_set_width(label, LV_SIZE_CONTENT);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-        lv_obj_update_layout(label);
-        const int label_x = metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(label) / 2;
-        lv_obj_set_x(label, label_x < metric(LayoutMetric::LabelBoxX) ? metric(LayoutMetric::LabelBoxX) : label_x);
+        lv_obj_set_style_anim_duration(label, lv_anim_speed(60), LV_PART_MAIN);
     }
+    lv_obj_set_x(label, metric(LayoutMetric::LabelBoxX));
 
     const int label_y = (metric(LayoutMetric::RowH) - lv_obj_get_height(label)) / 2;
-    lv_obj_set_y(label, label_y < 0 ? 0 : label_y);
+    lv_obj_set_y(label, label_y);
 }
 
 void LvSettingRollerPage2::set_status_hint(const char *text, uint32_t color)
@@ -192,8 +177,7 @@ void LvSettingRollerPage2::set_status_hint(const char *text, uint32_t color)
     // transition and make it jump when the overlay is dismissed. The next
     // transition completion snaps it to the appropriate resting coordinate.
     if (roller3_ || page3_transitioning_) return;
-    lv_obj_set_pos(hint_, hint_x,
-                   metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(hint_)) / 2);
+    lv_obj_set_pos(hint_, hint_x, metric(LayoutMetric::PanelH) - lv_obj_get_height(hint_) - 1);
 }
 
 void LvSettingRollerPage2::SetSelfUiMode(PageType mode)
@@ -203,7 +187,6 @@ void LvSettingRollerPage2::SetSelfUiMode(PageType mode)
     const bool enabled = mode == PageType::NextPageNeeded;
     NextActive         = enabled;
 
-    update_arrow_visibility();
 
     if (right_arrow_) {
         if (enabled)
@@ -244,7 +227,7 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     if (!power_warning_) return;
     lv_obj_set_size(power_warning_, 280, 92);
     lv_obj_center(power_warning_);
-    lv_obj_set_style_radius(power_warning_, 4, LV_PART_MAIN);
+    lv_obj_set_style_radius(power_warning_, 0, LV_PART_MAIN);
     lv_obj_set_style_border_width(power_warning_, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(power_warning_, lv_color_hex(0xFFAA00), LV_PART_MAIN);
     lv_obj_set_style_bg_color(power_warning_, lv_color_hex(0x171717), LV_PART_MAIN);
@@ -332,7 +315,6 @@ void LvSettingRollerPage2::show_power_warning()
 void LvSettingRollerPage2::set_compact_mode(bool enabled)
 {
     compact_mode_ = enabled;
-    update_arrow_visibility();
 
     if (right_arrow_) {
         if (enabled)
@@ -357,23 +339,6 @@ void LvSettingRollerPage2::set_compact_mode(bool enabled)
 
         const int distance = std::abs(static_cast<int32_t>(index) - selected_index);
         style_label(label, distance, enabled);
-    }
-}
-
-void LvSettingRollerPage2::update_arrow_visibility()
-{
-    const bool show_arrows = item_count_ > 1 && !NextActive;
-    if (arrow_up_) {
-        if (show_arrows)
-            lv_obj_remove_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_add_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-    }
-    if (arrow_down_) {
-        if (show_arrows)
-            lv_obj_remove_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_add_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -437,7 +402,7 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
 
             const bool pending = operation_started.load(std::memory_order_acquire);
             set_status_icon(icon_obj, std::get<0>(result));
-            set_status_hint(pending ? "Wait" : "ok:enter", pending ? 0xF0C850 : 0x3DDC84);
+            set_status_hint(pending ? "wait" : "", pending ? 0xF0C850 : 0x3DDC84);
             return pending;
         };
 
@@ -481,7 +446,7 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
         }
 
         set_status_icon(icon_obj, result.enabled);
-        set_status_hint("ok:enter", 0x3DDC84);
+        set_status_hint("", 0x3DDC84);
     };
     callbacks.on_exception = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &,
                                                                                  std::exception_ptr) {
@@ -562,8 +527,6 @@ void LvSettingRollerPage2::stop_page3_animations()
     };
     stop(selection_bg_);
     stop(ComponensObj);
-    stop(arrow_up_);
-    stop(arrow_down_);
     stop(right_arrow_);
     stop(hint_);
     if (roller3_ && roller3_->Get()) stop(roller3_->Get());
@@ -572,8 +535,6 @@ void LvSettingRollerPage2::stop_page3_animations()
 int LvSettingRollerPage2::page_object_base_x(lv_obj_t *object) const
 {
     if (object == selection_bg_ || object == ComponensObj) return metric(LayoutMetric::PanelX);
-    if (object == arrow_up_) return arrow_up_base_x_;
-    if (object == arrow_down_) return arrow_down_base_x_;
     if (object == right_arrow_) return right_arrow_base_x_;
     if (object == hint_) return hint_base_x_;
     return object ? lv_obj_get_x(object) : 0;
@@ -672,8 +633,6 @@ void LvSettingRollerPage2::start_page3_transition(bool entering)
     animate_first_page_objects(entering);
     animate_object_to(selection_bg_, page2_target_x(selection_bg_, entering));
     animate_object_to(ComponensObj, page2_target_x(ComponensObj, entering));
-    animate_object_to(arrow_up_, page2_target_x(arrow_up_, entering));
-    animate_object_to(arrow_down_, page2_target_x(arrow_down_, entering));
     animate_object_to(right_arrow_, page2_target_x(right_arrow_, entering));
     animate_object_to(hint_, page2_target_x(hint_, entering));
 }
@@ -703,8 +662,6 @@ void LvSettingRollerPage2::finish_page3_transition(bool entering)
     };
     snap(selection_bg_, page2_target_x(selection_bg_, entering));
     snap(ComponensObj, page2_target_x(ComponensObj, entering));
-    snap(arrow_up_, page2_target_x(arrow_up_, entering));
-    snap(arrow_down_, page2_target_x(arrow_down_, entering));
     snap(right_arrow_, page2_target_x(right_arrow_, entering));
     snap(hint_, page2_target_x(hint_, entering));
 
@@ -760,7 +717,7 @@ void LvSettingRollerPage2::set_network_time_icon_hidden(bool hidden)
 
     uint32_t row_index = 0;
     for (auto node = parent_node_.begin(); node != parent_node_.end(); ++node, ++row_index) {
-        if (node->label != "Network Time") continue;
+        if (node->label != "network time") continue;
         lv_obj_t *row = lv_obj_get_child(ComponensObj, row_index);
         lv_obj_t *status_icon = row ? lv_obj_get_child(row, 1) : nullptr;
         if (!status_icon) return;
@@ -788,7 +745,6 @@ void LvSettingRollerPage2::scroll_to_selected(lv_obj_t *cont, bool animated)
 
     lv_obj_scroll_to_view(item, animated ? LV_ANIM_ON : LV_ANIM_OFF);
     lv_obj_send_event(cont, LV_EVENT_SCROLL, cont);
-    update_arrow_visibility();
 }
 
 void LvSettingRollerPage2::select(int index)
@@ -849,7 +805,7 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
     lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(selection_bg_, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_SCROLLABLE);
@@ -876,10 +832,10 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     lv_obj_set_style_pad_bottom(ComponensObj, metric(LayoutMetric::EdgePadding), LV_PART_MAIN);
     lv_obj_set_style_pad_row(ComponensObj, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(ComponensObj, 0, LV_PART_MAIN);
-    lv_obj_set_style_clip_corner(ComponensObj, true, LV_PART_MAIN);
     lv_obj_set_flex_flow(ComponensObj, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_scroll_dir(ComponensObj, LV_DIR_VER);
     lv_obj_set_scroll_snap_y(ComponensObj, LV_SCROLL_SNAP_CENTER);
+    settings_quick_scroll(ComponensObj);
     lv_obj_set_scrollbar_mode(ComponensObj, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(ComponensObj, LV_OBJ_FLAG_SCROLL_WITH_ARROW);
     lv_obj_add_event_cb(ComponensObj, scroll_event_cb, LV_EVENT_SCROLL, this);
@@ -907,38 +863,14 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     }
     item_count_ = lv_obj_get_child_count(ComponensObj);
 
-    arrow_up_ = lv_img_create(utility_obj_);
-    if (arrow_up_) {
-        lv_img_set_src(arrow_up_, &setting_red_up);
-        lv_obj_update_layout(arrow_up_);
-        lv_obj_set_pos(
-            arrow_up_,
-            metric(LayoutMetric::PanelX) + metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(arrow_up_) / 2, 2);
-        lv_obj_update_layout(utility_obj_);
-        arrow_up_base_x_ = lv_obj_get_x(arrow_up_);
-    }
-
-    arrow_down_ = lv_img_create(utility_obj_);
-    if (arrow_down_) {
-        lv_img_set_src(arrow_down_, &setting_red_down);
-        lv_obj_update_layout(arrow_down_);
-        lv_obj_set_pos(
-            arrow_down_,
-            metric(LayoutMetric::PanelX) + metric(LayoutMetric::LabelCenterX) - lv_obj_get_width(arrow_down_) / 2,
-            metric(LayoutMetric::PanelH) - lv_obj_get_height(arrow_down_) - 4);
-        lv_obj_update_layout(utility_obj_);
-        arrow_down_base_x_ = lv_obj_get_x(arrow_down_);
-    }
-
     hint_ = lv_label_create(utility_obj_);
     if (hint_) {
-        lv_label_set_text(hint_, "ok:enter");
+        lv_label_set_text(hint_, "");
         lv_obj_set_style_text_color(hint_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
-        lv_obj_set_style_text_font(hint_, settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD),
-                                   LV_PART_MAIN);
+        lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_update_layout(hint_);
         lv_obj_set_pos(hint_, metric(LayoutMetric::PanelX) + metric(LayoutMetric::PanelW) - 6 - lv_obj_get_width(hint_),
-                       metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(hint_)) / 2);
+                       metric(LayoutMetric::PanelH) - lv_obj_get_height(hint_) - 1);
         lv_obj_update_layout(utility_obj_);
         hint_base_x_ = lv_obj_get_x(hint_);
     }
@@ -947,7 +879,6 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
         lv_obj_update_layout(ComponensObj);
         scroll_to_selected(ComponensObj, false);
     }
-    update_arrow_visibility();
 }
 
 void LvSettingRollerPage2::handle_key_event(lv_event_t *event)

@@ -75,15 +75,15 @@ void UIMeshPage::show_input_overlay()
     msg_input_buf_.clear();
     lv_obj_set_size(input_overlay_, 280, 50);
     lv_obj_set_pos(input_overlay_, 20, 50);
-    lv_obj_set_style_radius(input_overlay_, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(input_overlay_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(input_overlay_, lv_color_hex(0x1F3A5F), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(input_overlay_, 240, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_color(input_overlay_, lv_color_hex(0x1F6FEB), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(input_overlay_, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(input_overlay_, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_clear_flag(input_overlay_, LV_OBJ_FLAG_SCROLLABLE);
-    make_label(input_overlay_, "Send MESH Message:", 0, 0, 0x58A6FF, &lv_font_montserrat_10);
-    msg_input_lbl_ = make_label(input_overlay_, "_", 0, 14, 0xFFFFFF, &lv_font_montserrat_12);
+    make_label(input_overlay_, "Send MESH Message:", 0, 0, 0x58A6FF, launcher_fonts().get_chrome(11));
+    msg_input_lbl_ = make_label(input_overlay_, "_", 0, 14, 0xFFFFFF, launcher_fonts().get_chrome(11));
     if (!msg_input_lbl_) {
         close_input_overlay();
         return;
@@ -91,7 +91,7 @@ void UIMeshPage::show_input_overlay()
     lv_obj_add_event_cb(msg_input_lbl_, owned_obj_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_set_width(msg_input_lbl_, 260);
     lv_label_set_long_mode(msg_input_lbl_, LV_LABEL_LONG_CLIP);
-    make_label(input_overlay_, "OK:send  ESC:cancel", 0, 30, 0x888888, &lv_font_montserrat_10);
+    make_label(input_overlay_, "OK:send  ESC:cancel", 0, 30, 0x888888, launcher_fonts().get_chrome(11));
 }
 
 void UIMeshPage::close_input_overlay()

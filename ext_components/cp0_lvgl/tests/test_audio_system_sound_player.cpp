@@ -23,17 +23,24 @@ std::string cp0_file_path(std::string file)
 
 int main()
 {
+    // The launcher ships no UI sounds: the player starts empty and disabled
+    // until a platform or application registers sounds and enables it.
     Cp0SystemSoundPlayer player;
-    assert(player.sound_count() == 3);
-    assert(player.contains("Ding2.wav"));
-    assert(!player.play_index(player.sound_count()));
-
-    player.set_enabled(false);
+    assert(player.sound_count() == 0);
     assert(!player.enabled());
     assert(!player.play_index(0));
 
     player.set_enabled(true);
     assert(player.enabled());
+    assert(!player.play_index(0));
+
+    assert(player.reload({"startup.wav", "left.wav", "right.wav"}) == 0);
+    assert(player.sound_count() == 3);
+    assert(!player.play_index(player.sound_count()));
+
+    player.set_enabled(false);
+    assert(!player.play_index(0));
+    player.set_enabled(true);
 
     std::promise<bool> result;
     auto future = result.get_future();
@@ -46,6 +53,7 @@ int main()
     }));
     assert(std::chrono::steady_clock::now() - started < std::chrono::milliseconds(50));
     assert(future.wait_for(std::chrono::seconds(2)) == std::future_status::ready);
+    // The files do not exist, so the worker reports that nothing played.
     assert(!future.get());
     assert(callback_thread != caller_thread);
 

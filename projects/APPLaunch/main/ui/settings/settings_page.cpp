@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "settings_extras.hpp"
 #include "settings_page.hpp"
 
 #include "cp0_lvgl_app.h"
 #include "hal_lvgl_bsp.h"
-#include "settings_adb_guide_page.hpp"
 #include "settings_battery_info_page.hpp"
-#include "settings_battery_calibration_page.hpp"
 #include "settings_bluetooth_connected_devices_page.hpp"
 #include "settings_bluetooth_scan_page.hpp"
 #include "settings_brightness_page.hpp"
@@ -200,7 +199,7 @@ void refresh_bluetooth_alias(const NodeIter &page_node)
     std::string alias;
     if (!query_bluetooth_status(powered, discoverable, &alias) || alias.empty()) return;
 
-    constexpr const char *prefix = "Alias: ";
+    constexpr const char *prefix = "alias: ";
     for (auto child = page_node.begin(); child != page_node.end(); ++child) {
         if (child->label.rfind(prefix, 0) == 0) {
             child->label = std::string(prefix) + alias;
@@ -214,14 +213,13 @@ static std::unique_ptr<DComponens::LvglComponensBase> bluetooth_roller_page_fact
                                                                                     std::function<void()> on_back)
 {
 #ifdef LAUNCHER_BUILD
-    if (page_node->label == "Launcher") {
+    if (page_node->label == "apps") {
         Tree *tree = settings_tree_factory_context();
         if (tree) {
             settings_t12b::populate_launcher_children(*tree, page_node);
         }
     }
 #endif
-    system("/usr/sbin/rfkill unblock bluetooth");
     refresh_bluetooth_alias(page_node);
     return std::make_unique<LvSettingRollerPage2>(parent, page_node, std::move(on_back));
 }
@@ -230,14 +228,14 @@ static std::unique_ptr<DComponens::LvglComponensBase> roller_page_factory(lv_obj
                                                                           std::function<void()> on_back)
 {
 #ifdef LAUNCHER_BUILD
-    if (page_node->label == "Launcher") {
+    if (page_node->label == "apps") {
         Tree *tree = settings_tree_factory_context();
         if (tree) {
             settings_t12b::populate_launcher_children(*tree, page_node);
         }
     }
 #endif
-    if (page_node->label == "Date & Time") {
+    if (page_node->label == "time") {
         // Refresh before the page is built: the constructor's own status read
         // then sees initialized=true and returns, so one visit costs one D-Bus
         // read instead of two.  The status icon and the Set Manually gate both
@@ -245,7 +243,7 @@ static std::unique_ptr<DComponens::LvglComponensBase> roller_page_factory(lv_obj
         settings_rtc_refresh_ntp();
     }
     auto page = std::make_unique<LvSettingRollerPage2>(parent, page_node, std::move(on_back));
-    if (page_node->label == "Date & Time") {
+    if (page_node->label == "time") {
         // Manual time edits belong to a single visit to Date & Time; leaving the
         // submenu abandons them so a later visit cannot write a stale time.
         page->set_on_destroy([] { settings_rtc_discard_edits(); });
@@ -279,23 +277,16 @@ static std::unique_ptr<DComponens::LvglComponensBase> volume_page3_factory(lv_ob
     return std::make_unique<LvSettingVolumePage3>(parent, page_node, std::move(on_back));
 }
 
-static std::unique_ptr<DComponens::LvglComponensBase> bq_calibrate_page3_factory(lv_obj_t *parent,
-                                                                                 const NodeIter &page_node,
-                                                                                 std::function<void()> on_back)
-{
-    return std::make_unique<LvSettingBQCalibratePage3>(parent, page_node, std::move(on_back));
-}
-
 static std::unique_ptr<DComponens::LvglComponensBase> rtc_page3_factory(lv_obj_t *parent, const NodeIter &page_node,
                                                                         std::function<void()> on_back)
 {
-    // "Day" is declared with a static 1..31 option list, but the model clamps
+    // "day" is declared with a static 1..31 option list, but the model clamps
     // the day to the month that is actually selected.  Rebuild the options from
     // the model so the page can never offer a date that would be rejected on
     // commit.  This runs before the page object is constructed and after the
     // previous third-level page (with its per-entry action backups) has been
     // destroyed, so nothing holds an iterator into the children being replaced.
-    if (page_node->label == "Day") {
+    if (page_node->label == "day") {
         if (Tree *tree = settings_tree_factory_context()) {
             // Safe to replace the children here: LoadNextPage() returns early
             // while roller3_ is set, so the previous third-level page has been
@@ -340,13 +331,6 @@ static std::unique_ptr<DComponens::LvglComponensBase> wifi_add_hidden_page_facto
     return std::make_unique<LvSettingWifiScanPage3>(parent, page_node, std::move(on_back), true, enabled);
 }
 
-static std::unique_ptr<DComponens::LvglComponensBase> adb_guide_page_factory(lv_obj_t *parent,
-                                                                             const NodeIter &page_node,
-                                                                             std::function<void()> on_back)
-{
-    return std::make_unique<LvSettingAdbGuidePage3>(parent, page_node, std::move(on_back));
-}
-
 static std::unique_ptr<DComponens::LvglComponensBase> bluetooth_connected_page_factory(lv_obj_t *parent,
                                                                                        const NodeIter &page_node,
                                                                                        std::function<void()> on_back)
@@ -366,11 +350,11 @@ static std::unique_ptr<DComponens::LvglComponensBase> bluetooth_alias_page_facto
                                                                                    std::function<void()> on_back)
 {
     std::string alias            = page_node->label;
-    constexpr const char *prefix = "Alias: ";
+    constexpr const char *prefix = "alias: ";
     if (alias.rfind(prefix, 0) == 0) alias.erase(0, std::strlen(prefix));
     return std::make_unique<LvSettingBluetoothAliasPage3>(
         parent, page_node, std::move(on_back), std::move(alias),
-        [page_node](std::string value) { page_node->label = "Alias: " + std::move(value); });
+        [page_node](std::string value) { page_node->label = "alias: " + std::move(value); });
 }
 
 bool bluetooth_power_state          = false;
@@ -608,148 +592,140 @@ void UISettingTreePage::create_page_detail()
     NodeIter root                   = mode_tree.set_head(SettingEntry{"Settings"});
 
     {
-        NodeIter screen = mode_tree.append_child(root, SettingEntry{"Screen", roller_page_factory});
+        NodeIter screen = mode_tree.append_child(root, SettingEntry{"screen", roller_page_factory});
         {
-            NodeIter brightness = mode_tree.append_child(screen, SettingEntry{"Brightness", brightness_page3_factory});
+            NodeIter brightness = mode_tree.append_child(screen, SettingEntry{"brightness", brightness_page3_factory});
             append_brightness_options(mode_tree, brightness);
         }
         {
-            NodeIter dark_time = mode_tree.append_child(screen, SettingEntry{"DarkTime", dark_time_page3_factory});
-            mode_tree.append_child(dark_time, SettingEntry{"Never"});
-            mode_tree.append_child(dark_time, SettingEntry{"10S"});
-            mode_tree.append_child(dark_time, SettingEntry{"30S"});
-            mode_tree.append_child(dark_time, SettingEntry{"60S"});
-            mode_tree.append_child(dark_time, SettingEntry{"300S"});
+            NodeIter dark_time = mode_tree.append_child(screen, SettingEntry{"auto-lock", dark_time_page3_factory});
+            mode_tree.append_child(dark_time, SettingEntry{"never"});
+            mode_tree.append_child(dark_time, SettingEntry{"10 s"});
+            mode_tree.append_child(dark_time, SettingEntry{"30 s"});
+            mode_tree.append_child(dark_time, SettingEntry{"1 min"});
+            mode_tree.append_child(dark_time, SettingEntry{"5 min"});
         }
     }
 
     {
-        NodeIter speaker = mode_tree.append_child(
-            root, SettingEntry{"Speaker", volume_page3_factory, PageType::FullCustom});
+        NodeIter sound = mode_tree.append_child(root, SettingEntry{"sound", roller_page_factory});
+        NodeIter volume = mode_tree.append_child(
+            sound, SettingEntry{"volume", volume_page3_factory, PageType::FullCustom});
         for (int index = 0; index < setup_values::volume_metric(setup_values::VolumeMetric::OptionCount); ++index) {
             mode_tree.append_child(
-                speaker, SettingEntry{std::to_string(setup_values::volume_percent(index)) + "%"});
+                volume, SettingEntry{std::to_string(setup_values::volume_percent(index)) + "%"});
         }
+        NodeIter mic_gain = mode_tree.append_child(sound, SettingEntry{"mic gain", settings_mic_gain_page_factory});
+        append_mic_gain_options(mode_tree, mic_gain);
     }
 
     {
-        NodeIter wifi = mode_tree.append_child(root, SettingEntry{"Wi-Fi", roller_page_factory});
-        mode_tree.append_child(wifi, SettingEntry{"Enable", wifi_power_api, true});
-        mode_tree.append_child(wifi, SettingEntry{"Networks", wifi_scan_page3_factory, PageType::FullCustom});
-        mode_tree.append_child(wifi,
-                               SettingEntry{"Join Hidden Network", wifi_add_hidden_page_factory, PageType::FullCustom});
+        NodeIter wifi = mode_tree.append_child(root, SettingEntry{"wi-fi", roller_page_factory});
+        mode_tree.append_child(wifi, SettingEntry{"enable", wifi_power_api, true});
+        mode_tree.append_child(wifi, SettingEntry{"networks", wifi_scan_page3_factory, PageType::FullCustom});
+        mode_tree.append_child(wifi, SettingEntry{"hidden", wifi_add_hidden_page_factory, PageType::FullCustom});
     }
 
     {
-        NodeIter ethernet = mode_tree.append_child(root, SettingEntry{"Ethernet", roller_page_factory});
+        NodeIter bluetooth = mode_tree.append_child(root, SettingEntry{"bluetooth", bluetooth_roller_page_factory});
+        mode_tree.append_child(bluetooth, SettingEntry{"power", bluetooth_power_api, true});
+        mode_tree.append_child(bluetooth, SettingEntry{"alias: ", bluetooth_alias_page_factory});
+        mode_tree.append_child(bluetooth, SettingEntry{"visible", bluetooth_discoverable_api, true});
+        mode_tree.append_child(bluetooth, SettingEntry{"named only", bluetooth_named_only_api, true});
+        mode_tree.append_child(bluetooth,
+                               SettingEntry{"paired", bluetooth_connected_page_factory, PageType::FullCustom});
+        mode_tree.append_child(bluetooth, SettingEntry{"scan", bluetooth_scan_page_factory, PageType::FullCustom});
+    }
+
+    {
+        NodeIter ethernet = mode_tree.append_child(root, SettingEntry{"ethernet", roller_page_factory});
         NodeIter ethernet_enable =
-            mode_tree.append_child(ethernet, SettingEntry{"Enable", ethernet_enabled_api, true});
+            mode_tree.append_child(ethernet, SettingEntry{"enable", ethernet_enabled_api, true});
         ethernet_enable->status_read_policy = SettingStatusReadPolicy::Direct;
         mode_tree.append_child(
-            ethernet, SettingEntry{"Info", settings_ethernet_page_factory, PageType::FullCustom});
+            ethernet, SettingEntry{"info", settings_ethernet_page_factory, PageType::FullCustom});
     }
 
     {
-        NodeIter bluetooth = mode_tree.append_child(root, SettingEntry{"Bluetooth", bluetooth_roller_page_factory});
-        mode_tree.append_child(bluetooth, SettingEntry{"Power", bluetooth_power_api, true});
-        mode_tree.append_child(bluetooth, SettingEntry{"Alias: ", bluetooth_alias_page_factory});
-        mode_tree.append_child(bluetooth, SettingEntry{"Discoverable", bluetooth_discoverable_api, true});
-        mode_tree.append_child(bluetooth, SettingEntry{"Named Only", bluetooth_named_only_api, true});
-        mode_tree.append_child(bluetooth,
-                               SettingEntry{"Paired Devices", bluetooth_connected_page_factory, PageType::FullCustom});
-        mode_tree.append_child(bluetooth, SettingEntry{"Scan", bluetooth_scan_page_factory, PageType::FullCustom});
+        NodeIter tailscale = mode_tree.append_child(root, SettingEntry{"tailscale", roller_page_factory});
+        mode_tree.append_child(tailscale, SettingEntry{"enable", tailscale_enabled_api, true});
+        mode_tree.append_child(
+            tailscale, SettingEntry{"status", settings_tailscale_page_factory, PageType::FullCustom});
     }
 
     {
-        NodeIter ext_port = mode_tree.append_child(root, SettingEntry{"ExtPort", roller_page_factory});
+        NodeIter ext_port = mode_tree.append_child(root, SettingEntry{"ext port", roller_page_factory});
         mode_tree.append_child(
             ext_port,
-            SettingEntry{"Ext 5V", std::bind(&ext_port_com, "EXT5V", std::placeholders::_1,
+            SettingEntry{"ext 5v", std::bind(&ext_port_com, "EXT5V", std::placeholders::_1,
                                               std::placeholders::_2), true});
         mode_tree.append_child(
             ext_port,
-            SettingEntry{"Grove 5V", std::bind(&ext_port_com, "GROVE5V", std::placeholders::_1,
+            SettingEntry{"grove 5v", std::bind(&ext_port_com, "GROVE5V", std::placeholders::_1,
                                                 std::placeholders::_2), true});
     }
 
-    {
-        NodeIter info = mode_tree.append_child(root, SettingEntry{"Battery", roller_page_factory});
-        mode_tree.append_child(info, SettingEntry{"Info", settings_battery_info_page_factory, PageType::FullCustom});
-#if 0
-        NodeIter bq_calibrate = mode_tree.append_child(info, SettingEntry{"BQ Calibrate", bq_calibrate_page3_factory});
-        mode_tree.append_child(bq_calibrate, SettingEntry{"Enter CAL"});
-        mode_tree.append_child(bq_calibrate, SettingEntry{"CC Offset"});
-        mode_tree.append_child(bq_calibrate, SettingEntry{"Board Offset"});
-        mode_tree.append_child(bq_calibrate, SettingEntry{"Exit CAL"});
-#endif
-    }
+    mode_tree.append_child(root, SettingEntry{"battery", settings_battery_info_page_factory, PageType::FullCustom});
 
 #ifdef LAUNCHER_BUILD
-    mode_tree.append_child(root, SettingEntry{"Launcher", roller_page_factory});
+    mode_tree.append_child(root, SettingEntry{"apps", roller_page_factory});
 #endif
 
     {
-        NodeIter developer = mode_tree.append_child(root, SettingEntry{"Developer", roller_page_factory});
-        SettingEntry adb_entry{"ADB", LvSettingAdbGuidePage3::toggle_setting, true};
-        adb_entry.status_read_policy = SettingStatusReadPolicy::Direct;
-        mode_tree.append_child(developer, std::move(adb_entry));
-        mode_tree.append_child(developer, SettingEntry{"ADB guide", adb_guide_page_factory, PageType::FullCustom});
-    }
-
-    {
-        mode_tree.append_child(root, SettingEntry{"User", settings_account_page_factory, PageType::FullCustom});
-    }
-    {
-        NodeIter date_time = mode_tree.append_child(root, SettingEntry{"Date & Time", roller_page_factory});
+        NodeIter date_time = mode_tree.append_child(root, SettingEntry{"time", roller_page_factory});
         mode_tree.append_child(date_time,
-                               SettingEntry{"Info", settings_rtc_info_page_factory, PageType::FullCustom});
-        SettingEntry ntp_entry{"Network Time", settings_rtc_ntp_api, true};
+                               SettingEntry{"info", settings_rtc_info_page_factory, PageType::FullCustom});
+        SettingEntry ntp_entry{"network time", settings_rtc_ntp_api, true};
         ntp_entry.status_read_policy = SettingStatusReadPolicy::Direct;
         mode_tree.append_child(date_time, std::move(ntp_entry));
-        SettingEntry manual_entry{"Set Manually", roller_page_factory};
+        NodeIter zone = mode_tree.append_child(date_time, SettingEntry{"time zone", settings_time_zone_page_factory});
+        append_time_zone_options(mode_tree, zone);
+        SettingEntry manual_entry{"set manually", roller_page_factory};
         // While Network Time keeps the clock there is nothing to set by hand, so
         // refuse the page up front and say why instead of letting every edit
         // fail one by one.
         manual_entry.activation_gate = [] { return settings_rtc_manual_edit_block(); };
         NodeIter manual = mode_tree.append_child(date_time, std::move(manual_entry));
         {
-            NodeIter year = mode_tree.append_child(manual, SettingEntry{"Year", rtc_page3_factory});
+            NodeIter year = mode_tree.append_child(manual, SettingEntry{"year", rtc_page3_factory});
             append_numeric_options(mode_tree, year, 2000, 2099);
         }
         {
-            NodeIter month = mode_tree.append_child(manual, SettingEntry{"Month", rtc_page3_factory});
+            NodeIter month = mode_tree.append_child(manual, SettingEntry{"month", rtc_page3_factory});
             append_numeric_options(mode_tree, month, 1, 12);
         }
         {
-            NodeIter day = mode_tree.append_child(manual, SettingEntry{"Day", rtc_page3_factory});
+            NodeIter day = mode_tree.append_child(manual, SettingEntry{"day", rtc_page3_factory});
             append_numeric_options(mode_tree, day, 1, 31);
         }
         {
-            NodeIter hour = mode_tree.append_child(manual, SettingEntry{"Hour", rtc_page3_factory});
+            NodeIter hour = mode_tree.append_child(manual, SettingEntry{"hour", rtc_page3_factory});
             append_numeric_options(mode_tree, hour, 0, 23);
         }
         {
-            NodeIter minute = mode_tree.append_child(manual, SettingEntry{"Minute", rtc_page3_factory});
+            NodeIter minute = mode_tree.append_child(manual, SettingEntry{"minute", rtc_page3_factory});
             append_numeric_options(mode_tree, minute, 0, 59);
         }
         {
             NodeIter write_rtc = mode_tree.append_child(
-                manual, SettingEntry{"Write RTC?", settings_rtc_confirm_page_factory});
-            mode_tree.append_child(write_rtc, SettingEntry{"Yes"});
-            mode_tree.append_child(write_rtc, SettingEntry{"No"});
+                manual, SettingEntry{"write rtc?", settings_rtc_confirm_page_factory});
+            mode_tree.append_child(write_rtc, SettingEntry{"yes"});
+            mode_tree.append_child(write_rtc, SettingEntry{"no"});
         }
     }
 
     {
-        NodeIter system = mode_tree.append_child(root, SettingEntry{"System", roller_page_factory});
+        NodeIter system = mode_tree.append_child(root, SettingEntry{"system", roller_page_factory});
         mode_tree.append_child(system,
-                               SettingEntry{"Software", settings_update_page_factory, PageType::FullCustom});
+                               SettingEntry{"about", settings_t12b_about_page_factory, PageType::FullCustom});
         mode_tree.append_child(system,
-                               SettingEntry{"Storage", settings_storage_page_factory, PageType::FullCustom});
+                               SettingEntry{"storage", settings_storage_page_factory, PageType::FullCustom});
         mode_tree.append_child(system,
-                               SettingEntry{"Licenses", settings_credit_page_factory, PageType::FullCustom});
+                               SettingEntry{"licenses", settings_credit_page_factory, PageType::FullCustom});
         settings_t12b::append_boot_action_child(
             mode_tree, system, settings_t12b::boot_actions::Action::Reboot, confirm_page3_factory);
+        settings_t12b::append_boot_action_child(
+            mode_tree, system, settings_t12b::boot_actions::Action::Shutdown, confirm_page3_factory);
     }
 
 }

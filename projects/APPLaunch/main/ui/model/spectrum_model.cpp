@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+#include <sstream>
 
 namespace spectrum {
 
@@ -150,6 +152,33 @@ std::string sub_raw_lines(const std::vector<int32_t> &durations)
         text += "\n";
     }
     return text;
+}
+
+bool tx_allowed(uint32_t hz)
+{
+    return (hz >= 433050000 && hz <= 434790000) || (hz >= 863000000 && hz <= 870000000);
+}
+
+Capture parse_sub(const std::string &contents)
+{
+    Capture capture;
+    std::istringstream stream(contents);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const std::size_t colon = line.find(':');
+        if (colon == std::string::npos) continue;
+        const std::string key = line.substr(0, colon);
+        const std::string rest = line.substr(colon + 1);
+        if (key == "Frequency") {
+            capture.freq_hz = static_cast<uint32_t>(std::strtoul(rest.c_str(), nullptr, 10));
+        } else if (key == "RAW_Data") {
+            std::istringstream numbers(rest);
+            long value = 0;
+            while (numbers >> value) capture.durations.push_back(static_cast<int32_t>(value));
+        }
+    }
+    return capture;
 }
 
 } // namespace spectrum

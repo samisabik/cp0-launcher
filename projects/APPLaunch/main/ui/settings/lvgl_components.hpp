@@ -34,6 +34,26 @@
 
 // Generated from https://lvgl.100ask.net/master/examples.html
 // Each example is represented as a standalone C++ component class.
+// Settings lists scroll one row per key press. LVGL's default scroll speed
+// spends about 290 ms on a 26 px row; shorten it, and shorter still while a
+// key repeats so held keys never queue behind the animation.
+inline void settings_quick_scroll_cb(lv_event_t *event)
+{
+    auto *animation = static_cast<lv_anim_t *>(lv_event_get_param(event));
+    if (!animation) return;
+    static uint32_t last_begin = 0;
+    const uint32_t now   = lv_tick_get();
+    const bool repeating = now - last_begin < 180;
+    last_begin           = now;
+    lv_anim_set_duration(animation, repeating ? 50 : 110);
+    lv_anim_set_path_cb(animation, lv_anim_path_ease_out);
+}
+
+inline void settings_quick_scroll(lv_obj_t *scroller)
+{
+    if (scroller) lv_obj_add_event_cb(scroller, settings_quick_scroll_cb, LV_EVENT_SCROLL_BEGIN, nullptr);
+}
+
 namespace DComponens {
 
 // #if !defined(LVGL_COMPONENTS_ROLLER1_ONLY)
@@ -7955,20 +7975,20 @@ public:
     enum class LayoutMetric : int {
         ScreenW         = 320,
         ScreenH         = 150,
-        RowH            = 21,
-        CenterRow       = 3,
-        EdgePadding     = RowH * CenterRow,
+        RowH            = 26,
+        CenterRow       = 2,
+        EdgePadding     = 62,
         BarX            = 4,
-        BarY            = 66,
+        BarY            = 62,
         BarW            = 312,
-        BarH            = 22,
-        TitleCenterX    = 60,
-        TitleBoxW       = 84,
-        ValueListX      = 100,
-        ValueListW      = 120,
+        BarH            = 26,
+        TitleCenterX    = 56,
+        TitleBoxW       = 96,
+        ValueListX      = 112,
+        ValueListW      = 156,
         ValueCenterX    = ValueListW / 2,
-        ValueBoxX       = 16,
-        ValueBoxW       = 88,
+        ValueBoxX       = 8,
+        ValueBoxW       = 148,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -8040,8 +8060,6 @@ public:
         value_list_   = nullptr;
         title_label_  = nullptr;
         right_arrow_  = nullptr;
-        arrow_up_     = nullptr;
-        arrow_down_   = nullptr;
         hint_         = nullptr;
     }
 
@@ -8049,27 +8067,19 @@ public:
     {
         if (!label) return;
 
-        int font_size  = 10;
-        int opa        = 130;
-        uint32_t color = 0x555555;
+        uint32_t color = 0x3C3C3C;
         if (distance == 0) {
-            font_size = 16;
-            opa       = 255;
-            color     = 0xFFFFFF;
+            color = 0xE6E6E6;
         } else if (distance == 1) {
-            font_size = 12;
-            opa       = 220;
-            color     = 0xAAAAAA;
+            color = 0x8A8A8A;
         } else if (distance == 2) {
-            font_size = 12;
-            opa       = 170;
-            color     = 0x777777;
+            color = 0x5C5C5C;
         }
 
         lv_obj_set_style_text_font(
-            label, settings_fonts::cjk_sans(font_size), LV_PART_MAIN);
+            label, settings_fonts::mono(distance == 0 ? 22 : kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-        lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
+        lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         lv_obj_set_width(label, LV_SIZE_CONTENT);
         lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
@@ -8080,16 +8090,11 @@ public:
         if (natural_width > metric(LayoutMetric::ValueBoxW)) {
             lv_obj_set_width(label, metric(LayoutMetric::ValueBoxW));
             lv_label_set_long_mode(label, focused ? LV_LABEL_LONG_SCROLL_CIRCULAR : LV_LABEL_LONG_CLIP);
-            lv_obj_set_x(label, metric(LayoutMetric::ValueBoxX));
-        } else {
-            lv_obj_set_width(label, LV_SIZE_CONTENT);
-            lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-            lv_obj_update_layout(label);
-            lv_obj_set_x(label, metric(LayoutMetric::ValueCenterX) - lv_obj_get_width(label) / 2);
         }
+        lv_obj_set_x(label, metric(LayoutMetric::ValueBoxX));
 
         const int label_y = (metric(LayoutMetric::RowH) - lv_obj_get_height(label)) / 2;
-        lv_obj_set_y(label, std::max(0, label_y));
+        lv_obj_set_y(label, label_y);
     }
 
     void update_value_styles()
@@ -8150,22 +8155,6 @@ public:
         lv_obj_set_y(title_label_, std::max(0, label_y));
     }
 
-    void update_arrow_visibility()
-    {
-        if (arrow_up_) {
-            if (selected_index > 0)
-                lv_obj_remove_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-            else
-                lv_obj_add_flag(arrow_up_, LV_OBJ_FLAG_HIDDEN);
-        }
-        if (arrow_down_) {
-            if (selected_index + 1 < static_cast<int32_t>(item_count_))
-                lv_obj_remove_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
-            else
-                lv_obj_add_flag(arrow_down_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-
     void scroll_to_selected(bool animated)
     {
         if (!value_list_ || item_count_ == 0) return;
@@ -8175,11 +8164,10 @@ public:
 
         lv_obj_scroll_to_view(row, animated ? LV_ANIM_ON : LV_ANIM_OFF);
         update_value_styles();
-        update_arrow_visibility();
     }
 
     // Reserve a fixed footer below the scrollable value list for page-specific
-    // status content without changing the selection bar or arrow positions.
+    // status content without changing the selection bar position.
     void reserve_footer(int height)
     {
         if (!value_list_) return;
@@ -8413,7 +8401,7 @@ protected:
             lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
             lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
-            lv_obj_set_style_border_width(selection_bg_, 2, LV_PART_MAIN);
+            lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
             lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
             lv_obj_remove_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_remove_flag(selection_bg_, LV_OBJ_FLAG_SCROLLABLE);
@@ -8434,6 +8422,7 @@ protected:
             lv_obj_set_flex_flow(value_list_, LV_FLEX_FLOW_COLUMN);
             lv_obj_set_scroll_dir(value_list_, LV_DIR_VER);
             lv_obj_set_scroll_snap_y(value_list_, LV_SCROLL_SNAP_CENTER);
+            settings_quick_scroll(value_list_);
             lv_obj_set_scrollbar_mode(value_list_, LV_SCROLLBAR_MODE_OFF);
             lv_obj_remove_flag(value_list_, LV_OBJ_FLAG_SCROLL_WITH_ARROW);
 
@@ -8457,14 +8446,9 @@ protected:
 
         title_label_ = lv_label_create(ComponensObj);
         if (title_label_) {
-            std::string title = parent_node_->label;
-            if (title.rfind("BQ ", 0) == 0) title.erase(0, 3);
-            lv_label_set_text(title_label_, title.c_str());
-            lv_obj_set_style_text_font(
-                title_label_,
-                settings_fonts::cjk_sans(16),
-                LV_PART_MAIN);
-            lv_obj_set_style_text_color(title_label_, lv_color_white(), LV_PART_MAIN);
+            lv_label_set_text(title_label_, parent_node_->label.c_str());
+            lv_obj_set_style_text_font(title_label_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+            lv_obj_set_style_text_color(title_label_, lv_color_hex(0x8A8A8A), LV_PART_MAIN);
             lv_obj_set_style_text_align(title_label_, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
             update_title_position();
         }
@@ -8480,43 +8464,21 @@ protected:
                 metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(right_arrow_)) / 2);
         }
 
-        arrow_up_ = lv_img_create(ComponensObj);
-        if (arrow_up_) {
-            lv_img_set_src(arrow_up_, &setting_red_up);
-            lv_obj_update_layout(arrow_up_);
-            lv_obj_set_pos(
-                arrow_up_,
-                metric(LayoutMetric::ValueListX) + metric(LayoutMetric::ValueCenterX) - lv_obj_get_width(arrow_up_) / 2,
-                2);
-        }
-
-        arrow_down_ = lv_img_create(ComponensObj);
-        if (arrow_down_) {
-            lv_img_set_src(arrow_down_, &setting_red_down);
-            lv_obj_update_layout(arrow_down_);
-            lv_obj_set_pos(arrow_down_,
-                           metric(LayoutMetric::ValueListX) + metric(LayoutMetric::ValueCenterX) -
-                               lv_obj_get_width(arrow_down_) / 2,
-                           metric(LayoutMetric::ScreenH) - lv_obj_get_height(arrow_down_) - 4);
-        }
-
         hint_ = lv_label_create(ComponensObj);
         if (hint_) {
-            lv_label_set_text(hint_, "ok:set");
-            lv_obj_set_style_text_color(hint_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
-            lv_obj_set_style_text_font(hint_, settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD),
-                                       LV_PART_MAIN);
+            lv_label_set_text(hint_, "ent set");
+            lv_obj_set_style_text_color(hint_, lv_color_hex(0x5F7A66), LV_PART_MAIN);
+            lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
             lv_obj_update_layout(hint_);
             lv_obj_set_pos(hint_, metric(LayoutMetric::ScreenW) - 6 - lv_obj_get_width(hint_),
-                           metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(hint_)) / 2);
+                           metric(LayoutMetric::ScreenH) - lv_obj_get_height(hint_) - 1);
         }
 
         if (item_count_ > 0) {
             lv_obj_update_layout(value_list_);
             const int saved_selection = parent_node_->selected_index;
             select(saved_selection >= 0 ? saved_selection : initial_selection());
-        } else
-            update_arrow_visibility();
+        }
     }
 
 private:
@@ -8532,8 +8494,6 @@ private:
     lv_obj_t *value_list_   = nullptr;
     lv_obj_t *title_label_  = nullptr;
     lv_obj_t *right_arrow_  = nullptr;
-    lv_obj_t *arrow_up_     = nullptr;
-    lv_obj_t *arrow_down_   = nullptr;
     lv_obj_t *hint_         = nullptr;
 };
 

@@ -570,10 +570,10 @@ void append_boot_action_child(Tree &tree,
         tree.append_child(parent, SettingEntry{std::string(view.label), confirmation_factory});
     tree.append_child(
         action_node,
-        SettingEntry{"Yes", make_boot_confirmation_api(action, true, std::move(completion)), false});
+        SettingEntry{"yes", make_boot_confirmation_api(action, true, std::move(completion)), false});
     tree.append_child(
         action_node,
-        SettingEntry{"No", make_boot_confirmation_api(action, false), false});
+        SettingEntry{"no", make_boot_confirmation_api(action, false), false});
 }
 
 void append_boot_children(Tree &tree,

@@ -83,9 +83,11 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_page_app<UIIpPanelPage>},
     {{"Spectrum", "line/spectrum.png", "app_Spectrum", true, false},
      nullptr, false, true, false, append_page_app<UISpectrumPage>},
+    {{"Rec", "line/rec.png", "app_Rec", true, false},
+     nullptr, false, true, false, append_page_app<UIRecPage>},
+    {{"Power", "line/power.png", "app_Power", true, false},
+     nullptr, false, true, false, append_page_app<UIPowerPage>},
 #endif
-    {{"Calculator", "math_100.png", "app_Math", true, false},
-     "@calculator_exec", false, true, false, nullptr},
 };
 
 DynamicAppRegistry &dynamic_app_registry()

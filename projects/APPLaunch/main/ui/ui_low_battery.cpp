@@ -21,7 +21,12 @@ namespace launcher_battery_ui {
 namespace {
 
 constexpr int kScreenWidth = 320;
-constexpr int kScreenHeight = 240;
+constexpr int kScreenHeight = 170;
+// The warning flashes a thin frame round the display; a full-screen tint would
+// blend and resend every pixel on each flash.
+constexpr int kFrameWidth = 3;
+constexpr uint32_t kFrameBright = 0xFF3030;
+constexpr uint32_t kFrameDim = 0x5A1414;
 constexpr uint32_t kFlashMs = 500;
 constexpr uint32_t kBatteryRefreshMs = 3000;
 constexpr uint32_t kActivePeriodMs = 250;
@@ -35,6 +40,7 @@ lv_obj_t *countdown_label = nullptr;
 lv_obj_t *message_label = nullptr;
 lv_timer_t *warning_timer = nullptr;
 uint32_t flash_tick = 0;
+bool frame_bright = true;
 uint32_t rendered_seconds = 0;
 uint32_t battery_refresh_tick = 0;
 cp0_keyboard_key_filter_t previous_key_filter = nullptr;
@@ -149,6 +155,16 @@ void critical_child_deleted_cb(lv_event_t *event) noexcept
     }
 }
 
+void set_frame(bool bright)
+{
+    frame_bright = bright;
+    if (!tint) return;
+    const uint32_t count = lv_obj_get_child_count(tint);
+    for (uint32_t i = 0; i < count; ++i)
+        lv_obj_set_style_bg_color(lv_obj_get_child(tint, static_cast<int32_t>(i)),
+                                  lv_color_hex(bright ? kFrameBright : kFrameDim), 0);
+}
+
 void create_overlay()
 {
     if (overlay && tint && panel && countdown_label && message_label) return;
@@ -173,9 +189,24 @@ void create_overlay()
     lv_obj_add_event_cb(tint, critical_child_deleted_cb, LV_EVENT_DELETE, nullptr);
     lv_obj_remove_style_all(tint);
     lv_obj_set_size(tint, kScreenWidth, kScreenHeight);
-    lv_obj_set_style_bg_color(tint, lv_color_hex(0xFF0000), 0);
-    lv_obj_set_style_bg_opa(tint, LV_OPA_20, 0);
     lv_obj_clear_flag(tint, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+    const lv_area_t strips[] = {
+        {0, 0, kScreenWidth - 1, kFrameWidth - 1},
+        {0, kScreenHeight - kFrameWidth, kScreenWidth - 1, kScreenHeight - 1},
+        {0, kFrameWidth, kFrameWidth - 1, kScreenHeight - kFrameWidth - 1},
+        {kScreenWidth - kFrameWidth, kFrameWidth, kScreenWidth - 1, kScreenHeight - kFrameWidth - 1},
+    };
+    for (const lv_area_t &area : strips) {
+        lv_obj_t *strip = lv_obj_create(tint);
+        if (!strip) continue;
+        lv_obj_remove_style_all(strip);
+        lv_obj_set_pos(strip, area.x1, area.y1);
+        lv_obj_set_size(strip, lv_area_get_width(&area), lv_area_get_height(&area));
+        lv_obj_set_style_bg_opa(strip, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(strip, lv_color_hex(kFrameBright), 0);
+        lv_obj_clear_flag(strip, (lv_obj_flag_t)(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+    }
+    frame_bright = true;
 
     panel = lv_obj_create(overlay);
     if (!panel) {
@@ -286,9 +317,11 @@ void render(uint32_t now, bool force)
         if (reminder) lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
         else lv_obj_clear_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
         flash_tick = now;
-        lv_obj_set_style_bg_opa(tint, reminder ? LV_OPA_TRANSP : LV_OPA_20, 0);
+        if (reminder) lv_obj_add_flag(tint, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(tint, LV_OBJ_FLAG_HIDDEN);
+        set_frame(true);
         lv_obj_set_style_bg_color(panel, lv_color_hex(0x000000), 0);
-        lv_obj_set_style_bg_opa(panel, reminder ? LV_OPA_COVER : LV_OPA_80, 0);
+        lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(panel, lv_color_hex(reminder ? 0xFFAA00 : 0xFF3030), 0);
         lv_obj_set_style_text_color(countdown_label,
                                     lv_color_hex(reminder ? 0xFFAA00 : 0xFF4444), 0);
@@ -331,8 +364,7 @@ void timer_cb(lv_timer_t *timer) noexcept
          flow.warning() == LowBatteryWarning::ShutdownCountdown) &&
         lv_tick_elaps(flash_tick) >= kFlashMs) {
         flash_tick = now;
-        const lv_opa_t opacity = lv_obj_get_style_bg_opa(tint, LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(tint, opacity == LV_OPA_20 ? LV_OPA_50 : LV_OPA_20, 0);
+        set_frame(!frame_bright);
     }
     const bool urgent = (overlay && !lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN)) ||
         flow.warning() == LowBatteryWarning::Low ||

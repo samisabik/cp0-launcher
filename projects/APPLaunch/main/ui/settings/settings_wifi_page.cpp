@@ -343,7 +343,7 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
             if (row.background) {
                 lv_obj_set_size(row.background, metric(LayoutMetric::ScreenW) - 8, metric(LayoutMetric::RowH) - 2);
                 lv_obj_set_pos(row.background, 4, y);
-                lv_obj_set_style_radius(row.background, 2, LV_PART_MAIN);
+                lv_obj_set_style_radius(row.background, 0, LV_PART_MAIN);
                 lv_obj_set_style_bg_color(row.background, lv_color_hex(0x1F3A5F), LV_PART_MAIN);
                 lv_obj_set_style_bg_opa(row.background, LV_OPA_COVER, LV_PART_MAIN);
                 lv_obj_set_style_border_width(row.background, 0, LV_PART_MAIN);
@@ -649,7 +649,7 @@ lv_obj_t *LvSettingWifiScanPage3::create_hidden_input(lv_obj_t *parent, int y, u
         lv_obj_set_style_bg_opa(input, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_color(input, lv_color_hex(0x444444), LV_PART_MAIN);
         lv_obj_set_style_border_width(input, 1, LV_PART_MAIN);
-        lv_obj_set_style_radius(input, 3, LV_PART_MAIN);
+        lv_obj_set_style_radius(input, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_left(input, 6, LV_PART_MAIN);
         lv_obj_set_style_pad_right(input, 6, LV_PART_MAIN);
         lv_obj_set_style_pad_top(input, 3, LV_PART_MAIN);
@@ -820,7 +820,7 @@ void LvSettingWifiScanPage3::show_power_warning(){
         }
         lv_obj_set_size(power_warning_, 280, 92);
         lv_obj_center(power_warning_);
-        lv_obj_set_style_radius(power_warning_, 4, LV_PART_MAIN);
+        lv_obj_set_style_radius(power_warning_, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(power_warning_, 1, LV_PART_MAIN);
         lv_obj_set_style_border_color(power_warning_, lv_color_hex(0xFFAA00), LV_PART_MAIN);
         lv_obj_set_style_bg_color(power_warning_, lv_color_hex(0x171717), LV_PART_MAIN);

@@ -9,8 +9,8 @@
 namespace settings_t12b::boot_actions {
 namespace {
 
-constexpr Presentation kReboot{"Reboot", "Reboot?"};
-constexpr Presentation kShutdown{"Shutdown", "Shutdown?"};
+constexpr Presentation kReboot{"reboot", "reboot?"};
+constexpr Presentation kShutdown{"shutdown", "power off?"};
 constexpr Presentation kFactoryReset{"Factory Reset", {}};
 constexpr Presentation kRearmOobe{"Run Setup Again", {}};
 

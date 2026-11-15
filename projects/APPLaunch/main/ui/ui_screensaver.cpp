@@ -15,6 +15,9 @@
 #include "launcher_platform.hpp"
 #include "launcher_toast.h"
 #include "lvgl/lvgl.h"
+#include "model/life_model.hpp"
+#include "model/lockscreen_status_model.hpp"
+#include "settings/settings_battery_info_model.hpp"
 #include "model/lockscreen_state_model.hpp"
 #include "model/screensaver_model.hpp"
 #include "model/screensaver_runtime_contract.hpp"
@@ -27,6 +30,14 @@
 #include <ctime>
 #include <future>
 #include <string>
+#include <vector>
+
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <utility>
 
 namespace {
@@ -34,7 +45,7 @@ namespace {
 constexpr uint32_t kIdleCheckMs = 500;
 constexpr uint32_t kIdleMaxMs = 5000;
 constexpr uint32_t kHoldPollMs = 100;
-constexpr uint32_t kExitAnimationMs = 350;
+constexpr uint32_t kExitAnimationMs = 200;
 /* Shown once the idle TAB hold matures past the model's hint delay. */
 constexpr const char *kHoldHintText = "hold tab 3s to lock";
 
@@ -47,11 +58,41 @@ lv_obj_t *s_prompt_text = nullptr;
 constexpr uint32_t kColorAccent = 0x3DDC84;
 constexpr uint32_t kColorText = 0xE6E6E6;
 constexpr uint32_t kColorDim = 0x5F7A66;
+constexpr uint32_t kColorIdle = 0x8A8A8A;
 constexpr lv_coord_t kContentLeft = 16;
-constexpr lv_coord_t kClockTop = 22;
-constexpr lv_coord_t kDateTop = 52;
-constexpr lv_coord_t kPromptTop = 94;
+constexpr lv_coord_t kClockTop = 16;
+constexpr lv_coord_t kDateLeft = 96;
+constexpr lv_coord_t kDateTop = 24;
+constexpr lv_coord_t kStatusTop = 48;
+constexpr lv_coord_t kStatusRowH = 14;
+constexpr lv_coord_t kPromptTop = 104;
+constexpr uint32_t kStatusRefreshMs = 5000;
+constexpr int kStatusRows = 4;
+lv_obj_t *s_status_values[kStatusRows] = {};
+uint32_t s_status_refreshed = 0;
 lv_timer_t *s_timer = nullptr;
+
+/* Game of Life behind the clock while the lock panel is visible. It pauses
+ * whenever the panel is black, so a locked, dark device does no work. */
+constexpr int kLifeCell = 4;
+constexpr int kLifeCols = 80;
+constexpr int kLifeRows = 42;
+constexpr int kLifeCanvasTop = 1;
+constexpr int kCardWidth = 190;
+constexpr int kCardHeight = kPromptTop - kClockTop + 26;
+constexpr uint32_t kLifeStepMs = 110;
+constexpr uint64_t kLifeMaxGenerations = 900;
+constexpr uint64_t kLifeGliderEvery = 90;
+lv_obj_t *s_life_canvas = nullptr;
+lv_timer_t *s_life_timer = nullptr;
+std::vector<uint16_t> s_life_pixels;
+// Colour last written for each cell; 1 never occurs as a cell colour, so it
+// forces a full redraw after reseeding.
+std::vector<uint16_t> s_life_drawn;
+constexpr uint16_t kLifeUndrawn = 1;
+LifeGrid s_life(kLifeCols, kLifeRows);
+uint32_t s_life_rng = 0x2545F491u;
+void life_run(bool running);
 ScreensaverModel s_model;
 LockscreenStateModel s_lock;
 bool s_exiting = false;
@@ -85,12 +126,11 @@ ScreensaverPanel full_screen_panel()
 }
 
 /* The cached wallpaper fills the application area below the page's top bar. */
+/* The visible states cover the top bar too: the card carries the time and
+ * status, and the simulation gets the whole display. */
 ScreensaverPanel wake_panel()
 {
     ScreensaverPanel panel = full_screen_panel();
-    const int top = std::min<int>(AppPageRoot::kTopBarHeightPx, panel.height);
-    panel.y = top;
-    panel.height -= top;
     panel.black = false;
     return panel;
 }
@@ -112,6 +152,7 @@ void apply_panel(const ScreensaverPanel &panel)
         if (panel.black) lv_obj_add_flag(s_content, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_clear_flag(s_content, LV_OBJ_FLAG_HIDDEN);
     }
+    life_run(!panel.black);
 }
 
 void refresh_clock()
@@ -140,6 +181,216 @@ lv_obj_t *content_label(lv_obj_t *parent, uint16_t size, uint32_t color)
     return label;
 }
 
+std::string interface_ipv4(const char *name)
+{
+    ifaddrs *list = nullptr;
+    if (getifaddrs(&list) != 0) return {};
+    std::string address;
+    for (ifaddrs *entry = list; entry; entry = entry->ifa_next) {
+        if (!entry->ifa_addr || entry->ifa_addr->sa_family != AF_INET || std::strcmp(entry->ifa_name, name) != 0)
+            continue;
+        char text[INET_ADDRSTRLEN] = {};
+        const auto *in = reinterpret_cast<const sockaddr_in *>(entry->ifa_addr);
+        if (inet_ntop(AF_INET, &in->sin_addr, text, sizeof(text))) address = text;
+        break;
+    }
+    freeifaddrs(list);
+    return address;
+}
+
+std::string battery_status()
+{
+    std::string payload;
+    int code = -1;
+    cp0_signal_bq27220_api({"Read"}, [&](int result, std::string data) {
+        code = result;
+        payload = std::move(data);
+    });
+    SettingsBatterySnapshot battery;
+    if (code != 0 || !SettingsBatteryInfoModel::parse_payload(payload, battery)) return "--";
+    return lockscreen_status::battery_line(battery.soc, battery.remain_mah, battery.avg_current_ma);
+}
+
+std::string network_status()
+{
+    cp0_wifi_status_t wifi{};
+    if (cp0_wifi_status_read(&wifi) == 0 && wifi.connected && wifi.ssid[0]) return wifi.ssid;
+    if (!interface_ipv4("eth0").empty()) return "ethernet";
+    return "offline";
+}
+
+std::string recordings_status()
+{
+    const char *home = std::getenv("HOME");
+    const std::string dir = std::string(home && home[0] ? home : "/tmp") + "/Recordings";
+    DIR *handle = opendir(dir.c_str());
+    if (!handle) return lockscreen_status::recordings_line(0, 0);
+    int total = 0;
+    int untranscribed = 0;
+    while (dirent *entry = readdir(handle)) {
+        const std::string name = entry->d_name;
+        if (name.size() <= 4 || name.compare(name.size() - 4, 4, ".wav") != 0) continue;
+        ++total;
+        const std::string txt = dir + "/" + name.substr(0, name.size() - 4) + ".txt";
+        if (access(txt.c_str(), F_OK) != 0) ++untranscribed;
+    }
+    closedir(handle);
+    return lockscreen_status::recordings_line(total, untranscribed);
+}
+
+void refresh_status(bool force)
+{
+    const uint32_t now = lv_tick_get();
+    if (!force && now - s_status_refreshed < kStatusRefreshMs) return;
+    s_status_refreshed = now;
+    const std::string tailscale = interface_ipv4("tailscale0");
+    const std::string values[kStatusRows] = {
+        battery_status(), network_status(), tailscale.empty() ? std::string("off") : tailscale, recordings_status()};
+    for (int i = 0; i < kStatusRows; ++i)
+        if (s_status_values[i] && values[i] != lv_label_get_text(s_status_values[i]))
+            lv_label_set_text(s_status_values[i], values[i].c_str());
+}
+
+uint32_t life_random()
+{
+    s_life_rng ^= s_life_rng << 13;
+    s_life_rng ^= s_life_rng >> 17;
+    s_life_rng ^= s_life_rng << 5;
+    return s_life_rng;
+}
+
+uint16_t rgb565(uint32_t rgb)
+{
+    return lv_color_to_u16(lv_color_hex(rgb));
+}
+
+/* Newborn cells flash launcher green, settle into a deep green, and leave a
+ * short trail that fades to black after they die. */
+uint16_t life_color(int8_t age)
+{
+    static const uint16_t kAlive[] = {
+        rgb565(0x3DDC84), rgb565(0x34BF72), rgb565(0x2C9E60), rgb565(0x24824F),
+        rgb565(0x1F6E44), rgb565(0x1B603B),
+    };
+    static const uint16_t kTrail[] = {
+        rgb565(0x123D27), rgb565(0x0F321F), rgb565(0x0C2819), rgb565(0x0A2014),
+        rgb565(0x081910), rgb565(0x06130C), rgb565(0x040D08), rgb565(0x020604),
+    };
+    if (age > 0) return kAlive[std::min<int>(age, 6) - 1];
+    const int faded = -age;
+    return faded < 8 ? kTrail[faded] : 0;
+}
+
+void life_seed()
+{
+    s_life_drawn.clear();
+    s_life_rng ^= lv_tick_get() * 2654435761u ^ static_cast<uint32_t>(std::time(nullptr));
+    s_life.randomize(life_random(), 22 + static_cast<int>(life_random() % 10));
+}
+
+/* Cells completely hidden by the status card are never drawn. */
+bool life_cell_covered(int x, int y)
+{
+    const int left = kContentLeft - 8;
+    const int top = kClockTop - 6 - kLifeCanvasTop;
+    const int right = left + kCardWidth;
+    const int bottom = top + kCardHeight;
+    return x * kLifeCell >= left && (x + 1) * kLifeCell <= right && y * kLifeCell >= top &&
+           (y + 1) * kLifeCell <= bottom;
+}
+
+/* Writes only cells whose colour changed and invalidates the changed rows as
+ * merged bands, so a quiet pattern costs a few small SPI transfers. */
+void life_draw()
+{
+    if (!s_life_canvas || s_life_pixels.empty()) return;
+    if (s_life_drawn.size() != static_cast<std::size_t>(kLifeCols * kLifeRows))
+        s_life_drawn.assign(static_cast<std::size_t>(kLifeCols * kLifeRows), kLifeUndrawn);
+    const int stride = kLifeCols * kLifeCell;
+    lv_area_t canvas_area;
+    lv_obj_get_coords(s_life_canvas, &canvas_area);
+
+    int band_top = -1;
+    int band_left = kLifeCols;
+    int band_right = -1;
+    int bands = 0;
+    std::vector<lv_area_t> areas;
+    auto close_band = [&](int end_row) {
+        if (band_top < 0) return;
+        lv_area_t area;
+        area.x1 = canvas_area.x1 + band_left * kLifeCell;
+        area.x2 = canvas_area.x1 + (band_right + 1) * kLifeCell - 1;
+        area.y1 = canvas_area.y1 + band_top * kLifeCell;
+        area.y2 = canvas_area.y1 + end_row * kLifeCell - 1;
+        areas.push_back(area);
+        ++bands;
+        band_top = -1;
+        band_left = kLifeCols;
+        band_right = -1;
+    };
+
+    for (int y = 0; y < kLifeRows; ++y) {
+        int row_left = kLifeCols;
+        int row_right = -1;
+        for (int x = 0; x < kLifeCols; ++x) {
+            if (life_cell_covered(x, y)) continue;
+            const uint16_t color = life_color(s_life.age(x, y));
+            uint16_t &drawn = s_life_drawn[static_cast<std::size_t>(y) * kLifeCols + x];
+            if (drawn == color) continue;
+            drawn = color;
+            uint16_t *row = &s_life_pixels[static_cast<std::size_t>(y * kLifeCell) * stride + x * kLifeCell];
+            for (int dy = 0; dy < kLifeCell - 1; ++dy, row += stride)
+                std::fill_n(row, kLifeCell - 1, color);
+            row_left = std::min(row_left, x);
+            row_right = std::max(row_right, x);
+        }
+        if (row_right < 0) {
+            close_band(y);
+            continue;
+        }
+        if (band_top < 0) band_top = y;
+        band_left = std::min(band_left, row_left);
+        band_right = std::max(band_right, row_right);
+    }
+    close_band(kLifeRows);
+
+    // LVGL keeps a short list of dirty areas; past that a full redraw is cheaper.
+    if (bands > 12) {
+        lv_obj_invalidate(s_life_canvas);
+        return;
+    }
+    for (const lv_area_t &area : areas) lv_obj_invalidate_area(s_life_canvas, &area);
+}
+
+void life_timer_cb(lv_timer_t *) noexcept
+{
+    try {
+        s_life.step();
+        if (s_life.stagnant() || s_life.population() < 12 || s_life.generation() > kLifeMaxGenerations) {
+            life_seed();
+        } else if (s_life.generation() % kLifeGliderEvery == 0) {
+            s_life.glider(static_cast<int>(life_random() % kLifeCols), static_cast<int>(life_random() % kLifeRows));
+        }
+        life_draw();
+    } catch (...) {
+    }
+}
+
+void life_run(bool running)
+{
+    if (!s_life_canvas) return;
+    if (running) {
+        if (!s_life_timer) {
+            life_seed();
+            life_draw();
+            s_life_timer = lv_timer_create(life_timer_cb, kLifeStepMs, nullptr);
+        }
+    } else if (s_life_timer) {
+        lv_timer_delete(s_life_timer);
+        s_life_timer = nullptr;
+    }
+}
+
 /* Clock, date and prompt in the launcher's terminal style. They are children of
  * the overlay so they slide away with it on unlock. */
 void create_content()
@@ -151,10 +402,45 @@ void create_content()
     lv_obj_set_size(s_content, LV_PCT(100), LV_PCT(100));
     lv_obj_clear_flag(s_content, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
 
+    s_life_pixels.assign(static_cast<std::size_t>(kLifeCols * kLifeCell) * kLifeRows * kLifeCell, 0);
+    s_life_canvas = lv_canvas_create(s_content);
+    if (s_life_canvas) {
+        lv_canvas_set_buffer(s_life_canvas, s_life_pixels.data(), kLifeCols * kLifeCell, kLifeRows * kLifeCell,
+                             LV_COLOR_FORMAT_RGB565);
+        lv_obj_set_pos(s_life_canvas, 0, kLifeCanvasTop);
+    }
+
+    // A black terminal card keeps the clock readable over the simulation.
+    if (lv_obj_t *card = lv_obj_create(s_content)) {
+        lv_obj_remove_style_all(card);
+        lv_obj_set_pos(card, kContentLeft - 8, kClockTop - 6);
+        lv_obj_set_size(card, kCardWidth, kCardHeight);
+        lv_obj_set_style_bg_color(card, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(card, lv_color_hex(0x1E2B23), 0);
+        lv_obj_set_style_border_width(card, 1, 0);
+        lv_obj_clear_flag(card, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+    }
+
     s_clock = content_label(s_content, kCp0ChromeFontSize * 2, kColorText);
     if (s_clock) lv_obj_set_pos(s_clock, kContentLeft, kClockTop);
     s_date = content_label(s_content, kCp0ChromeFontSize, kColorDim);
-    if (s_date) lv_obj_set_pos(s_date, kContentLeft, kDateTop);
+    if (s_date) lv_obj_set_pos(s_date, kDateLeft, kDateTop);
+
+    static const char *const kStatusKeys[kStatusRows] = {"bat", "net", "ts", "rec"};
+    for (int i = 0; i < kStatusRows; ++i) {
+        const lv_coord_t y = kStatusTop + i * kStatusRowH;
+        if (lv_obj_t *key = content_label(s_content, kCp0ChromeFontSize, kColorDim)) {
+            lv_label_set_text(key, kStatusKeys[i]);
+            lv_obj_set_pos(key, kContentLeft, y);
+        }
+        s_status_values[i] = content_label(s_content, kCp0ChromeFontSize, kColorIdle);
+        if (s_status_values[i]) {
+            lv_obj_set_pos(s_status_values[i], kContentLeft + 34, y);
+            lv_obj_set_width(s_status_values[i], 140);
+            lv_label_set_long_mode(s_status_values[i], LV_LABEL_LONG_CLIP);
+        }
+    }
 
     lv_obj_t *prompt = lv_obj_create(s_content);
     if (!prompt) return;
@@ -166,13 +452,6 @@ void create_content()
     if (lv_obj_t *dollar = content_label(prompt, kCp0ChromeFontSize, kColorDim))
         lv_label_set_text(dollar, "$ ");
     s_prompt_text = content_label(prompt, kCp0ChromeFontSize, kColorText);
-    if (lv_obj_t *cursor = lv_obj_create(prompt)) {
-        lv_obj_remove_style_all(cursor);
-        lv_obj_set_size(cursor, 7, 11);
-        lv_obj_set_style_margin_left(cursor, 2, 0);
-        lv_obj_set_style_bg_color(cursor, lv_color_hex(kColorAccent), 0);
-        lv_obj_set_style_bg_opa(cursor, LV_OPA_COVER, 0);
-    }
 }
 
 /* The title mask is a top-layer sibling: the wallpaper's application-area
@@ -302,6 +581,7 @@ void finish_screensaver_exit() noexcept
     (void)finish_system_sound_prepare();
     release_screen_off_backlight();
     try {
+        life_run(false);
         if (s_overlay) {
             lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_y(s_overlay, 0);
@@ -343,6 +623,10 @@ void overlay_delete_cb(lv_event_t *event) noexcept
             return;
         s_overlay = nullptr;
         s_content = s_clock = s_date = s_prompt_text = nullptr;
+        for (lv_obj_t *&value : s_status_values) value = nullptr;
+        s_life_canvas = nullptr;
+        if (s_life_timer) lv_timer_delete(s_life_timer);
+        s_life_timer = nullptr;
         if (s_hint) lv_obj_delete(s_hint);
         s_hint = nullptr;
         s_exiting = false;
@@ -352,6 +636,10 @@ void overlay_delete_cb(lv_event_t *event) noexcept
     } catch (...) {
         s_overlay = nullptr;
         s_content = s_clock = s_date = s_prompt_text = nullptr;
+        for (lv_obj_t *&value : s_status_values) value = nullptr;
+        s_life_canvas = nullptr;
+        if (s_life_timer) lv_timer_delete(s_life_timer);
+        s_life_timer = nullptr;
         if (s_hint) lv_obj_delete(s_hint);
         s_hint = nullptr;
         s_exiting = false;
@@ -433,8 +721,9 @@ void stop_screensaver(bool was_active = false, bool animated = false)
     update_timer_period();
 
     if (active && animated && s_overlay) {
-        /* Slide the wallpaper away while keeping the page's status bar in place. */
+        /* Slide the lock panel away; the simulation freezes for the slide. */
         apply_panel(wake_panel());
+        life_run(false);
         if (s_panel.height > 0) {
             cancel_exit_animation();
             s_exiting = true;
@@ -443,7 +732,7 @@ void stop_screensaver(bool was_active = false, bool animated = false)
             lv_anim_set_var(&animation, s_overlay);
             lv_anim_set_values(&animation, s_panel.y, -s_panel.height);
             lv_anim_set_duration(&animation, kExitAnimationMs);
-            lv_anim_set_path_cb(&animation, lv_anim_path_ease_in_out);
+            lv_anim_set_path_cb(&animation, lv_anim_path_ease_out);
             lv_anim_set_exec_cb(&animation, curtain_exit_anim_exec);
             lv_anim_set_user_data(&animation, s_overlay);
             lv_anim_set_completed_cb(&animation, curtain_exit_anim_completed);
@@ -500,6 +789,7 @@ void show_lockscreen_panel()
     show_hint(s_lock.state() == LockscreenState::Armed
                   ? "press enter to unlock"
                   : "press tab to unlock");
+    refresh_status(true);
 }
 
 /* Back to (1) after the visible state timed out. */
@@ -523,8 +813,10 @@ void timer_cb(lv_timer_t *timer) noexcept
         /* The visible lock states fall back to the black screen when idle. */
         if (s_lock.poll(now).sleep)
             sleep_lockscreen();
-        else if (!s_panel.black)
+        else if (!s_panel.black) {
             refresh_clock();
+            refresh_status(false);
+        }
         return;
     }
 

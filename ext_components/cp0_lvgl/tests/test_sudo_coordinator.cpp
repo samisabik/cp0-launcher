@@ -32,6 +32,16 @@ static bool has(const std::vector<Action> &actions, ActionType type, uint64_t id
 int main()
 {
     {
+        // The dispatcher pauses its tick while idle and resumes on submission.
+        Coordinator c;
+        assert(c.idle());
+        assert(c.reserve(request(9)));
+        assert(!c.idle());
+        (void)c.release_reserved(9, 0);
+        for (int i = 0; i < 4 && !c.idle(); ++i) (void)c.tick(0, {SIZE_MAX, SIZE_MAX});
+        assert(c.idle());
+    }
+    {
         Coordinator c;
         auto reserved = request(1);
         assert(c.reserve(reserved));

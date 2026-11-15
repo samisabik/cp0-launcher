@@ -60,9 +60,13 @@ private:
     static std::string key(const std::string &path, uint16_t size,
                            lv_freetype_font_style_t style,
                            lv_freetype_font_render_mode_t render_mode);
+    // Faces by resolved path, and the result of each request by name so a
+    // repeat lookup skips the path resolution. nullptr marks a failed load.
     std::unordered_map<std::string, lv_font_t *> fonts_;
+    std::unordered_map<std::string, lv_font_t *> requests_;
     std::mutex mutex_;
 #endif
+    lv_font_t *chrome_[2] = {nullptr, nullptr};
 };
 
 Cp0FontService &cp0_fonts();

@@ -137,6 +137,123 @@ private:
 
 StartupVolumeCache g_startup_volume_cache;
 
+std::atomic<bool> g_muted{false};
+constexpr std::chrono::milliseconds kSaveDelay{1000};
+
+/* Media keys must not block the LVGL thread: each PulseAudio call opens its own
+ * session, and Save fsyncs the config and calls sync(). The key handler updates
+ * the cached values and the OSD at once; this worker applies the latest mixer
+ * target (older requests are dropped) and saves the config once the keys have
+ * been idle for kSaveDelay. */
+class MediaWorker
+{
+public:
+    ~MediaWorker() { shutdown(false); }
+
+    void request_volume(int target)
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            volume_target_ = target;
+            ensure_started_locked();
+        }
+        wake_.notify_all();
+    }
+
+    void request_mute_toggle()
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            ++mute_toggles_;
+            ensure_started_locked();
+        }
+        wake_.notify_all();
+    }
+
+    void request_save()
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            save_pending_ = true;
+            save_due_ = std::chrono::steady_clock::now() + kSaveDelay;
+            ensure_started_locked();
+        }
+        wake_.notify_all();
+    }
+
+    bool newer_volume_pending()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return volume_target_ >= 0;
+    }
+
+    bool newer_mute_pending()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return mute_toggles_ > 0;
+    }
+
+    void flush()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        idle_.wait(lock, [this] { return !busy_ && volume_target_ < 0 && mute_toggles_ == 0; });
+        const bool save = save_pending_;
+        save_pending_ = false;
+        lock.unlock();
+        if (save) save_config();
+    }
+
+    /* Teardown persists anything still pending; the static destructor only
+     * joins, because the signal objects may already be gone at exit. */
+    void shutdown(bool persist)
+    {
+        if (persist) flush();
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            stop_ = true;
+        }
+        wake_.notify_all();
+        if (worker_.joinable()) worker_.join();
+        std::lock_guard<std::mutex> lock(mutex_);
+        stop_ = false;
+    }
+
+private:
+    void ensure_started_locked()
+    {
+        if (worker_.joinable()) return;
+        worker_ = std::thread([this] {
+            try {
+                run();
+            } catch (...) {
+            }
+        });
+    }
+
+    static void save_config()
+    {
+        try {
+            cp0_signal_config_api({"Save"}, nullptr);
+        } catch (...) {
+        }
+    }
+
+    void run();
+
+    std::mutex mutex_;
+    std::condition_variable wake_;
+    std::condition_variable idle_;
+    std::thread worker_;
+    int volume_target_ = -1;
+    int mute_toggles_ = 0;
+    bool save_pending_ = false;
+    bool busy_ = false;
+    bool stop_ = false;
+    std::chrono::steady_clock::time_point save_due_{};
+};
+
+MediaWorker g_media_worker;
+
 int read_config_int(const char *key, int fallback)
 {
     int value = fallback;
@@ -156,14 +273,12 @@ bool call_config(const std::list<std::string> &arguments)
     return succeeded;
 }
 
-bool write_config_int(const char *key, int value, int fallback)
+// SetInt only updates the in-memory config; the write to disk is debounced.
+bool set_config_int(const char *key, int value)
 {
-    const int previous = read_config_int(key, fallback);
     if (!call_config({"SetInt", key, std::to_string(value)})) return false;
-    if (call_config({"Save"})) return true;
-
-    if (call_config({"SetInt", key, std::to_string(previous)})) call_config({"Save"});
-    return false;
+    g_media_worker.request_save();
+    return true;
 }
 
 int read_volume()
@@ -181,36 +296,81 @@ int read_volume()
     return volume;
 }
 
-bool read_mute()
+// Mixer access below runs on the media worker only.
+int mixer_mute_call(const char *command)
 {
-    bool muted = model.muted();
-    cp0_signal_audio_api({"MuteRead"}, [&](int code, std::string data) {
+    int muted = -1;
+    cp0_signal_audio_api({command}, [&](int code, std::string data) {
         int parsed = 0;
-        if (code == 0 && LauncherMediaControlsModel::parse_int(data, parsed) &&
-            (parsed == 0 || parsed == 1)) {
-            muted = parsed != 0;
-            model.set_mute(muted);
-        }
+        if (code == 0 && LauncherMediaControlsModel::parse_int(data, parsed) && (parsed == 0 || parsed == 1))
+            muted = parsed;
     });
     return muted;
 }
 
-int write_volume(int previous, int percent)
+void apply_volume(int target, int previous)
 {
-    percent = LauncherMediaControlsModel::clamp_percent(percent);
+    // A volume key also unmutes, as the hardware keys on most devices do.
+    if (mixer_mute_call("MuteRead") == 1) {
+        const int muted = mixer_mute_call("MuteToggle");
+        if (muted >= 0 && !g_media_worker.newer_mute_pending()) g_muted.store(muted == 1);
+    }
     int written = -1;
-    cp0_signal_audio_api({"VolumeWrite", std::to_string(percent)}, [&](int code, std::string data) {
+    cp0_signal_audio_api({"VolumeWrite", std::to_string(target)}, [&](int code, std::string data) {
         int parsed = 0;
         if (code == 0 && LauncherMediaControlsModel::parse_percent(data, parsed)) written = parsed;
     });
-    if (written < 0) return previous;
-    if (!write_config_int("volume", written, previous)) {
-        cp0_signal_audio_api({"VolumeWrite", std::to_string(previous)}, nullptr);
-        return previous;
+    if (written < 0) {
+        if (!g_media_worker.newer_volume_pending()) g_cached_volume.store(previous);
+        return;
     }
-    model.set_volume(written);
-    g_cached_volume.store(written);
-    return written;
+    if (!g_media_worker.newer_volume_pending()) g_cached_volume.store(written);
+    set_config_int("volume", written);
+}
+
+void MediaWorker::run()
+{
+    int applied_volume = g_cached_volume.load();
+    std::unique_lock<std::mutex> lock(mutex_);
+    for (;;) {
+        if (volume_target_ >= 0 || mute_toggles_ > 0) {
+            const int target = volume_target_;
+            const int toggles = mute_toggles_;
+            volume_target_ = -1;
+            mute_toggles_ = 0;
+            busy_ = true;
+            lock.unlock();
+            if (toggles % 2 == 1) {
+                const int muted = mixer_mute_call("MuteToggle");
+                if (muted >= 0 && !newer_mute_pending()) g_muted.store(muted == 1);
+            }
+            if (target >= 0) {
+                apply_volume(target, applied_volume);
+                const int cached = g_cached_volume.load();
+                if (cached >= 0) applied_volume = cached;
+            }
+            lock.lock();
+            busy_ = false;
+            idle_.notify_all();
+            continue;
+        }
+        if (stop_) break;
+        if (save_pending_) {
+            if (std::chrono::steady_clock::now() >= save_due_) {
+                save_pending_ = false;
+                busy_ = true;
+                lock.unlock();
+                save_config();
+                lock.lock();
+                busy_ = false;
+                idle_.notify_all();
+                continue;
+            }
+            wake_.wait_until(lock, save_due_);
+            continue;
+        }
+        wake_.wait(lock);
+    }
 }
 
 int backlight_max()
@@ -271,7 +431,7 @@ int write_brightness(int previous_percent, int percent)
     if (written < 0) return previous_percent;
     const int previous_raw = setup_values::brightness_step_value(
         setup_values::brightness_step_index(previous_percent), maximum);
-    if (!write_config_int(setup_values::kBrightnessConfigKey, written, previous_raw)) {
+    if (!set_config_int(setup_values::kBrightnessConfigKey, written)) {
         cp0_signal_settings_api({"BacklightWrite", std::to_string(previous_raw)}, nullptr);
         return previous_percent;
     }
@@ -302,6 +462,12 @@ void start_volume_cache()
 void stop_volume_cache()
 {
     g_startup_volume_cache.stop();
+    g_media_worker.shutdown(true);
+}
+
+void flush_pending()
+{
+    g_media_worker.flush();
 }
 
 void update_cached_volume(int percent)
@@ -311,13 +477,15 @@ void update_cached_volume(int percent)
 
 int adjust_volume(int delta_percent)
 {
-    if (read_mute())
-        (void)toggle_mute();
     const int current = read_volume();
     const int base = setup_values::round_volume_percent(current);
     const int delta = delta_percent > 0 ? VOLUME_STEP_PERCENT
                                        : delta_percent < 0 ? -VOLUME_STEP_PERCENT : 0;
-    return write_volume(current, base + delta);
+    const int target = LauncherMediaControlsModel::clamp_percent(base + delta);
+    g_cached_volume.store(target);
+    g_muted.store(false);
+    g_media_worker.request_volume(target);
+    return target;
 }
 
 int adjust_brightness(int delta_percent)
@@ -337,16 +505,10 @@ int adjust_brightness(int delta_percent)
 
 bool toggle_mute()
 {
-    const bool previous = model.muted();
-    bool muted = previous;
-    cp0_signal_audio_api({"MuteToggle"}, [&](int code, std::string data) {
-        int parsed = 0;
-        if (code == 0 && LauncherMediaControlsModel::parse_int(data, parsed) &&
-            (parsed == 0 || parsed == 1)) {
-            muted = parsed != 0;
-            model.set_mute(muted);
-        }
-    });
+    // The OSD shows the predicted state; the worker corrects it from the mixer.
+    const bool muted = !g_muted.load();
+    g_muted.store(muted);
+    g_media_worker.request_mute_toggle();
     return muted;
 }
 

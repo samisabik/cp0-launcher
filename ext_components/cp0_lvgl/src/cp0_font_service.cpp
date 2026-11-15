@@ -23,22 +23,34 @@ lv_font_t *Cp0FontService::get(const char *font_name, uint16_t size,
 {
 #if LV_USE_FREETYPE
     std::lock_guard<std::mutex> lock(mutex_);
+    const std::string request_key = key(font_name ? font_name : "", size, style, render_mode);
+    const auto requested = requests_.find(request_key);
+    if (requested != requests_.end()) return requested->second ? requested->second : fallback(size);
+
+    lv_font_t *font = nullptr;
     const std::string path = resolve_path(font_name);
-    if (path.empty()) return fallback(size);
-
-    const std::string font_key = key(path, size, style, render_mode);
-    const auto found = fonts_.find(font_key);
-    if (found != fonts_.end()) return found->second ? found->second : fallback(size);
-
-    lv_font_t *font = lv_freetype_font_create(path.c_str(), render_mode, size, style);
-    if (!cp0::font::should_cache(font)) return fallback(size);
-    try {
-        fonts_.emplace(font_key, font);
-    } catch (...) {
-        lv_freetype_font_delete(font);
-        return fallback(size);
+    if (!path.empty()) {
+        const std::string font_key = key(path, size, style, render_mode);
+        const auto found = fonts_.find(font_key);
+        if (found != fonts_.end()) {
+            font = found->second;
+        } else {
+            font = lv_freetype_font_create(path.c_str(), render_mode, size, style);
+            if (cp0::font::should_cache(font)) {
+                try {
+                    fonts_.emplace(font_key, font);
+                } catch (...) {
+                    lv_freetype_font_delete(font);
+                    font = nullptr;
+                }
+            }
+        }
     }
-    return font;
+    try {
+        requests_.emplace(request_key, font);
+    } catch (...) {
+    }
+    return font ? font : fallback(size);
 #else
     (void)font_name;
     (void)style;
@@ -56,7 +68,14 @@ lv_font_t *Cp0FontService::get_mono(const char *font_name, uint16_t size,
 
 lv_font_t *Cp0FontService::get_chrome(uint16_t size)
 {
-    const uint16_t px = size > 16 ? kCp0ChromeFontSize * 2 : kCp0ChromeFontSize;
+    const int slot = size > 16 ? 1 : 0;
+#if LV_USE_FREETYPE
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (chrome_[slot]) return chrome_[slot];
+    }
+#endif
+    const uint16_t px = slot ? kCp0ChromeFontSize * 2 : kCp0ChromeFontSize;
     lv_font_t *font = get_mono(kCp0ChromeFont, px);
     if (font && !font->fallback && font != fallback(px)) {
         lv_font_t *latin = get("DejaVuSans.ttf", px);
@@ -68,6 +87,12 @@ lv_font_t *Cp0FontService::get_chrome(uint16_t size)
             font->fallback = latin;
         }
     }
+#if LV_USE_FREETYPE
+    if (font && font != fallback(px)) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        chrome_[slot] = font;
+    }
+#endif
     return font;
 }
 
@@ -124,6 +149,8 @@ void Cp0FontService::release()
         if (font.second) lv_freetype_font_delete(font.second);
     }
     fonts_.clear();
+    requests_.clear();
+    chrome_[0] = chrome_[1] = nullptr;
 #endif
 }
 

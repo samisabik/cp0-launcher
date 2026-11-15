@@ -21,6 +21,7 @@
 #include <time.h>
 #ifdef __linux__
 #include <sys/ioctl.h>
+#include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <linux/input.h>
 #include <libinput.h>
@@ -57,21 +58,41 @@ static atomic_bool keyboard_shutdown_requested = false;
 static pthread_t keyboard_read_thread_id;
 static cp0_keyboard_thread_lifecycle_t keyboard_thread_lifecycle = {0};
 static pthread_mutex_t keyboard_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+/* Wakes the reader for pause, resume and shutdown so it can block in poll()
+ * without a timeout. -1 falls back to timed polling. */
+static int keyboard_wake_fd = -1;
+
+static void keyboard_wake(void)
+{
+    if (keyboard_wake_fd < 0) return;
+    const uint64_t one = 1;
+    ssize_t written = write(keyboard_wake_fd, &one, sizeof(one));
+    (void)written;
+}
+
+static void keyboard_drain_wake(void)
+{
+    uint64_t count;
+    while (keyboard_wake_fd >= 0 && read(keyboard_wake_fd, &count, sizeof(count)) == sizeof(count)) {
+    }
+}
 #ifdef __linux__
 static struct libinput *g_libinput = NULL;
 void keyboard_pause(void) {
     keyboard_paused_flag = 1;
     if (g_libinput) libinput_suspend(g_libinput);
+    keyboard_wake();
     SLOGI("[KBD] keyboard_pause()");
 }
 void keyboard_resume(void) {
     if (g_libinput) libinput_resume(g_libinput);
     keyboard_paused_flag = 0;
+    keyboard_wake();
     SLOGI("[KBD] keyboard_resume()");
 }
 #else
-void keyboard_pause(void) { keyboard_paused_flag = 1; }
-void keyboard_resume(void) { keyboard_paused_flag = 0; }
+void keyboard_pause(void) { keyboard_paused_flag = 1; keyboard_wake(); }
+void keyboard_resume(void) { keyboard_paused_flag = 0; keyboard_wake(); }
 #endif
 
 /* ============================================================
@@ -593,10 +614,12 @@ void *keyboard_read_thread(void *argv) {
 
     /* ---------- 4. event loop ---------- */
     int li_fd = libinput_get_fd(kc.li);
-    struct pollfd pfds[2] = {
-        { .fd = li_fd,        .events = POLLIN },
-        { .fd = kc.repeat_fd, .events = POLLIN },
+    struct pollfd pfds[3] = {
+        { .fd = li_fd,            .events = POLLIN },
+        { .fd = kc.repeat_fd,     .events = POLLIN },
+        { .fd = keyboard_wake_fd, .events = POLLIN },
     };
+    const int timeout_ms = keyboard_wake_fd >= 0 ? -1 : 100;
 
     g_libinput = kc.li;
     SLOGI("Start listening for keyboard input (%s)", device_path);
@@ -605,15 +628,21 @@ void *keyboard_read_thread(void *argv) {
     while (!atomic_load_explicit(&keyboard_shutdown_requested,
                                  memory_order_acquire)) {
         if (keyboard_paused_flag) {
-            usleep(50000);
+            if (keyboard_wake_fd < 0) {
+                usleep(50000);
+                continue;
+            }
+            struct pollfd wake = { .fd = keyboard_wake_fd, .events = POLLIN };
+            if (poll(&wake, 1, -1) > 0) keyboard_drain_wake();
             continue;
         }
-        int pr = poll(pfds, 2, 100);
+        int pr = poll(pfds, keyboard_wake_fd >= 0 ? 3 : 2, timeout_ms);
         if (pr < 0) {
             if (errno == EINTR) continue;
             perror("poll"); break;
         }
         if (pr == 0) continue;
+        if (keyboard_wake_fd >= 0 && (pfds[2].revents & POLLIN)) keyboard_drain_wake();
 
         /* keyboard event */
         if (pfds[0].revents & POLLIN) {
@@ -689,6 +718,8 @@ void init_input(void)
 
     atomic_store_explicit(&keyboard_shutdown_requested, false,
                           memory_order_release);
+    if (keyboard_wake_fd < 0)
+        keyboard_wake_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (pthread_create(&keyboard_read_thread_id, NULL, keyboard_read_thread, keyboard_device_arg) != 0) {
         perror("pthread_create keyboard_read_thread");
         free(keyboard_device_arg);
@@ -707,6 +738,7 @@ void deinit_input(void)
     int should_join = 0;
     atomic_store_explicit(&keyboard_shutdown_requested, true,
                           memory_order_release);
+    keyboard_wake();
     pthread_mutex_lock(&keyboard_thread_mutex);
     should_join = cp0_keyboard_thread_begin_deinit(
         &keyboard_thread_lifecycle);

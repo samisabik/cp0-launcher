@@ -8,6 +8,9 @@
 
 #include "ui.h"
 
+#include <cctype>
+#include <string>
+
 namespace {
 
 constexpr lv_coord_t kWidth = 190;
@@ -25,6 +28,21 @@ void center_osd(lv_obj_t *obj)
     const lv_coord_t width = lv_display_get_horizontal_resolution(display);
     const lv_coord_t height = lv_display_get_vertical_resolution(display);
     lv_obj_set_pos(obj, (width - kWidth) / 2, (height - kHeight) / 2);
+}
+
+// The OSD draws in the pixel font, so LVGL symbol glyphs become short words.
+std::string osd_glyph(const std::string &icon)
+{
+    if (icon == LV_SYMBOL_TINT) return "bri";
+    if (icon == LV_SYMBOL_VOLUME_MAX || icon == LV_SYMBOL_VOLUME_MID) return "vol";
+    if (icon == LV_SYMBOL_MUTE) return "mute";
+    return icon;
+}
+
+std::string lowercase(std::string text)
+{
+    for (char &c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return text;
 }
 
 } // namespace
@@ -48,7 +66,7 @@ bool LauncherMediaOsd::ensure_created() noexcept
     lv_obj_set_size(container_, kWidth, kHeight);
     center_osd(container_);
     lv_obj_set_style_bg_color(container_, lv_color_hex(kBackgroundColor), 0);
-    lv_obj_set_style_bg_opa(container_, LV_OPA_90, 0);
+    lv_obj_set_style_bg_opa(container_, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(container_, 0, 0);
     lv_obj_set_style_border_width(container_, 1, 0);
     lv_obj_set_style_border_color(container_, lv_color_hex(kAccentColor), 0);
@@ -67,7 +85,7 @@ bool LauncherMediaOsd::ensure_created() noexcept
     lv_obj_set_size(icon_, 30, 24);
     lv_obj_set_pos(icon_, 14, 10);
     lv_obj_set_style_text_color(icon_, lv_color_hex(kAccentColor), 0);
-    lv_obj_set_style_text_font(icon_, LV_FONT_DEFAULT, 0);
+    lv_obj_set_style_text_font(icon_, launcher_fonts().get_chrome(11), 0);
     lv_obj_set_style_text_align(icon_, LV_TEXT_ALIGN_CENTER, 0);
 
     lv_font_t *font = launcher_fonts().get_chrome(11);
@@ -157,8 +175,9 @@ void LauncherMediaOsd::show_level(const char *title, const char *icon, int perce
 
     model_.show_level(title ? title : "", icon ? icon : "", percent);
     const auto &state = model_.state();
-    lv_label_set_text(icon_, state.icon.c_str());
-    lv_label_set_text(title_, state.title.c_str());
+    lv_obj_set_style_text_font(icon_, launcher_fonts().get_chrome(11), 0);
+    lv_label_set_text(icon_, osd_glyph(state.icon).c_str());
+    lv_label_set_text(title_, lowercase(state.title).c_str());
     lv_label_set_text_fmt(value_, "%d%%", state.percent);
     lv_bar_set_value(bar_, state.percent, LV_ANIM_OFF);
     lv_obj_set_size(icon_, 30, 24);
@@ -185,8 +204,9 @@ void LauncherMediaOsd::show_mute(bool muted) noexcept
 
     model_.show_mute(muted, LV_SYMBOL_MUTE, LV_SYMBOL_VOLUME_MAX);
     const auto &state = model_.state();
-    lv_label_set_text(icon_, state.icon.c_str());
-    lv_label_set_text(title_, state.title.c_str());
+    lv_obj_set_style_text_font(icon_, launcher_fonts().get_chrome(22), 0);
+    lv_label_set_text(icon_, osd_glyph(state.icon).c_str());
+    lv_label_set_text(title_, lowercase(state.title).c_str());
     lv_obj_set_size(icon_, 60, 32);
     lv_obj_set_pos(icon_, 65, 12);
     lv_obj_set_size(title_, kWidth, 18);

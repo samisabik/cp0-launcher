@@ -13,7 +13,7 @@ template <typename CallbackTimer, typename ActiveTimer>
 constexpr bool screensaver_timer_is_current(CallbackTimer callback_timer,
                                             ActiveTimer active_timer)
 {
-    return callback_timer && callback_timer == active_timer;
+    return callback_timer != nullptr && callback_timer == active_timer;
 }
 
 template <typename Target, typename CurrentTarget, typename Owned>
@@ -21,7 +21,7 @@ constexpr bool screensaver_delete_is_tracked(Target target,
                                               CurrentTarget current_target,
                                               Owned owned)
 {
-    return target && target == current_target && target == owned;
+    return target != nullptr && target == current_target && target == owned;
 }
 
 inline int screensaver_timeout_from_config(bool request_succeeded,

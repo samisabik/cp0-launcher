@@ -1,0 +1,34 @@
+/*
+ * SPDX-License-Identifier: MIT
+ */
+
+#pragma once
+
+#include "settings_tree_types.hpp"
+#include "lvgl_components.hpp"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+// Tailscale on/off toggle (SettingEntry api) and its status page.
+void tailscale_enabled_api(int cmd, void *data);
+std::unique_ptr<DComponens::LvglComponensBase> settings_tailscale_page_factory(lv_obj_t *parent,
+                                                                               const NodeIter &page_node,
+                                                                               std::function<void()> on_back);
+
+// Kernel, uptime, host, user and network addresses for the About page.
+std::vector<std::string> settings_system_lines();
+
+// Microphone PGA gain, 0..42 dB in 3 dB steps; children are the option labels.
+void append_mic_gain_options(Tree &tree, const NodeIter &parent);
+std::unique_ptr<DComponens::LvglComponensBase> settings_mic_gain_page_factory(lv_obj_t *parent,
+                                                                              const NodeIter &page_node,
+                                                                              std::function<void()> on_back);
+
+// Time zone picker; children are zone names.
+void append_time_zone_options(Tree &tree, const NodeIter &parent);
+std::unique_ptr<DComponens::LvglComponensBase> settings_time_zone_page_factory(lv_obj_t *parent,
+                                                                               const NodeIter &page_node,
+                                                                               std::function<void()> on_back);

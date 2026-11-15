@@ -57,7 +57,7 @@ public:
     bool current(Handle handle) const
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        return handle && handle_ == handle;
+        return handle != nullptr && handle_ == handle;
     }
 
     bool active() const

@@ -18,18 +18,17 @@ BUILTIN_REGISTRY = (ROOT / "main/ui/builtin_app_registry.cpp").read_text()
 PREINSTALLED_MANIFEST = (ROOT / "APPLaunch/preinstalled-desktop-apps.tsv").read_text()
 
 EXPECTED_ROOT_ORDER = [
-    "Screen",
-    "Speaker",
-    "Wi-Fi",
-    "Ethernet",
-    "Bluetooth",
-    "ExtPort",
-    "Battery",
-    "Launcher",
-    "Developer",
-    "User",
-    "Date & Time",
-    "System",
+    "screen",
+    "sound",
+    "wi-fi",
+    "bluetooth",
+    "ethernet",
+    "tailscale",
+    "ext port",
+    "battery",
+    "apps",
+    "time",
+    "system",
 ]
 
 
@@ -58,20 +57,19 @@ def test_screen_keeps_lock_timeout_options():
     screen_entries = re.findall(
         r'append_child\(\s*screen,\s*SettingEntry\{"([^"]+)"', builder
     )
-    assert screen_entries == ["Brightness", "DarkTime"]
+    assert screen_entries == ["brightness", "auto-lock"]
     timeouts = re.findall(
         r'append_child\(\s*dark_time,\s*SettingEntry\{"([^"]+)"', builder
     )
-    assert timeouts == ["Never", "10S", "30S", "60S", "300S"]
+    assert timeouts == ["never", "10 s", "30 s", "1 min", "5 min"]
 
 
-def test_volume_opens_the_volume_editor_directly():
+def test_sound_holds_volume_and_mic_gain():
     builder = settings_tree_builder()
-    assert re.search(
-        r'root,\s*SettingEntry\{"Speaker",\s*volume_page3_factory,\s*PageType::FullCustom\}',
-        builder,
-    )
-    assert not re.search(r'append_child\(\s*speaker,\s*SettingEntry\{"Volume"', builder)
+    sound_entries = re.findall(r'append_child\(\s*sound,\s*SettingEntry\{"([^"]+)"', builder)
+    assert sound_entries == ["volume", "mic gain"]
+    assert re.search(r'sound,\s*SettingEntry\{"volume",\s*volume_page3_factory,\s*PageType::FullCustom\}', builder)
+    assert "settings_mic_gain_page_factory" in builder
 
 
 def test_wifi_menu_uses_product_labels_without_changing_actions():
@@ -79,10 +77,10 @@ def test_wifi_menu_uses_product_labels_without_changing_actions():
         r'append_child\(\s*wifi,\s*SettingEntry\{"([^"]+)"',
         settings_tree_builder(),
     )
-    assert wifi_entries == ["Enable", "Networks", "Join Hidden Network"]
-    assert 'SettingEntry{"Enable", wifi_power_api, true}' in SETTINGS_PAGE
-    assert 'SettingEntry{"Networks", wifi_scan_page3_factory, PageType::FullCustom}' in SETTINGS_PAGE
-    assert 'SettingEntry{"Join Hidden Network", wifi_add_hidden_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
+    assert wifi_entries == ["enable", "networks", "hidden"]
+    assert 'SettingEntry{"enable", wifi_power_api, true}' in SETTINGS_PAGE
+    assert 'SettingEntry{"networks", wifi_scan_page3_factory, PageType::FullCustom}' in SETTINGS_PAGE
+    assert 'SettingEntry{"hidden", wifi_add_hidden_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
     assert 'create_label(hidden_panel_, "Join Hidden Network"' in WIFI_PAGE
 
 
@@ -91,9 +89,9 @@ def test_ethernet_is_a_submenu_with_enable_and_existing_info_page():
         r'append_child\(\s*ethernet,\s*SettingEntry\{"([^"]+)"',
         settings_tree_builder(),
     )
-    assert ethernet_entries == ["Enable", "Info"]
-    assert 'SettingEntry{"Enable", ethernet_enabled_api, true}' in SETTINGS_PAGE
-    assert 'SettingEntry{"Info", settings_ethernet_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
+    assert ethernet_entries == ["enable", "info"]
+    assert 'SettingEntry{"enable", ethernet_enabled_api, true}' in SETTINGS_PAGE
+    assert 'SettingEntry{"info", settings_ethernet_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
     assert '"GENERAL.STATE", "device", "show", "eth0"' in ETHERNET_CONTROLLER
     assert "GENERAL.AUTOCONNECT" not in SETTINGS_PAGE
     assert "GENERAL.AUTOCONNECT" not in ETHERNET_CONTROLLER
@@ -109,9 +107,9 @@ def test_ext_port_order_and_hardware_mappings():
         r'append_child\(\s*ext_port,\s*SettingEntry\{"([^"]+)"',
         settings_tree_builder(),
     )
-    assert ext_port_entries == ["Ext 5V", "Grove 5V"]
-    assert 'SettingEntry{"Ext 5V", std::bind(&ext_port_com, "EXT5V"' in SETTINGS_PAGE
-    assert 'SettingEntry{"Grove 5V", std::bind(&ext_port_com, "GROVE5V"' in SETTINGS_PAGE
+    assert ext_port_entries == ["ext 5v", "grove 5v"]
+    assert 'SettingEntry{"ext 5v", std::bind(&ext_port_com, "EXT5V"' in SETTINGS_PAGE
+    assert 'SettingEntry{"grove 5v", std::bind(&ext_port_com, "GROVE5V"' in SETTINGS_PAGE
 
 
 def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
@@ -127,18 +125,20 @@ def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
     ) in PREINSTALLED_MANIFEST
 
 
-def test_system_replaces_about_with_requested_entries():
+def test_system_entries_and_power_actions():
     builder = settings_tree_builder()
     system = builder[builder.index("NodeIter system =") :]
     system_entries = re.findall(
         r'append_child\(\s*system,\s*SettingEntry\{"([^"]+)"',
         system,
     )
-    assert system_entries == ["Software", "Storage", "Licenses"]
-    assert "settings_update_page_factory" in system
+    assert system_entries == ["about", "storage", "licenses"]
+    assert "settings_update_page_factory" not in system
+    assert "settings_t12b_about_page_factory" in system
     assert "settings_storage_page_factory" in system
     assert "settings_credit_page_factory" in system
     assert "boot_actions::Action::Reboot" in system
+    assert "boot_actions::Action::Shutdown" in system
     for removed in ('SettingEntry{"OS"', 'SettingEntry{"APPLaunch"',
                     'SettingEntry{"Help"', 'SettingEntry{"Boot"'):
         assert removed not in system
@@ -148,9 +148,9 @@ if __name__ == "__main__":
     test_root_menu_matches_product_order()
     test_screen_remains_the_initial_selection()
     test_screen_keeps_lock_timeout_options()
-    test_volume_opens_the_volume_editor_directly()
+    test_sound_holds_volume_and_mic_gain()
     test_wifi_menu_uses_product_labels_without_changing_actions()
     test_ethernet_is_a_submenu_with_enable_and_existing_info_page()
     test_ext_port_order_and_hardware_mappings()
     test_launcher_settings_use_builtin_and_release_preinstalled_apps()
-    test_system_replaces_about_with_requested_entries()
+    test_system_entries_and_power_actions()

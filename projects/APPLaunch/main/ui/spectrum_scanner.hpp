@@ -32,6 +32,12 @@ public:
     void end_capture();
     int read_rssi_dbm();
 
+    // OOK transmitter. GDO0 becomes the TX data input: the Pi drives G15 high
+    // to key the carrier on, low to key it off. begin_transmit tri-states the
+    // chip's GDO0 driver and enters TX; end_transmit restores the receiver.
+    bool begin_transmit(uint32_t hz);
+    void end_transmit();
+
 private:
     int fd_ = -1;
     int previous_power_ = -1;
@@ -89,6 +95,12 @@ public:
     void adjust_threshold(int delta_db);
     CaptureStatus capture_status();
 
+    // Replay a saved .sub capture over the transmitter. The worker parses the
+    // file, refuses frequencies outside the licence-exempt TX bands, and keys
+    // the carrier on G15 with the recorded timings.
+    void request_transmit(const std::string &path);
+    bool transmitting() const { return transmit_active_.load(); }
+
     SpectrumFrame snapshot();
     std::string take_message();
 
@@ -130,6 +142,13 @@ private:
     void close_capture(bool report);
     void capture_step();
     void finish_packet(int64_t now_ns);
+
+    std::atomic<bool> transmit_request_{false};
+    std::atomic<bool> transmit_active_{false};
+    std::string transmit_path_;
+    void handle_transmit_request();
+    void run_transmit(const std::string &path);
+    bool set_tx_line(bool high);
 
     void run();
     void handle_record_request();

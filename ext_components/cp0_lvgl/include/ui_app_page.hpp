@@ -312,12 +312,15 @@ protected:
 
 private:
     static void child_delete_cb(lv_event_t *event);
-    static void blink_cb(void *object, int32_t opacity);
+    static void blink_timer_cb(lv_timer_t *timer);
     void set_charging(bool charging);
     void set_low_battery_blink(bool enabled);
 
     bool charging_ = false;
+    bool charging_styled_ = false;
     bool low_battery_blink_ = false;
+    bool blink_dim_ = false;
+    lv_timer_t *blink_timer_ = nullptr;
     lv_obj_t *battery_bar_ = nullptr;
     lv_obj_t *charge_wave_ = nullptr;
     lv_obj_t *label_ = nullptr;
@@ -341,6 +344,8 @@ private:
     lv_obj_t *ethernet_image_ = nullptr;
     lv_obj_t *wifi_panel_ = nullptr;
     lv_obj_t *wifi_bars_[4] = {};
+    // Bit-packed signal bars, ethernet and wifi flags last drawn; -1 forces a redraw.
+    int drawn_state_ = -1;
 };
 
 /**

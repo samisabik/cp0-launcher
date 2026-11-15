@@ -86,6 +86,9 @@ public:
     std::shared_ptr<Request> find(uint64_t id) const;
     State state(uint64_t id) const;
     bool accepting() const;
+    // True when no request, reservation or undelivered event remains, so the
+    // dispatcher may stop ticking until the next submission.
+    bool idle() const;
     bool resume();
     size_t max_output_chunk() const { return pending_limit_; }
 

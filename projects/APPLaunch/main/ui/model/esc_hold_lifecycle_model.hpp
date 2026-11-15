@@ -48,5 +48,5 @@ template <typename CallbackTimer, typename ActiveTimer>
 constexpr bool esc_hold_timer_is_current(CallbackTimer callback_timer,
                                          ActiveTimer active_timer)
 {
-    return callback_timer && callback_timer == active_timer;
+    return callback_timer != nullptr && callback_timer == active_timer;
 }
