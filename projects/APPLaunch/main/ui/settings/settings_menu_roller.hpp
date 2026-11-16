@@ -14,6 +14,7 @@
 #include <string>
 
 #include "settings_fonts.hpp"
+#include "cp0_theme.hpp"
 #include "cp0_lvgl_app_page_assets.h"
 #define LVGL_COMPONENTS_ROLLER1_ONLY
 #include "lvgl_components.hpp"
@@ -41,8 +42,8 @@ public:
     enum class LayoutMetric : int {
         RowH         = 26,
         CenterRow    = 2,
-        PanelH       = 150,
-        EdgePadding  = 62,
+        PanelH       = cp0::theme::kFooterRuleY - cp0::theme::kBodyTop,
+        EdgePadding  = (PanelH - RowH) / 2,
         LabelX       = 10,
         IconX        = 12,
         IconLabelX   = 44,
@@ -158,14 +159,13 @@ public:
         // glance; the others stay at 11 px and dim with distance. While a submenu
         // is open this column is context only, so every row drops to 11 px.
         const int font_px = distance == 0 && !left_aligned ? 22 : kCp0ChromeFontSize;
-        uint32_t color = 0x3C3C3C;
+        uint32_t color = cp0::theme::kDim;
         if (distance == 0) {
-            color = 0xE6E6E6;
+            color = cp0::theme::kText;
         } else if (distance == 1) {
-            color = 0x8A8A8A;
-        } else if (distance == 2) {
-            color = 0x5C5C5C;
+            color = cp0::theme::kIdle;
         }
+        const lv_opa_t opa = distance >= 3 ? LV_OPA_50 : LV_OPA_COVER;
 
         lv_obj_t *row  = lv_obj_get_parent(label);
         lv_obj_t *icon = row && lv_obj_get_child_count(row) > 1 ? lv_obj_get_child(row, 1) : nullptr;
@@ -175,7 +175,8 @@ public:
                 lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
             else
                 lv_obj_remove_flag(icon, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_image_recolor(icon, lv_color_hex(distance == 0 ? 0x3DDC84 : color), LV_PART_MAIN);
+            lv_obj_set_style_image_recolor(icon, lv_color_hex(distance == 0 ? cp0::theme::kAccent : color), LV_PART_MAIN);
+            lv_obj_set_style_opa(icon, opa, LV_PART_MAIN);
             lv_obj_set_style_image_recolor_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_pos(icon, metric(LayoutMetric::IconX), (metric(LayoutMetric::RowH) - 24) / 2);
         }
@@ -183,7 +184,7 @@ public:
         // Set the current row font and colour first, then recalculate the text width using the final font.
         lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-        lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         // Restore the content width and disable scrolling first to obtain the text's natural width.
         // Re-enable marquee scrolling only when the entry is selected and the text actually exceeds the display box.
@@ -461,8 +462,8 @@ public:
         ensure_async_dispatch();
         lv_obj_t *page_container = lv_obj_create(parent);
         if (!page_container) return;
-        lv_obj_set_size(page_container, 320, 150);
-        lv_obj_set_pos(page_container, 0, 0);
+        lv_obj_set_size(page_container, cp0::theme::kScreenW, metric(LayoutMetric::PanelH));
+        lv_obj_set_pos(page_container, 0, cp0::theme::kBodyTop);
         lv_obj_set_style_bg_opa(page_container, LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_set_style_border_width(page_container, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(page_container, 0, LV_PART_MAIN);
@@ -477,10 +478,10 @@ public:
         lv_obj_set_size(selection_bg, 312, metric(LayoutMetric::RowH));
         lv_obj_set_pos(selection_bg, 4, metric(LayoutMetric::EdgePadding));
         selection_bg_base_x_ = lv_obj_get_x(selection_bg);
-        lv_obj_set_style_bg_color(selection_bg, lv_color_hex(0x13261B), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(selection_bg, lv_color_hex(cp0::theme::kSelect), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(selection_bg, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_side(selection_bg, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
-        lv_obj_set_style_border_color(selection_bg, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+        lv_obj_set_style_border_color(selection_bg, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
         lv_obj_set_style_border_width(selection_bg, 0, LV_PART_MAIN);
         lv_obj_set_style_radius(selection_bg, 0, LV_PART_MAIN);
         lv_obj_remove_flag(selection_bg, LV_OBJ_FLAG_CLICKABLE);
@@ -490,8 +491,8 @@ public:
         // also snap to the center.
         ComponensObj = lv_obj_create(page_container);
         if (!ComponensObj) return;
-        lv_obj_set_size(ComponensObj, 320, 150);
-        lv_obj_set_pos(ComponensObj, 0, 20);
+        lv_obj_set_size(ComponensObj, cp0::theme::kScreenW, metric(LayoutMetric::PanelH));
+        lv_obj_set_pos(ComponensObj, 0, 0);
         lv_obj_center(ComponensObj);
         componens_base_x_ = lv_obj_get_x(ComponensObj);
         lv_obj_set_style_bg_opa(ComponensObj, LV_OPA_TRANSP, LV_PART_MAIN);

@@ -30,12 +30,12 @@ public:
     enum class LayoutMetric : int {
         PanelX       = 120,
         PanelW       = 200,
-        PanelH       = 150,
+        PanelH       = 136,
         RowH         = 26,
         CenterRow    = 2,
-        EdgePadding  = 62,
+        EdgePadding  = (PanelH - RowH) / 2,
         BarH         = 26,
-        BarY         = 62,
+        BarY         = EdgePadding,
         LabelCenterX = 40,
         LabelBoxX    = 8,
         LabelBoxW    = 170,
@@ -87,8 +87,6 @@ public:
     }
 
     std::string selected_entry_label() const;
-
-    void show_power_warning();
 
     // Modal that refuses activation and explains why.  While it is up it owns
     // every key, so the page underneath cannot be used.

@@ -17,10 +17,18 @@
 
 #include "cp0_font_service.hpp"
 #include "cp0_enum_cast.h"
+#include "cp0_theme.hpp"
 
 namespace {
 
 constexpr uint32_t kWifiScanRefreshPeriodMs = 8000;
+
+std::string lower_copy(std::string text)
+{
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char byte) { return static_cast<char>(std::tolower(byte)); });
+    return text;
+}
 
 class settings_wifi_com {
 private:
@@ -285,10 +293,12 @@ LvSettingWifiScanPage3::~LvSettingWifiScanPage3(){
             ComponensObj = nullptr;
         }
         title_                 = nullptr;
+        title_status_          = nullptr;
         empty_                 = nullptr;
         hint_                  = nullptr;
         password_panel_        = nullptr;
         password_title_        = nullptr;
+        password_title_status_ = nullptr;
         password_network_      = nullptr;
         password_value_        = nullptr;
         password_input_        = nullptr;
@@ -308,7 +318,7 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
         if (!ComponensObj) return;
         lv_obj_set_size(ComponensObj, metric(LayoutMetric::ScreenW), metric(LayoutMetric::ScreenH));
         lv_obj_set_pos(ComponensObj, 0, 0);
-        lv_obj_set_style_bg_color(ComponensObj, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(ComponensObj, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(ComponensObj, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(ComponensObj, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(ComponensObj, 0, LV_PART_MAIN);
@@ -324,39 +334,38 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
                                                       static_cast<lv_event_code_t>(LV_EVENT_KEYBOARD), this);
         }
 
-        title_ = create_label(ComponensObj, "", 8, 2, 0x58A6FF,
-                              settings_fonts::cjk_sans(12, LV_FREETYPE_FONT_STYLE_BOLD));
-        if (title_) {
-            lv_obj_set_width(title_, metric(LayoutMetric::TitleW));
-            lv_label_set_long_mode(title_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        const cp0::ui::TitleRow title_row = cp0::ui::title_row(ComponensObj, "settings/wi-fi");
+        title_        = title_row.title;
+        title_status_ = title_row.status;
+        if (title_status_) {
+            lv_obj_set_x(title_status_, metric(LayoutMetric::StatusX));
+            lv_obj_set_width(title_status_, cp0::ui::kStatusRight - metric(LayoutMetric::StatusX));
         }
 
-        create_label(ComponensObj, "SSID", 8, 18, 0x888888, settings_fonts::sans(10));
-        create_label(ComponensObj, "Security", 180, 18, 0x888888, settings_fonts::sans(10));
-        create_label(ComponensObj, "dBm", 275, 18, 0x888888, settings_fonts::sans(10));
+        const int header_y = metric(LayoutMetric::HeaderY);
+        create_label(ComponensObj, "ssid", cp0::theme::kPadX, header_y, cp0::theme::kIdle, settings_fonts::sans(11));
+        create_label(ComponensObj, "security", metric(LayoutMetric::SecurityX), header_y, cp0::theme::kIdle,
+                     settings_fonts::sans(11));
+        create_label(ComponensObj, "dBm", metric(LayoutMetric::SignalX), header_y, cp0::theme::kIdle,
+                     settings_fonts::sans(11));
 
         for (int index = 0; index < metric(LayoutMetric::VisibleRows); ++index) {
-            auto &row   = rows_[index];
-            const int y = metric(LayoutMetric::RowY) + index * metric(LayoutMetric::RowH);
+            auto &row    = rows_[index];
+            const int y  = metric(LayoutMetric::RowY) + index * metric(LayoutMetric::RowH);
+            const int ty = y + 3;
 
-            row.background = lv_obj_create(ComponensObj);
-            if (row.background) {
-                lv_obj_set_size(row.background, metric(LayoutMetric::ScreenW) - 8, metric(LayoutMetric::RowH) - 2);
-                lv_obj_set_pos(row.background, 4, y);
-                lv_obj_set_style_radius(row.background, 0, LV_PART_MAIN);
-                lv_obj_set_style_bg_color(row.background, lv_color_hex(0x1F3A5F), LV_PART_MAIN);
-                lv_obj_set_style_bg_opa(row.background, LV_OPA_COVER, LV_PART_MAIN);
-                lv_obj_set_style_border_width(row.background, 0, LV_PART_MAIN);
-                lv_obj_remove_flag(row.background, LV_OBJ_FLAG_CLICKABLE);
-                lv_obj_remove_flag(row.background, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_add_flag(row.background, LV_OBJ_FLAG_HIDDEN);
-            }
+            row.background = cp0::ui::box(ComponensObj, 0, y, metric(LayoutMetric::ScreenW), metric(LayoutMetric::RowH),
+                                          cp0::theme::kSelect);
+            if (row.background) lv_obj_add_flag(row.background, LV_OBJ_FLAG_HIDDEN);
 
-            row.ssid     = create_label(ComponensObj, "", 8, y + 2, 0xCCCCCC, settings_fonts::cjk_sans(12));
-            row.security = create_label(ComponensObj, "", 180, y + 2, 0xCCCCCC, settings_fonts::sans(10));
-            row.signal   = create_label(ComponensObj, "", 275, y + 2, 0xCCCCCC, settings_fonts::mono(10));
+            row.ssid = create_label(ComponensObj, "", cp0::theme::kPadX, ty, cp0::theme::kIdle,
+                                    settings_fonts::cjk_sans(11));
+            row.security = create_label(ComponensObj, "", metric(LayoutMetric::SecurityX), ty, cp0::theme::kIdle,
+                                        settings_fonts::sans(11));
+            row.signal = create_label(ComponensObj, "", metric(LayoutMetric::SignalX), ty, cp0::theme::kIdle,
+                                      settings_fonts::mono(11));
             if (row.ssid) {
-                lv_obj_set_width(row.ssid, 165);
+                lv_obj_set_width(row.ssid, metric(LayoutMetric::SsidW));
                 lv_label_set_long_mode(row.ssid, LV_LABEL_LONG_CLIP);
                 lv_obj_add_flag(row.ssid, LV_OBJ_FLAG_HIDDEN);
             }
@@ -364,8 +373,11 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
             if (row.signal) lv_obj_add_flag(row.signal, LV_OBJ_FLAG_HIDDEN);
         }
 
-        empty_ = create_label(ComponensObj, "", 8, 50, 0x666666, settings_fonts::sans(12));
-        hint_ = create_label(ComponensObj, "", 8, metric(LayoutMetric::ScreenH) - 14, 0x555555, settings_fonts::sans(10));
+        empty_ = create_label(ComponensObj, "", cp0::theme::kPadX,
+                              metric(LayoutMetric::RowY) + metric(LayoutMetric::RowH) + 8, cp0::theme::kDim,
+                              settings_fonts::sans(11));
+        if (empty_) lv_obj_set_width(empty_, metric(LayoutMetric::ScreenW) - 2 * cp0::theme::kPadX);
+        hint_ = cp0::ui::footer(ComponensObj);
         create_password_panel();
         create_hidden_network_panel();
         ui_dispatch_timer_     = lv_timer_create(ui_dispatch_timer_cb, 30, this);
@@ -516,30 +528,30 @@ const char *LvSettingWifiScanPage3::scan_error_message(int result){
             case CP0_WIFI_ERROR_RADIO_OFF:
                 return "Wi-Fi is off. Enable Wi-Fi to scan";
             case CP0_WIFI_ERROR_TIMEOUT:
-                return "Wi-Fi scan timed out. Press R to retry";
+                return "wi-fi scan timed out, press r to retry";
             case CP0_WIFI_ERROR_SERVICE:
-                return "Wi-Fi service unavailable. Press R to retry";
+                return "wi-fi service unavailable, press r to retry";
             default:
-                return "Wi-Fi scan failed. Press R to retry";
+                return "wi-fi scan failed, press r to retry";
         }
     }
 
 const char *LvSettingWifiScanPage3::connection_error_message(int result){
         switch (result) {
             case CP0_WIFI_ERROR_RADIO_OFF:
-                return "Wi-Fi is off";
+                return "wi-fi is off";
             case CP0_WIFI_ERROR_AUTH:
-                return "Incorrect password";
+                return "incorrect password";
             case CP0_WIFI_ERROR_NOT_FOUND:
-                return "Network is no longer available";
+                return "network is no longer available";
             case CP0_WIFI_ERROR_IP_CONFIG:
-                return "Connected, but IP setup failed";
+                return "connected, but ip setup failed";
             case CP0_WIFI_ERROR_TIMEOUT:
-                return "Network operation timed out";
+                return "network operation timed out";
             case CP0_WIFI_ERROR_INVALID:
-                return "Invalid Wi-Fi credentials";
+                return "invalid wi-fi credentials";
             default:
-                return "Wi-Fi service unavailable";
+                return "wi-fi service unavailable";
         }
     }
 
@@ -586,7 +598,7 @@ void LvSettingWifiScanPage3::create_password_panel(){
         if (!password_panel_) return;
         lv_obj_set_size(password_panel_, metric(LayoutMetric::ScreenW), metric(LayoutMetric::ScreenH));
         lv_obj_set_pos(password_panel_, 0, 0);
-        lv_obj_set_style_bg_color(password_panel_, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(password_panel_, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(password_panel_, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(password_panel_, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(password_panel_, 0, LV_PART_MAIN);
@@ -594,12 +606,14 @@ void LvSettingWifiScanPage3::create_password_panel(){
         lv_obj_remove_flag(password_panel_, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(password_panel_, LV_OBJ_FLAG_SCROLLABLE);
 
-        password_title_   = create_label(password_panel_, "Wi-Fi password", 8, 8, 0x58A6FF,
-                                         settings_fonts::sans(13, LV_FREETYPE_FONT_STYLE_BOLD));
-        password_network_ = create_label(password_panel_, "", 8, 28, 0xCCCCCC, settings_fonts::cjk_sans(10));
-        password_input_   = create_hidden_input(password_panel_, 48, metric(LayoutMetric::MaxPasswordBytes));
+        const cp0::ui::TitleRow title_row = cp0::ui::title_row(password_panel_, "settings/wi-fi/password");
+        password_title_        = title_row.title;
+        password_title_status_ = title_row.status;
+        password_network_ = create_label(password_panel_, "", cp0::theme::kPadX, 22, cp0::theme::kText,
+                                         settings_fonts::cjk_sans(11));
+        password_input_   = create_hidden_input(password_panel_, 40, metric(LayoutMetric::MaxPasswordBytes));
         if (password_input_) {
-            lv_obj_set_pos(password_input_, metric(LayoutMetric::PasswordTextX), 48);
+            lv_obj_set_pos(password_input_, metric(LayoutMetric::PasswordTextX), 40);
             lv_obj_set_width(password_input_, metric(LayoutMetric::ScreenW) -
                                              metric(LayoutMetric::PasswordTextX) -
                                              metric(LayoutMetric::PasswordTextRightInset));
@@ -607,21 +621,25 @@ void LvSettingWifiScanPage3::create_password_panel(){
             lv_textarea_set_password_show_time(password_input_, 0);
             lv_textarea_set_password_mode(password_input_, true);
             lv_obj_add_state(password_input_, LV_STATE_FOCUSED);
-            lv_obj_set_style_border_color(password_input_, lv_color_hex(0x58A6FF), LV_PART_MAIN);
+            lv_obj_set_style_border_color(password_input_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
         }
-        password_value_  = create_label(password_panel_, "", 8, 50, 0xFFFFFF, settings_fonts::sans(12));
-        password_status_ = create_label(password_panel_, "", 8, 78, 0xFF4444, settings_fonts::sans(10));
-        password_hint_ =
-            create_label(password_panel_, "", 8, metric(LayoutMetric::ScreenH) - 14, 0x555555, settings_fonts::sans(10));
+        password_value_  = create_label(password_panel_, "", cp0::theme::kPadX, 42, cp0::theme::kIdle,
+                                        settings_fonts::sans(11));
+        password_status_ = create_label(password_panel_, "", cp0::theme::kPadX, 66, cp0::theme::kDanger,
+                                        settings_fonts::sans(11));
+        password_hint_   = cp0::ui::footer(password_panel_);
 
-        if (password_network_) lv_obj_set_width(password_network_, metric(LayoutMetric::ScreenW) - 16);
+        const int body_w = metric(LayoutMetric::ScreenW) - 2 * cp0::theme::kPadX;
+        if (password_network_) {
+            lv_obj_set_width(password_network_, body_w);
+            lv_label_set_long_mode(password_network_, LV_LABEL_LONG_CLIP);
+        }
         if (password_value_) {
-            lv_obj_set_width(password_value_, metric(LayoutMetric::ScreenW) - 16);
+            lv_obj_set_width(password_value_, body_w);
             lv_label_set_long_mode(password_value_, LV_LABEL_LONG_CLIP);
             lv_obj_add_flag(password_value_, LV_OBJ_FLAG_HIDDEN);
         }
-        if (password_status_) lv_obj_set_width(password_status_, metric(LayoutMetric::ScreenW) - 16);
-        if (password_hint_) lv_obj_set_width(password_hint_, metric(LayoutMetric::ScreenW) - 16);
+        if (password_status_) lv_obj_set_width(password_status_, body_w);
         lv_obj_add_flag(password_panel_, LV_OBJ_FLAG_HIDDEN);
     }
 
@@ -642,19 +660,19 @@ lv_obj_t *LvSettingWifiScanPage3::create_hidden_input(lv_obj_t *parent, int y, u
         lv_textarea_set_one_line(input, true);
         lv_textarea_set_max_length(input, max_length);
         lv_textarea_set_text(input, "");
-        lv_obj_set_style_text_font(input, input_font(14), LV_PART_MAIN);
+        lv_obj_set_style_text_font(input, input_font(11), LV_PART_MAIN);
         lv_obj_set_style_text_letter_space(input, metric(LayoutMetric::HiddenInputLetterSpace), LV_PART_MAIN);
-        lv_obj_set_style_text_color(input, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(input, lv_color_hex(0x181818), LV_PART_MAIN);
+        lv_obj_set_style_text_color(input, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(input, lv_color_hex(cp0::theme::kLine), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(input, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_color(input, lv_color_hex(0x444444), LV_PART_MAIN);
+        lv_obj_set_style_border_color(input, lv_color_hex(cp0::theme::kLine), LV_PART_MAIN);
         lv_obj_set_style_border_width(input, 1, LV_PART_MAIN);
         lv_obj_set_style_radius(input, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_left(input, 6, LV_PART_MAIN);
         lv_obj_set_style_pad_right(input, 6, LV_PART_MAIN);
         lv_obj_set_style_pad_top(input, 3, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(input, LV_OPA_TRANSP, LV_PART_CURSOR);
-        lv_obj_set_style_border_color(input, lv_color_hex(0x58A6FF), LV_PART_CURSOR);
+        lv_obj_set_style_border_color(input, lv_color_hex(cp0::theme::kAccent), LV_PART_CURSOR);
         lv_obj_set_style_border_width(input, metric(LayoutMetric::HiddenInputCursorWidth), LV_PART_CURSOR);
         lv_obj_set_style_border_side(input, LV_BORDER_SIDE_LEFT, LV_PART_CURSOR);
         lv_obj_set_style_pad_left(input, -1, LV_PART_CURSOR);
@@ -667,7 +685,7 @@ void LvSettingWifiScanPage3::create_hidden_network_panel(){
         if (!hidden_panel_) return;
         lv_obj_set_size(hidden_panel_, metric(LayoutMetric::ScreenW), metric(LayoutMetric::ScreenH));
         lv_obj_set_pos(hidden_panel_, 0, 0);
-        lv_obj_set_style_bg_color(hidden_panel_, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(hidden_panel_, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(hidden_panel_, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(hidden_panel_, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(hidden_panel_, 0, LV_PART_MAIN);
@@ -675,20 +693,19 @@ void LvSettingWifiScanPage3::create_hidden_network_panel(){
         lv_obj_remove_flag(hidden_panel_, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(hidden_panel_, LV_OBJ_FLAG_SCROLLABLE);
 
-        create_label(hidden_panel_, "Join Hidden Network", 10, 4, 0x58A6FF, settings_fonts::sans(12));
-        create_label(hidden_panel_, "SSID", 10, 25, 0xCCCCCC, settings_fonts::sans(10));
-        create_label(hidden_panel_, "PASSWORD", 10, 59, 0xCCCCCC, settings_fonts::sans(10));
+        cp0::ui::title_row(hidden_panel_, "settings/wi-fi/hidden");
+        create_label(hidden_panel_, "ssid", cp0::theme::kPadX, 26, cp0::theme::kIdle, settings_fonts::sans(11));
+        create_label(hidden_panel_, "password", cp0::theme::kPadX, 54, cp0::theme::kIdle, settings_fonts::sans(11));
 
-        hidden_ssid_input_     = create_hidden_input(hidden_panel_, 18, metric(LayoutMetric::MaxSsidBytes));
-        hidden_password_input_ = create_hidden_input(hidden_panel_, 52, metric(LayoutMetric::MaxPasswordBytes));
+        hidden_ssid_input_     = create_hidden_input(hidden_panel_, 22, metric(LayoutMetric::MaxSsidBytes));
+        hidden_password_input_ = create_hidden_input(hidden_panel_, 50, metric(LayoutMetric::MaxPasswordBytes));
         if (!hidden_ssid_input_ || !hidden_password_input_) return;
 
         lv_textarea_set_password_bullet(hidden_password_input_, "*");
         lv_textarea_set_password_show_time(hidden_password_input_, 0);
         lv_textarea_set_password_mode(hidden_password_input_, true);
 
-        hidden_hint_ = create_label(hidden_panel_, "TAB:switch  ALT:show  OK:connect", 10,
-                                    metric(LayoutMetric::ScreenH) - 14, 0x555555, settings_fonts::sans(10));
+        hidden_hint_ = cp0::ui::footer(hidden_panel_);
         lv_obj_add_flag(hidden_panel_, LV_OBJ_FLAG_HIDDEN);
     }
 
@@ -701,44 +718,27 @@ void LvSettingWifiScanPage3::render_password_panel(){
             if (password_value_) lv_obj_clear_flag(password_value_, LV_OBJ_FLAG_HIDDEN);
             if (password_input_) lv_obj_add_flag(password_input_, LV_OBJ_FLAG_HIDDEN);
             const bool forgetting = connection_state_ && connection_state_->operation == NetworkOperation::Forget;
-            if (password_title_)
-                lv_label_set_text(password_title_, forgetting ? "Forgetting Wi-Fi..." : "Connecting...");
-            if (password_network_) {
-                const std::string text = "Network: " + password_ssid_;
-                lv_label_set_text(password_network_, text.c_str());
-            }
-            if (password_value_)
-                lv_label_set_text(password_value_, forgetting ? "Removing saved profile..." : "Please wait...");
-            if (password_status_) {
-                lv_label_set_text(password_status_, "");
-                lv_obj_set_style_text_color(password_status_, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
-            }
-            if (password_hint_) lv_label_set_text(password_hint_, "ESC:back");
+            cp0::ui::set_text(password_title_, forgetting ? "settings/wi-fi/forgetting" : "settings/wi-fi/connecting",
+                              cp0::theme::kAccent);
+            cp0::ui::set_text(password_title_status_, "", cp0::theme::kIdle);
+            cp0::ui::set_text(password_network_, password_ssid_.c_str(), cp0::theme::kText);
+            cp0::ui::set_text(password_value_, forgetting ? "removing saved profile..." : "please wait...",
+                              cp0::theme::kIdle);
+            cp0::ui::set_text(password_status_, "", cp0::theme::kText);
+            cp0::ui::set_footer(password_hint_, {{"esc", "back"}});
             return;
         }
 
         if (password_value_) lv_obj_add_flag(password_value_, LV_OBJ_FLAG_HIDDEN);
         if (password_input_) lv_obj_remove_flag(password_input_, LV_OBJ_FLAG_HIDDEN);
-        if (password_title_) lv_label_set_text(password_title_, "Wi-Fi password");
-        if (password_network_) {
-            std::string text = password_ssid_;
-            if (!password_security_.empty()) {
-                text += "  [";
-                text += password_security_;
-                text += "]";
-            }
-            lv_label_set_text(password_network_, text.c_str());
-        }
+        cp0::ui::set_text(password_title_, "settings/wi-fi/password", cp0::theme::kAccent);
+        cp0::ui::set_text(password_title_status_, password_security_.c_str(), cp0::theme::kIdle);
+        cp0::ui::set_text(password_network_, password_ssid_.c_str(), cp0::theme::kText);
         render_password_editor();
-        if (password_status_) {
-            lv_label_set_text(password_status_, password_error_.c_str());
-            lv_obj_set_style_text_color(password_status_, lv_color_hex(password_error_.empty() ? 0x666666 : 0xFF4444),
-                                        LV_PART_MAIN);
-        }
-        if (password_hint_) {
-            lv_label_set_text(password_hint_,
-                              password_visible_ ? "ALT:hide  OK:connect  ESC:back" : "ALT:show  OK:connect  ESC:back");
-        }
+        cp0::ui::set_text(password_status_, lower_copy(password_error_).c_str(),
+                          password_error_.empty() ? cp0::theme::kDim : cp0::theme::kDanger);
+        cp0::ui::set_footer(password_hint_,
+                            {{"ent", "connect"}, {"alt", password_visible_ ? "hide" : "show"}, {"esc", "back"}});
     }
 
 void LvSettingWifiScanPage3::update_hidden_input(lv_obj_t *input, const std::string &value, std::size_t cursor_position){
@@ -755,10 +755,10 @@ void LvSettingWifiScanPage3::set_hidden_focus(int focus){
         lv_obj_t *unfocused = hidden_focus_ == 0 ? hidden_password_input_ : hidden_ssid_input_;
         lv_obj_add_state(focused, LV_STATE_FOCUSED);
         lv_obj_remove_state(unfocused, LV_STATE_FOCUSED);
-        lv_obj_set_style_border_color(focused, lv_color_hex(0x58A6FF), LV_PART_MAIN);
-        lv_obj_set_style_border_color(unfocused, lv_color_hex(0x444444), LV_PART_MAIN);
+        lv_obj_set_style_border_color(focused, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
+        lv_obj_set_style_border_color(unfocused, lv_color_hex(cp0::theme::kLine), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(focused, LV_OPA_TRANSP, LV_PART_CURSOR);
-        lv_obj_set_style_border_color(focused, lv_color_hex(0x58A6FF), LV_PART_CURSOR);
+        lv_obj_set_style_border_color(focused, lv_color_hex(cp0::theme::kAccent), LV_PART_CURSOR);
         lv_obj_set_style_border_width(focused, metric(LayoutMetric::HiddenInputCursorWidth), LV_PART_CURSOR);
         lv_obj_set_style_border_side(focused, LV_BORDER_SIDE_LEFT, LV_PART_CURSOR);
         lv_obj_set_style_bg_opa(unfocused, LV_OPA_TRANSP, LV_PART_CURSOR);
@@ -778,23 +778,24 @@ void LvSettingWifiScanPage3::render_hidden_network_panel(){
         set_hidden_focus(hidden_focus_);
 
         if (!hidden_hint_) return;
-        const char *hint = connection_pending_       ? "Connecting..."
-                           : password_error_.empty() ? (password_visible_ ? "TAB:switch  ALT:hide  OK:connect"
-                                                                          : "TAB:switch  ALT:show  OK:connect")
-                                                     : password_error_.c_str();
-        lv_label_set_text(hidden_hint_, hint);
-        lv_obj_set_style_text_color(hidden_hint_, lv_color_hex(password_error_.empty() ? 0x555555 : 0xFF4444),
-                                    LV_PART_MAIN);
+        if (connection_pending_) {
+            cp0::ui::set_footer_message(hidden_hint_, "connecting...", cp0::theme::kAccent);
+        } else if (!password_error_.empty()) {
+            cp0::ui::set_footer_message(hidden_hint_, lower_copy(password_error_).c_str(), cp0::theme::kDanger);
+        } else {
+            cp0::ui::set_footer(hidden_hint_, {{"ent", "connect"},
+                                               {"tab", "switch"},
+                                               {"alt", password_visible_ ? "hide" : "show"},
+                                               {"esc", "back"}});
+        }
     }
 
 void LvSettingWifiScanPage3::refresh_status(){
         if (wifi_data_->status.connected && !wifi_data_->status.ssid.empty()) {
-            title_text_ = "Connected Wi-Fi: ";
-            title_text_ += wifi_data_->status.ssid;
-            title_text_ += "  ";
-            title_text_ += wifi_data_->status.ip.empty() ? "No IP" : wifi_data_->status.ip;
+            // The connected network is already marked in the list; the title keeps the address.
+            title_text_ = wifi_data_->status.ip.empty() ? "no ip" : wifi_data_->status.ip;
         } else {
-            title_text_ = "Wi-Fi: Not connected";
+            title_text_ = "not connected";
         }
     }
 
@@ -804,7 +805,7 @@ void LvSettingWifiScanPage3::show_power_warning(){
         if (!power_warning_overlay_) return;
         lv_obj_set_size(power_warning_overlay_, metric(LayoutMetric::ScreenW), metric(LayoutMetric::ScreenH));
         lv_obj_set_pos(power_warning_overlay_, 0, 0);
-        lv_obj_set_style_bg_color(power_warning_overlay_, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(power_warning_overlay_, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(power_warning_overlay_, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(power_warning_overlay_, 0, LV_PART_MAIN);
         lv_obj_set_style_pad_all(power_warning_overlay_, 0, LV_PART_MAIN);
@@ -822,17 +823,17 @@ void LvSettingWifiScanPage3::show_power_warning(){
         lv_obj_center(power_warning_);
         lv_obj_set_style_radius(power_warning_, 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(power_warning_, 1, LV_PART_MAIN);
-        lv_obj_set_style_border_color(power_warning_, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(power_warning_, lv_color_hex(0x171717), LV_PART_MAIN);
+        lv_obj_set_style_border_color(power_warning_, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(power_warning_, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(power_warning_, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_pad_all(power_warning_, 0, LV_PART_MAIN);
         lv_obj_clear_flag(power_warning_, LV_OBJ_FLAG_SCROLLABLE);
 
-        lv_obj_t *title     = lv_msgbox_add_title(power_warning_, "Wi-Fi is disabled");
+        lv_obj_t *title     = lv_msgbox_add_title(power_warning_, lower_copy("Wi-Fi is disabled").c_str());
         lv_obj_t *header    = lv_msgbox_get_header(power_warning_);
         lv_obj_t *content   = lv_msgbox_get_content(power_warning_);
-        lv_obj_t *message   = lv_msgbox_add_text(power_warning_, "Enable Wi-Fi before continuing.");
-        lv_obj_t *ok_button = lv_msgbox_add_footer_button(power_warning_, "OK");
+        lv_obj_t *message   = lv_msgbox_add_text(power_warning_, lower_copy("Enable Wi-Fi before continuing.").c_str());
+        lv_obj_t *ok_button = lv_msgbox_add_footer_button(power_warning_, "ok");
         lv_obj_t *footer    = lv_msgbox_get_footer(power_warning_);
         lv_obj_t *ok_label  = ok_button ? lv_obj_get_child(ok_button, 0) : nullptr;
 
@@ -846,8 +847,8 @@ void LvSettingWifiScanPage3::show_power_warning(){
             lv_obj_set_style_pad_bottom(header, 0, LV_PART_MAIN);
         }
         if (title) {
-            lv_obj_set_style_text_color(title, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-            lv_obj_set_style_text_font(title, settings_fonts::sans(14, LV_FREETYPE_FONT_STYLE_BOLD), LV_PART_MAIN);
+            lv_obj_set_style_text_color(title, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
+            lv_obj_set_style_text_font(title, settings_fonts::sans(11), LV_PART_MAIN);
         }
         if (content) {
             lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);
@@ -857,8 +858,8 @@ void LvSettingWifiScanPage3::show_power_warning(){
             lv_obj_set_style_pad_right(content, 12, LV_PART_MAIN);
         }
         if (message) {
-            lv_obj_set_style_text_color(message, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
-            lv_obj_set_style_text_font(message, settings_fonts::sans(12), LV_PART_MAIN);
+            lv_obj_set_style_text_color(message, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
+            lv_obj_set_style_text_font(message, settings_fonts::sans(11), LV_PART_MAIN);
         }
         if (footer) {
             lv_obj_set_height(footer, 28);
@@ -881,8 +882,8 @@ void LvSettingWifiScanPage3::show_power_warning(){
             lv_obj_set_style_pad_all(ok_button, 0, LV_PART_MAIN);
         }
         if (ok_label) {
-            lv_obj_set_style_text_color(ok_label, lv_color_hex(0x58A6FF), LV_PART_MAIN);
-            lv_obj_set_style_text_font(ok_label, settings_fonts::sans(12), LV_PART_MAIN);
+            lv_obj_set_style_text_color(ok_label, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
+            lv_obj_set_style_text_font(ok_label, settings_fonts::sans(11), LV_PART_MAIN);
         }
         DComponens::lvgl_bind_event(power_warning_, LV_EVENT_KEY, nullptr,
                                     std::bind(&LvSettingWifiScanPage3::handle_key_event, this, std::placeholders::_1));
@@ -913,23 +914,31 @@ void LvSettingWifiScanPage3::render(){
         if (hidden_panel_) lv_obj_add_flag(hidden_panel_, LV_OBJ_FLAG_HIDDEN);
         if (password_panel_) lv_obj_add_flag(password_panel_, LV_OBJ_FLAG_HIDDEN);
 
-        if (title_) lv_label_set_text(title_, title_text_.c_str());
+        cp0::ui::set_text(title_status_, title_text_.c_str(), cp0::theme::kIdle);
         if (empty_) {
-            const std::string message = !scan_error_.empty() ? scan_error_
-                                        : scanning_          ? "Scanning for Wi-Fi networks..."
-                                                             : "No networks found. Press R to rescan.";
-            lv_label_set_text(empty_, message.c_str());
+            const std::string message = !scan_error_.empty() ? lower_copy(scan_error_)
+                                        : scanning_          ? "scanning for wi-fi networks..."
+                                                             : "no networks found";
+            cp0::ui::set_text(empty_, message.c_str(), scan_error_.empty() ? cp0::theme::kDim : cp0::theme::kDanger);
             if (wifi_data_->access_points.empty())
                 lv_obj_remove_flag(empty_, LV_OBJ_FLAG_HIDDEN);
             else
                 lv_obj_add_flag(empty_, LV_OBJ_FLAG_HIDDEN);
         }
-        if (hint_) {
-            lv_label_set_text(hint_, scanning_ ? "Scanning...  OK:connect  R:rescan  D:forget  ESC:back"
-                                               : "OK:connect  R:rescan  D:forget  ESC:back");
+        const int network_count = static_cast<int>(wifi_data_->access_points.size());
+        if (!scan_error_.empty() && !wifi_data_->access_points.empty()) {
+            cp0::ui::set_footer_message(hint_, lower_copy(scan_error_).c_str(), cp0::theme::kDanger);
+        } else if (selected_index_ >= network_count) {
+            cp0::ui::set_footer(hint_, {{"ent", "join"}, {"r", scanning_ ? "scanning" : "rescan"}, {"esc", "back"}});
+        } else {
+            cp0::ui::set_footer(hint_, {{"ent", "connect"},
+                                        {"r", scanning_ ? "scanning" : "rescan"},
+                                        {"d", "forget"},
+                                        {"esc", "back"}});
         }
 
-        const int count = static_cast<int>(wifi_data_->access_points.size());
+        // The last row joins a network that does not broadcast its SSID.
+        const int count = network_count + 1;
         int offset      = selected_index_ - metric(LayoutMetric::VisibleRows) / 2;
         offset          = std::max(0, std::min(offset, std::max(0, count - metric(LayoutMetric::VisibleRows))));
 
@@ -941,13 +950,33 @@ void LvSettingWifiScanPage3::render(){
                 continue;
             }
 
+            const bool selected = index == selected_index_;
+            if (index == network_count) {
+                const uint32_t color = selected ? cp0::theme::kText : cp0::theme::kIdle;
+                set_row_text(row.ssid, "+ hidden network");
+                set_row_text(row.security, "");
+                set_row_text(row.signal, "");
+                if (row.ssid) lv_obj_set_style_text_color(row.ssid, lv_color_hex(color), LV_PART_MAIN);
+                if (row.background) {
+                    if (selected)
+                        lv_obj_remove_flag(row.background, LV_OBJ_FLAG_HIDDEN);
+                    else
+                        lv_obj_add_flag(row.background, LV_OBJ_FLAG_HIDDEN);
+                }
+                show_row(row);
+                row.selected = selected;
+                row.color    = color;
+                continue;
+            }
+
             const auto &access_point = wifi_data_->access_points[static_cast<std::size_t>(index)];
-            const bool selected      = index == selected_index_;
-            const uint32_t color     = access_point.in_use ? 0x58A6FF : selected ? 0xFFFFFF : 0xCCCCCC;
+            const uint32_t color     = access_point.in_use ? cp0::theme::kAccent
+                                       : selected            ? cp0::theme::kText
+                                                             : cp0::theme::kIdle;
             std::string ssid         = access_point.ssid;
             if (access_point.saved) ssid += " *";
             set_row_text(row.ssid, ssid);
-            set_row_text(row.security, access_point.security.empty() ? "Open" : access_point.security);
+            set_row_text(row.security, access_point.security.empty() ? "open" : access_point.security);
             char signal[16];
             std::snprintf(signal, sizeof(signal), "%d dBm", access_point.signal);
             set_row_text(row.signal, signal);
@@ -1118,20 +1147,20 @@ bool LvSettingWifiScanPage3::move_hidden_cursor_right(){
     }
 
 std::string LvSettingWifiScanPage3::password_validation_error() const{
-        if (password_.empty()) return "Password required";
+        if (password_.empty()) return "password required";
 
         std::string security = password_security_;
         std::transform(security.begin(), security.end(), security.begin(),
                        [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
         if (security.find("802.1X") != std::string::npos || security.find("EAP") != std::string::npos ||
             security.find("ENTERPRISE") != std::string::npos)
-            return "Enterprise Wi-Fi is not supported";
+            return "enterprise wi-fi is not supported";
         if (security.find("WPA") == std::string::npos) return {};
         if (password_.size() >= 8 && password_.size() <= 63) return {};
         if (password_.size() == 64 &&
             std::all_of(password_.begin(), password_.end(), [](unsigned char ch) { return std::isxdigit(ch) != 0; }))
             return {};
-        return "WPA password: 8-63 chars or 64 hex";
+        return "wpa password: 8-63 chars or 64 hex";
     }
 
 void LvSettingWifiScanPage3::show_password_prompt(const std::string &ssid, const std::string &security, const std::string &error){
@@ -1173,10 +1202,6 @@ void LvSettingWifiScanPage3::leave_hidden_ssid_prompt(){
         password_error_.clear();
         password_visible_ = false;
         hidden_network_   = false;
-        if (LeaveSelfPage) {
-            LeaveSelfPage();
-            return;
-        }
         view_ = View::List;
         render();
         start_scan();
@@ -1185,14 +1210,14 @@ void LvSettingWifiScanPage3::leave_hidden_ssid_prompt(){
 void LvSettingWifiScanPage3::submit_hidden_ssid(){
         if (view_ != View::HiddenSsid || connection_pending_) return;
         if (hidden_ssid_.empty()) {
-            password_error_ = "SSID required";
+            password_error_ = "ssid required";
             render();
             return;
         }
 
         password_error_.clear();
         if (!start_connection(hidden_ssid_, password_, ConnectionOrigin::HiddenPasswordEntry)) {
-            password_error_ = "Unable to start connection";
+            password_error_ = "unable to start connection";
             render();
         }
     }
@@ -1325,7 +1350,7 @@ bool LvSettingWifiScanPage3::start_network_operation(NetworkOperation operation,
             connection_state_.reset();
             connection_pending_ = false;
             ++generation_;
-            const std::string error = "Unable to start Wi-Fi operation";
+            const std::string error = "unable to start wi-fi operation";
             if (origin == ConnectionOrigin::HiddenPasswordEntry) {
                 clear_password();
                 password_error_ = error;
@@ -1461,7 +1486,7 @@ void LvSettingWifiScanPage3::handle_dispatch_failures(){
             scanning_             = false;
             scan_restart_pending_ = false;
             ++generation_;
-            scan_error_ = "Unable to deliver Wi-Fi scan result";
+            scan_error_ = "unable to deliver wi-fi scan result";
             render();
         }
 
@@ -1473,7 +1498,7 @@ void LvSettingWifiScanPage3::handle_dispatch_failures(){
         connection_state_.reset();
         connection_pending_ = false;
         ++generation_;
-        const std::string error = "Unable to deliver Wi-Fi operation result";
+        const std::string error = "unable to deliver wi-fi operation result";
         if (state->origin == ConnectionOrigin::HiddenPasswordEntry) {
             password_error_ = error;
             clear_password();
@@ -1490,7 +1515,11 @@ void LvSettingWifiScanPage3::handle_dispatch_failures(){
     }
 
 void LvSettingWifiScanPage3::activate_selected(){
-        if (view_ != View::List || connection_pending_ || wifi_data_->access_points.empty()) return;
+        if (view_ != View::List || connection_pending_) return;
+        if (selected_index_ == static_cast<int>(wifi_data_->access_points.size())) {
+            show_hidden_ssid_prompt();
+            return;
+        }
         if (selected_index_ < 0 || selected_index_ >= static_cast<int>(wifi_data_->access_points.size())) return;
 
         const WifiAccessPoint access_point = wifi_data_->access_points[static_cast<std::size_t>(selected_index_)];
@@ -1610,7 +1639,7 @@ void LvSettingWifiScanPage3::start_scan(){
         }
         if (!ui_dispatch_timer_) {
             scanning_   = false;
-            scan_error_ = "Unable to start Wi-Fi scan";
+            scan_error_ = "unable to start wi-fi scan";
             render();
             return;
         }
@@ -1661,7 +1690,7 @@ void LvSettingWifiScanPage3::start_scan(){
                 }
             })) {
             scanning_   = false;
-            scan_error_ = "Unable to start Wi-Fi scan";
+            scan_error_ = "unable to start wi-fi scan";
             render();
         }
     }
@@ -1721,6 +1750,8 @@ void LvSettingWifiScanPage3::apply_scan_result(const ScanResult &result){
             return;
         }
 
+        const bool hidden_row_selected = !wifi_data_->access_points.empty() &&
+                                         selected_index_ >= static_cast<int>(wifi_data_->access_points.size());
         wifi_data_->access_points.assign(result.access_points.begin(), result.access_points.begin() + count);
         if (!forgotten_ssid_.empty()) {
             for (auto &access_point : wifi_data_->access_points) {
@@ -1730,10 +1761,10 @@ void LvSettingWifiScanPage3::apply_scan_result(const ScanResult &result){
                 }
             }
         }
-        if (wifi_data_->access_points.empty()) {
-            selected_index_ = 0;
+        if (hidden_row_selected || wifi_data_->access_points.empty()) {
+            selected_index_ = static_cast<int>(wifi_data_->access_points.size());
         } else {
-            selected_index_ = std::clamp(selected_index_, 0, static_cast<int>(wifi_data_->access_points.size()) - 1);
+            selected_index_ = std::clamp(selected_index_, 0, static_cast<int>(wifi_data_->access_points.size()));
             if (!selected_ssid_before_scan_.empty()) {
                 const auto selected = std::find_if(wifi_data_->access_points.begin(), wifi_data_->access_points.end(),
                                                    [this](const WifiAccessPoint &access_point) {
@@ -1751,8 +1782,8 @@ void LvSettingWifiScanPage3::apply_scan_result(const ScanResult &result){
     }
 
 bool LvSettingWifiScanPage3::move_selection(int delta){
-        if (view_ != View::List || wifi_data_->access_points.empty() || delta == 0) return false;
-        const int next = std::clamp(selected_index_ + delta, 0, static_cast<int>(wifi_data_->access_points.size()) - 1);
+        if (view_ != View::List || delta == 0) return false;
+        const int next = std::clamp(selected_index_ + delta, 0, static_cast<int>(wifi_data_->access_points.size()));
         if (next == selected_index_) return false;
         selected_index_ = next;
         return true;

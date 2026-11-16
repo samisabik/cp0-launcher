@@ -69,7 +69,7 @@ def test_wifi_editors_share_the_configured_input_font():
     assert password_panel.count("create_hidden_input(") == 1
     assert hidden_panel.count("create_hidden_input(") == 2
     assert "lv_textarea_create(parent)" in hidden_input
-    assert "input_font(14)" in hidden_input
+    assert "input_font(11)" in hidden_input
     assert "settings_text_cursor" not in WIFI_HEADER + WIFI_SOURCE
 
 
@@ -94,8 +94,8 @@ def test_bluetooth_editor_uses_one_font_for_all_cursor_states():
     alias_editor = function_definition(
         BLUETOOTH_SOURCE, "void LvSettingBluetoothAliasPage3::render"
     )
-    assert alias_editor.count("input_font(14)") == 1
-    assert "lv_obj_set_style_text_font(alias_input_, input_font(14), LV_PART_MAIN);" in alias_editor
+    assert alias_editor.count("input_font(11)") == 1
+    assert "lv_obj_set_style_text_font(alias_input_, input_font(11), LV_PART_MAIN);" in alias_editor
     assert "settings_text_cursor" not in BLUETOOTH_HEADER + BLUETOOTH_SOURCE
 
 

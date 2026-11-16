@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "../../main/ui/settings/settings_bluetooth_page.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -15,7 +16,12 @@ extern "C" void cp0_keyboard_set_lvgl_keypad_intercept(int value) { intercept = 
 extern "C" int cp0_keyboard_get_lvgl_keypad_intercept() { return intercept; }
 extern "C" void cp0_keyboard_set_input_context(cp0_keyboard_input_context_t value) { input_context = value; }
 extern "C" cp0_keyboard_input_context_t cp0_keyboard_get_input_context() { return input_context; }
-bool settings_bluetooth_named_only_enabled() { return false; }
+extern "C" cp0_battery_info_t cp0_battery_read() { return {}; }
+extern "C" int cp0_wifi_status_read(cp0_wifi_status_t *status)
+{
+    if (status) *status = {};
+    return -1;
+}
 
 static void snapshot(const char *name)
 {
@@ -79,13 +85,16 @@ int main()
         assert(page.discovery_active_);
         key(KEY_R);
         drain();
-        assert(page.error_message_ == "Bluetooth scan stop failed.");
+        assert(page.error_message_ == "bluetooth scan stop failed.");
         assert(page.scan_stop_required_);
         snapshot("bluetooth-error");
         calls.clear();
         key(KEY_R);
         drain();
-        assert((calls == std::vector<std::string>{"BtStatus", "BtDiscoveryStop"}));
+        // The scan page asks to be discoverable whenever the adapter reports it
+        // is not; that request runs alongside the scan stop.
+        std::sort(calls.begin(), calls.end());
+        assert((calls == std::vector<std::string>{"BtDiscoverable", "BtDiscoveryStop", "BtStatus"}));
 
         // B must interrupt pending work, rather than being gated by action flags.
         page.request_api({"BtPair"}, [&](int, std::string) { assert(false); },

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "lvgl/lvgl.h"
+#include "cp0_theme.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -7974,12 +7975,12 @@ public:
 
     enum class LayoutMetric : int {
         ScreenW         = 320,
-        ScreenH         = 150,
+        ScreenH         = 136,
         RowH            = 26,
         CenterRow       = 2,
-        EdgePadding     = 62,
+        EdgePadding     = 55, // (ScreenH - RowH) / 2
         BarX            = 4,
-        BarY            = 62,
+        BarY            = 55,
         BarW            = 312,
         BarH            = 26,
         TitleCenterX    = 56,
@@ -8067,19 +8068,17 @@ public:
     {
         if (!label) return;
 
-        uint32_t color = 0x3C3C3C;
+        uint32_t color = cp0::theme::kDim;
         if (distance == 0) {
-            color = 0xE6E6E6;
+            color = cp0::theme::kText;
         } else if (distance == 1) {
-            color = 0x8A8A8A;
-        } else if (distance == 2) {
-            color = 0x5C5C5C;
+            color = cp0::theme::kIdle;
         }
 
         lv_obj_set_style_text_font(
             label, settings_fonts::mono(distance == 0 ? 22 : kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-        lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_opa(label, distance >= 3 ? LV_OPA_50 : LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
         lv_obj_set_width(label, LV_SIZE_CONTENT);
         lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
@@ -8382,7 +8381,7 @@ protected:
         ComponensObj = lv_obj_create(parent);
         if (!ComponensObj) return;
         lv_obj_set_size(ComponensObj, metric(LayoutMetric::ScreenW), metric(LayoutMetric::ScreenH));
-        lv_obj_set_pos(ComponensObj, 0, 0);
+        lv_obj_set_pos(ComponensObj, 0, cp0::theme::kBodyTop);
         lv_obj_set_style_bg_color(ComponensObj, lv_color_black(), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(ComponensObj, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(ComponensObj, 0, LV_PART_MAIN);
@@ -8397,10 +8396,10 @@ protected:
         if (selection_bg_) {
             lv_obj_set_size(selection_bg_, metric(LayoutMetric::BarW), metric(LayoutMetric::BarH));
             lv_obj_set_pos(selection_bg_, metric(LayoutMetric::BarX), metric(LayoutMetric::BarY));
-            lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x13261B), LV_PART_MAIN);
+            lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(cp0::theme::kSelect), LV_PART_MAIN);
             lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
-            lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+            lv_obj_set_style_border_color(selection_bg_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
             lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
             lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
             lv_obj_remove_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
@@ -8448,7 +8447,7 @@ protected:
         if (title_label_) {
             lv_label_set_text(title_label_, parent_node_->label.c_str());
             lv_obj_set_style_text_font(title_label_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
-            lv_obj_set_style_text_color(title_label_, lv_color_hex(0x8A8A8A), LV_PART_MAIN);
+            lv_obj_set_style_text_color(title_label_, lv_color_hex(cp0::theme::kIdle), LV_PART_MAIN);
             lv_obj_set_style_text_align(title_label_, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
             update_title_position();
         }

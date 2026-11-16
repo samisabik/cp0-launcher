@@ -21,14 +21,13 @@ class LvSettingStaticInfoPage3 : public DComponens::LvglComponensBase {
 public:
     enum class LayoutMetric : int {
         ScreenW = 320,
-        ScreenH = 150,
-        ContentX = 8,
-        ContentW = 304,
-        TitleY = 6,
-        LinesY = 30,
-        LinesBottomY = 132,
+        ScreenH = 170,
+        ContentX = 4,
+        ContentW = 312,
+        TitleY = 1,
+        LinesY = 20,
+        LinesBottomY = 150,
         LineGap = 3,
-        FooterY = 133,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -84,16 +83,6 @@ private:
 };
 
 std::unique_ptr<DComponens::LvglComponensBase> settings_t12b_about_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> on_back);
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_storage_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> on_back);
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_credit_page_factory(
     lv_obj_t *parent,
     const NodeIter &page_node,
     std::function<void()> on_back);

@@ -37,6 +37,7 @@ INSTALL_PARENT = PurePosixPath("usr/share")
 SERVICE_PATH = PurePosixPath("usr/lib/systemd/user")
 SYSTEM_SERVICE_PATH = PurePosixPath("usr/lib/systemd/system")
 POLKIT_RULES_PATH = PurePosixPath("usr/share/polkit-1/rules.d")
+POLKIT_LOCAL_RULES_PATH = PurePosixPath("etc/polkit-1/rules.d")
 LIBEXEC_PATH = PurePosixPath("usr/libexec")
 LAUNCHER_UPDATE_ABI = "1"
 
@@ -441,6 +442,23 @@ polkit.addRule(function(action, subject) {
            action.lookup("unit") == "applaunch-apt-update.service" ||
            action.lookup("unit") == "applaunch-apps-updater.service"))) &&
         subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+});
+"""
+
+
+def _wifi_polkit_text() -> str:
+    return """// Let members of netdev scan, join and forget Wi-Fi networks from the
+// launcher.  APPLaunch runs as a systemd user service without an active seat
+// session, so NetworkManager's default policy refuses `nmcli dev wifi rescan`.
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
+         action.id == "org.freedesktop.NetworkManager.network-control" ||
+         action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+         action.id == "org.freedesktop.NetworkManager.settings.modify.own" ||
+         action.id == "org.freedesktop.NetworkManager.settings.modify.system") &&
+        subject.isInGroup("netdev")) {
         return polkit.Result.YES;
     }
 });
@@ -987,6 +1005,10 @@ def prepare_package_tree(
         _write_text(
             paths.package_root / Path(*POLKIT_RULES_PATH.parts) / "60-applaunch-updater.rules",
             _updater_polkit_text(),
+        )
+        _write_text(
+            paths.package_root / Path(*POLKIT_LOCAL_RULES_PATH.parts) / "50-cp0-wifi-scan.rules",
+            _wifi_polkit_text(),
         )
         _write_text(
             paths.package_root / Path(*LIBEXEC_PATH.parts) / "applaunch-updater",

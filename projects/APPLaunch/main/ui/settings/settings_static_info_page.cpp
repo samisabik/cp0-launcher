@@ -5,6 +5,8 @@
  */
 
 #include "settings_static_info_page.hpp"
+
+#include "cp0_theme.hpp"
 #include "settings_extras.hpp"
 #include "settings_fonts.hpp"
 #include "settings_storage_model.hpp"
@@ -157,12 +159,7 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
     lv_obj_remove_flag(ComponensObj, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(ComponensObj, LV_OBJ_FLAG_SCROLLABLE);
 
-    add_label(content_.title,
-              metric(LayoutMetric::ContentX),
-              metric(LayoutMetric::TitleY),
-              0x58A6FF,
-              settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD),
-              false);
+    cp0::ui::title_row(ComponensObj, ("settings/" + cp0::ui::lower(content_.title)).c_str());
 
     // The license list is much longer than the fixed display.  Keep the
     // title and footer fixed while allowing the body to scroll with the
@@ -204,8 +201,8 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
                 lv_obj_set_width(body_label, metric(LayoutMetric::ContentW));
                 lv_label_set_long_mode(body_label, LV_LABEL_LONG_WRAP);
                 lv_label_set_text(body_label, body_text.c_str());
-                lv_obj_set_style_text_color(body_label, lv_color_hex(0xE0E0E0), LV_PART_MAIN);
-                lv_obj_set_style_text_font(body_label, settings_fonts::cjk_sans(13), LV_PART_MAIN);
+                lv_obj_set_style_text_color(body_label, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
+                lv_obj_set_style_text_font(body_label, settings_fonts::cjk_sans(11), LV_PART_MAIN);
                 lv_obj_update_layout(body_label);
                 lv_obj_update_layout(scroll_body_);
             }
@@ -217,8 +214,8 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
             lv_obj_t *label = add_label(line,
                                         metric(LayoutMetric::ContentX),
                                         y,
-                                        0xE0E0E0,
-                                        settings_fonts::cjk_sans(12),
+                                        cp0::theme::kText,
+                                        settings_fonts::cjk_sans(11),
                                         true);
             if (!label) break;
             line_labels_.push_back(label);
@@ -227,13 +224,11 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
         }
     }
 
-    const lv_font_t *hint_font = settings_fonts::sans(12, LV_FREETYPE_FONT_STYLE_BOLD);
-    add_label(scroll_body_ ? "UP/DOWN: scroll   ESC: back" : "ESC: back",
-              metric(LayoutMetric::ContentX),
-              metric(LayoutMetric::FooterY),
-              0x46DC87,
-              hint_font ? hint_font : settings_fonts::sans(12),
-              false);
+    lv_obj_t *footer = cp0::ui::footer(ComponensObj);
+    if (scroll_body_)
+        cp0::ui::set_footer(footer, {{"up/dn", "scroll"}, {"esc", "back"}});
+    else
+        cp0::ui::set_footer(footer, {{"esc", "back"}});
     DComponens::lvgl_bind_event(
         ComponensObj, LV_EVENT_KEY, nullptr,
         [this](lv_event_t *event) { handle_key_event(event); });
@@ -381,29 +376,21 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_t12b_about_page_factory(
     content.lines.push_back(std::string("commit     ") + build_commit());
     content.lines.push_back(std::string("built      ") + build_date());
     for (std::string &line : settings_system_lines()) content.lines.push_back(std::move(line));
-    return std::make_unique<LvSettingStaticInfoPage3>(parent, page_node, std::move(on_back), std::move(content));
-}
 
-std::unique_ptr<DComponens::LvglComponensBase> settings_storage_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> on_back)
-{
     // The root filesystem is the SD card on this device; report it directly
     // rather than probing for removable media.
-    settings_t12b::about_help::Content content{"storage", {}};
+    content.lines.push_back("");
+    content.lines.push_back("storage");
     struct statvfs root{};
     if (statvfs("/", &root) == 0) {
         const uint64_t total = static_cast<uint64_t>(root.f_blocks) * root.f_frsize;
         const uint64_t available = static_cast<uint64_t>(root.f_bavail) * root.f_frsize;
         const uint64_t used = total - static_cast<uint64_t>(root.f_bfree) * root.f_frsize;
-        content.lines = {
-            "disk       " + SettingsStorageModel::format_bytes(total),
-            "used       " + SettingsStorageModel::format_bytes(used),
-            "free       " + SettingsStorageModel::format_bytes(available),
-        };
+        content.lines.push_back("disk       " + SettingsStorageModel::format_bytes(total));
+        content.lines.push_back("used       " + SettingsStorageModel::format_bytes(used));
+        content.lines.push_back("free       " + SettingsStorageModel::format_bytes(available));
     } else {
-        content.lines = {"disk usage unavailable"};
+        content.lines.push_back("disk usage unavailable");
     }
     struct sysinfo memory{};
     if (sysinfo(&memory) == 0) {
@@ -412,15 +399,10 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_storage_page_factory(
         content.lines.push_back("ram free   " +
                                 SettingsStorageModel::format_bytes((memory.freeram + memory.bufferram) * unit));
     }
-    return std::make_unique<LvSettingStaticInfoPage3>(
-        parent, page_node, std::move(on_back), std::move(content));
-}
 
-std::unique_ptr<DComponens::LvglComponensBase> settings_credit_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> on_back)
-{
-    return std::make_unique<LvSettingStaticInfoPage3>(
-        parent, page_node, std::move(on_back), settings_t12b::about_help::credit());
+    content.lines.push_back("");
+    content.lines.push_back("licenses");
+    settings_t12b::about_help::Content licenses = settings_t12b::about_help::credit();
+    for (std::string &line : licenses.lines) content.lines.push_back(std::move(line));
+    return std::make_unique<LvSettingStaticInfoPage3>(parent, page_node, std::move(on_back), std::move(content));
 }

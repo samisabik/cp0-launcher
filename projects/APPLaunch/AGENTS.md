@@ -241,7 +241,9 @@ network, Tailscale address, recordings) and the unlock prompt. The simulation
 runs only while the panel is visible and pauses in the black state. Animate exit
 using the stored panel rectangle, not potentially stale LVGL layout geometry.
 
-UI sounds are removed from this launcher build: `play_lockscreen_sound` only
-records the requested asset name. Lock entry still suspends the system sound
-player, and exit prepares it asynchronously and completes cleanup before
-exposing the working screen.
+`play_lockscreen_sound` records the requested asset name and passes it to
+`settings_prefs::play_system_sound` (`main/ui/settings/settings_prefs.hpp`),
+which plays it only while Settings -> sound -> system sounds is on. No sound
+assets ship in this build, so the cues are silent until assets are added. Lock
+entry still suspends the system sound player, and exit prepares it
+asynchronously and completes cleanup before exposing the working screen.

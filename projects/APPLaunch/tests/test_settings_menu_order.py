@@ -12,7 +12,6 @@ ETHERNET_CONTROLLER = (
 ).read_text()
 SETTINGS_ROLLER = (ROOT / "main/ui/settings/settings_menu_roller.hpp").read_text()
 WIFI_PAGE = (ROOT / "main/ui/settings/settings_wifi_page.cpp").read_text()
-SYSTEM_PAGE = (ROOT / "main/ui/settings/settings_system_page.cpp").read_text()
 SETTINGS_ADAPTER = (ROOT / "main/ui/settings/settings_adapter.cpp").read_text()
 BUILTIN_REGISTRY = (ROOT / "main/ui/builtin_app_registry.cpp").read_text()
 PREINSTALLED_MANIFEST = (ROOT / "APPLaunch/preinstalled-desktop-apps.tsv").read_text()
@@ -67,39 +66,59 @@ def test_screen_keeps_lock_timeout_options():
 def test_sound_holds_volume_and_mic_gain():
     builder = settings_tree_builder()
     sound_entries = re.findall(r'append_child\(\s*sound,\s*SettingEntry\{"([^"]+)"', builder)
-    assert sound_entries == ["volume", "mic gain"]
+    assert sound_entries == ["volume", "mic gain", "system sounds"]
     assert re.search(r'sound,\s*SettingEntry\{"volume",\s*volume_page3_factory,\s*PageType::FullCustom\}', builder)
     assert "settings_mic_gain_page_factory" in builder
+    assert 'SettingEntry{"system sounds", system_sounds_api, true}' in builder
 
 
-def test_wifi_menu_uses_product_labels_without_changing_actions():
+def test_wifi_menu_joins_hidden_networks_from_the_list():
     wifi_entries = re.findall(
         r'append_child\(\s*wifi,\s*SettingEntry\{"([^"]+)"',
         settings_tree_builder(),
     )
-    assert wifi_entries == ["enable", "networks", "hidden"]
+    assert wifi_entries == ["enable", "networks"]
     assert 'SettingEntry{"enable", wifi_power_api, true}' in SETTINGS_PAGE
     assert 'SettingEntry{"networks", wifi_scan_page3_factory, PageType::FullCustom}' in SETTINGS_PAGE
-    assert 'SettingEntry{"hidden", wifi_add_hidden_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
-    assert 'create_label(hidden_panel_, "Join Hidden Network"' in WIFI_PAGE
+    assert "wifi_add_hidden_page_factory" not in SETTINGS_PAGE
+    assert '"+ hidden network"' in WIFI_PAGE
+    assert 'cp0::ui::title_row(hidden_panel_, "settings/wi-fi/hidden")' in WIFI_PAGE
 
 
-def test_ethernet_is_a_submenu_with_enable_and_existing_info_page():
-    ethernet_entries = re.findall(
-        r'append_child\(\s*ethernet,\s*SettingEntry\{"([^"]+)"',
+def test_bluetooth_menu_has_power_paired_and_scan():
+    bluetooth_entries = re.findall(
+        r'append_child\(\s*bluetooth,\s*SettingEntry\{"([^"]+)"',
         settings_tree_builder(),
     )
-    assert ethernet_entries == ["enable", "info"]
+    assert bluetooth_entries == ["power", "paired", "scan"]
+    assert "bt_named_only" not in SETTINGS_PAGE
+    assert "BtDiscoverable" not in SETTINGS_PAGE
+
+
+def test_ethernet_submenu_shows_the_address_read_only():
+    ethernet_entries = re.findall(
+        r'append_child\(\s*ethernet,\s*SettingEntry\{"?([^"},]+)',
+        settings_tree_builder(),
+    )
+    assert ethernet_entries == ["enable", "std::string(kEthernetIpPrefix) + "]
+    assert 'constexpr const char *kEthernetIpPrefix = "ip: ";' in SETTINGS_PAGE
+    assert 'settings_interface_ipv4("eth0")' in SETTINGS_PAGE
     assert 'SettingEntry{"enable", ethernet_enabled_api, true}' in SETTINGS_PAGE
-    assert 'SettingEntry{"info", settings_ethernet_page_factory, PageType::FullCustom}' in SETTINGS_PAGE
     assert '"GENERAL.STATE", "device", "show", "eth0"' in ETHERNET_CONTROLLER
     assert "GENERAL.AUTOCONNECT" not in SETTINGS_PAGE
     assert "GENERAL.AUTOCONNECT" not in ETHERNET_CONTROLLER
     assert 'operation == Operation::Connect ? "connect" : "disconnect"' in ETHERNET_CONTROLLER
-    assert 'create_network_table_row(ComponensObj, 0, "IP")' in SYSTEM_PAGE
-    assert 'create_network_table_row(ComponensObj, 1, "Gateway")' in SYSTEM_PAGE
-    assert 'create_network_table_row(ComponensObj, 2, "MAC")' in SYSTEM_PAGE
-    assert 'settings_fonts::mono(14)' in SYSTEM_PAGE
+
+
+def test_time_menu_order():
+    builder = settings_tree_builder()
+    time_block = builder[builder.index("NodeIter date_time =") : builder.index("NodeIter system =")]
+    assert "std::string(kTimeNowPrefix)" in time_block
+    labels = re.findall(r'SettingEntry \w+\{"([^"]+)"|SettingEntry\{"([^"]+)"', time_block)
+    assert [a or b for a, b in labels] == [
+        "time", "network time", "time zone", "clock format", "set manually"]
+    assert "settings_rtc_editor_page_factory, PageType::FullCustom" in time_block
+    assert "append_clock_format_options" in time_block
 
 
 def test_ext_port_order_and_hardware_mappings():
@@ -132,13 +151,17 @@ def test_system_entries_and_power_actions():
         r'append_child\(\s*system,\s*SettingEntry\{"([^"]+)"',
         system,
     )
-    assert system_entries == ["about", "storage", "licenses"]
-    assert "settings_update_page_factory" not in system
+    assert system_entries == ["about", "hardware", "updates"]
+    assert "std::string(kDeviceNamePrefix)" in system
+    assert 'SettingEntry ssh_entry{"ssh server", ssh_server_api, true};' in system
     assert "settings_t12b_about_page_factory" in system
-    assert "settings_storage_page_factory" in system
-    assert "settings_credit_page_factory" in system
-    assert "boot_actions::Action::Reboot" in system
-    assert "boot_actions::Action::Shutdown" in system
+    assert "settings_hardware_page_factory" in system
+    assert "settings_updates_page_factory" in system
+    assert "settings_storage_page_factory" not in system
+    assert "settings_credit_page_factory" not in system
+    assert system.index("ssh_entry") < system.index('"updates"')
+    assert system.index("boot_actions::Action::Reboot") < system.index("boot_actions::Action::Shutdown")
+    assert "settings_power_request(action)" in SETTINGS_PAGE
     for removed in ('SettingEntry{"OS"', 'SettingEntry{"APPLaunch"',
                     'SettingEntry{"Help"', 'SettingEntry{"Boot"'):
         assert removed not in system
@@ -149,8 +172,10 @@ if __name__ == "__main__":
     test_screen_remains_the_initial_selection()
     test_screen_keeps_lock_timeout_options()
     test_sound_holds_volume_and_mic_gain()
-    test_wifi_menu_uses_product_labels_without_changing_actions()
-    test_ethernet_is_a_submenu_with_enable_and_existing_info_page()
+    test_wifi_menu_joins_hidden_networks_from_the_list()
+    test_bluetooth_menu_has_power_paired_and_scan()
+    test_ethernet_submenu_shows_the_address_read_only()
+    test_time_menu_order()
     test_ext_port_order_and_hardware_mappings()
     test_launcher_settings_use_builtin_and_release_preinstalled_apps()
     test_system_entries_and_power_actions()

@@ -5,6 +5,8 @@
  */
 
 #include "settings_screen_timeout_page.hpp"
+
+#include "cp0_theme.hpp"
 #include "settings_fonts.hpp"
 
 #if __has_include("model/setup_value_policy.hpp")
@@ -259,8 +261,8 @@ void LvSettingDarkTimePage3::create_status_label()
     lv_obj_set_width(status_label_, 104);
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(
-        status_label_, settings_fonts::sans(10, LV_FREETYPE_FONT_STYLE_BOLD), LV_PART_MAIN);
-    lv_obj_set_style_text_color(status_label_, lv_color_hex(0xFFCC66), LV_PART_MAIN);
+        status_label_, settings_fonts::sans(11), LV_PART_MAIN);
+    lv_obj_set_style_text_color(status_label_, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
     lv_obj_set_pos(status_label_, 4, 4);
     lv_label_set_text(status_label_, "");
 }
@@ -268,8 +270,8 @@ void LvSettingDarkTimePage3::create_status_label()
 void LvSettingDarkTimePage3::set_status(const std::string &text, bool error)
 {
     if (!status_label_) return;
-    lv_label_set_text(status_label_, text.c_str());
-    lv_obj_set_style_text_color(status_label_, lv_color_hex(error ? 0xFF6666 : 0x66CC88), LV_PART_MAIN);
+    lv_label_set_text(status_label_, cp0::ui::lower(text).c_str());
+    lv_obj_set_style_text_color(status_label_, lv_color_hex(error ? cp0::theme::kDanger : cp0::theme::kAccent), LV_PART_MAIN);
 }
 
 void LvSettingDarkTimePage3::finish_load(const DarkTimeReadResult &result)

@@ -297,6 +297,12 @@ assert "status downloading:5" in packager._updater_script_text()
 assert "status installing:85" in packager._updater_script_text()
 assert "status restarting:95" in packager._updater_script_text()
 assert "applaunch-apps-updater.service" in packager._updater_polkit_text()
+assert str(packager.POLKIT_LOCAL_RULES_PATH) == "etc/polkit-1/rules.d"
+for action in ("wifi.scan", "network-control", "enable-disable-wifi",
+               "settings.modify.own", "settings.modify.system"):
+    assert f'"org.freedesktop.NetworkManager.{action}"' in packager._wifi_polkit_text()
+assert 'subject.isInGroup("netdev")' in packager._wifi_polkit_text()
+assert '"50-cp0-wifi-scan.rules"' in Path(packager.__file__).read_text()
 assert "TimeoutStartSec=30min" in packager._apps_updater_service_text()
 assert "TimeoutStopSec=5min" in packager._apps_updater_service_text()
 assert "apt-get install" in packager._apps_updater_script_text()

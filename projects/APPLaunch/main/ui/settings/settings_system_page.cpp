@@ -6,35 +6,17 @@
 
 #include "settings_system_page.hpp"
 
-#include "cp0_lvgl_app.h"
-#include "cp0_font_service.hpp"
+#include "cp0_theme.hpp"
 #include "hal_lvgl_bsp.h"
-#include "input_keys.h"
-#include "keyboard_input.h"
-#include "settings_about_info_model.hpp"
-#include "settings_http_worker.hpp"
+#include "settings_system_model.hpp"
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
+#include <array>
 #include <cstdint>
-#include <cerrno>
-#include <cstdlib>
-#include <functional>
-#include <fstream>
 #include <list>
-#include <map>
-#include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace {
-
-enum class TimerInterval : uint32_t {
-    UpdatePollMs = 500,
-};
-constexpr std::chrono::seconds kUpdateTimeout{20 * 60};
 
 #define SETTINGS_SYSTEM_STRINGIFY_IMPL(value) #value
 #define SETTINGS_SYSTEM_STRINGIFY(value) SETTINGS_SYSTEM_STRINGIFY_IMPL(value)
@@ -50,732 +32,291 @@ const char *launcher_version()
 #endif
 }
 
-const char *launcher_channel()
+#undef SETTINGS_SYSTEM_STRINGIFY
+#undef SETTINGS_SYSTEM_STRINGIFY_IMPL
+
+constexpr uint32_t kPollMs = 500;
+
+enum class Job { None, Check, Launcher, System };
+
+struct ActionRow {
+    Job job;
+    const char *label;
+};
+
+constexpr std::array<ActionRow, 3> kActions = {{
+    {Job::Check, "check for updates"},
+    {Job::Launcher, "update launcher"},
+    {Job::System, "refresh system packages"},
+}};
+
+// The osinfo service answers these requests inline, so they are safe to call
+// from the LVGL thread; the work itself runs in the service's job threads.
+int osinfo_call(std::list<std::string> arguments, std::string &payload)
 {
-#ifdef LAUNCHER_CHANNEL
-    return LAUNCHER_CHANNEL;
-#elif defined(LAUNCHER_CHANNEL_RAW)
-    return SETTINGS_SYSTEM_STRINGIFY(LAUNCHER_CHANNEL_RAW);
-#else
-    return "development";
-#endif
-}
-
-const char *launcher_build_date()
-{
-#ifdef LAUNCHER_BUILD_DATE
-    return LAUNCHER_BUILD_DATE;
-#elif defined(LAUNCHER_BUILD_DATE_RAW)
-    return SETTINGS_SYSTEM_STRINGIFY(LAUNCHER_BUILD_DATE_RAW);
-#else
-    return "unknown";
-#endif
-}
-
-const char *launcher_commit()
-{
-#ifdef LAUNCHER_GIT_COMMIT
-    return LAUNCHER_GIT_COMMIT;
-#elif defined(LAUNCHER_GIT_COMMIT_RAW)
-    return SETTINGS_SYSTEM_STRINGIFY(LAUNCHER_GIT_COMMIT_RAW);
-#else
-    return "unknown";
-#endif
-}
-
-std::string lvgl_version()
-{
-    return std::to_string(LVGL_VERSION_MAJOR) + "." +
-           std::to_string(LVGL_VERSION_MINOR) + "." +
-           std::to_string(LVGL_VERSION_PATCH);
-}
-
-const lv_font_t *title_font()
-{
-    return settings_fonts::sans(14, LV_FREETYPE_FONT_STYLE_BOLD);
-}
-
-const lv_font_t *body_font()
-{
-    return settings_fonts::sans(12);
-}
-
-const lv_font_t *hint_font()
-{
-    return settings_fonts::sans(12, LV_FREETYPE_FONT_STYLE_BOLD);
-}
-
-lv_obj_t *create_label(lv_obj_t *parent,
-                       int x,
-                       int y,
-                       int width,
-                       const char *text,
-                       uint32_t color,
-                       const lv_font_t *font,
-                       bool wrap = false)
-{
-    if (!parent) return nullptr;
-    lv_obj_t *label = lv_label_create(parent);
-    if (!label) return nullptr;
-    lv_label_set_text(label, text ? text : "");
-    lv_obj_set_pos(label, x, y);
-    lv_obj_set_width(label, width);
-    lv_label_set_long_mode(label, wrap ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-    lv_obj_set_style_text_font(label, font ? font : body_font(), LV_PART_MAIN);
-    return label;
-}
-
-void configure_page(lv_obj_t *object, int width, int height)
-{
-    if (!object) return;
-    lv_obj_set_size(object, width, height);
-    lv_obj_set_pos(object, 0, 0);
-    lv_obj_set_style_bg_color(object, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(object, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(object, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(object, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(object, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(object, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(object, LV_OBJ_FLAG_SCROLLABLE);
-}
-
-void set_label(lv_obj_t *label, const std::string &text)
-{
-    if (label) lv_label_set_text(label, text.c_str());
-}
-
-bool uses_network_table(SettingsSystemPageKind kind)
-{
-    return kind == SettingsSystemPageKind::Network ||
-           kind == SettingsSystemPageKind::Ethernet;
-}
-
-lv_obj_t *create_network_table_row(lv_obj_t *parent,
-                                   int row_index,
-                                   const char *key)
-{
-    if (!parent) return nullptr;
-    using LayoutMetric = LvSettingSystemInfoPage3::LayoutMetric;
-    const auto metric = [](LayoutMetric value) {
-        return LvSettingSystemInfoPage3::metric(value);
-    };
-
-    lv_obj_t *row = lv_obj_create(parent);
-    if (!row) return nullptr;
-    lv_obj_set_pos(row,
-                   metric(LayoutMetric::TableX),
-                   metric(LayoutMetric::TableY) + row_index * metric(LayoutMetric::TableRowH));
-    lv_obj_set_size(row, metric(LayoutMetric::TableW), metric(LayoutMetric::TableRowH));
-    lv_obj_set_style_bg_color(row,
-                              lv_color_hex(row_index % 2 == 0 ? 0x151515 : 0x1B1B1B),
-                              LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(row, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(row, lv_color_hex(0x383838), LV_PART_MAIN);
-    lv_obj_set_style_border_side(row, LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(row, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *divider = lv_obj_create(row);
-    if (divider) {
-        lv_obj_set_pos(divider, metric(LayoutMetric::TableDividerX), 0);
-        lv_obj_set_size(divider,
-                        metric(LayoutMetric::TableDividerW),
-                        metric(LayoutMetric::TableDividerH));
-        lv_obj_set_style_bg_color(divider, lv_color_hex(0x505050), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_border_width(divider, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_all(divider, 0, LV_PART_MAIN);
-        lv_obj_set_style_radius(divider, 0, LV_PART_MAIN);
-        lv_obj_remove_flag(divider, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(divider, LV_OBJ_FLAG_SCROLLABLE);
-    }
-
-    create_label(row,
-                 metric(LayoutMetric::TableKeyX),
-                 4,
-                 metric(LayoutMetric::TableKeyW),
-                 key,
-                 0xA8A8A8,
-                 settings_fonts::sans(13, LV_FREETYPE_FONT_STYLE_BOLD));
-    return create_label(row,
-                        metric(LayoutMetric::TableValueX),
-                        3,
-                        metric(LayoutMetric::TableValueW),
-                        "--",
-                        0xF2F2F2,
-                        settings_fonts::mono(14));
-}
-
-SettingsSystemPageKind resolve_kind(const NodeIter &page_node, SettingsSystemPageKind requested)
-{
-    if (requested != SettingsSystemPageKind::Auto) return requested;
-    if (page_node.node && !page_node->label.empty()) {
-        if (page_node->label == "Password") return SettingsSystemPageKind::Password;
-        if (page_node->label == "OS") return SettingsSystemPageKind::OS;
-        if (page_node->label == "Username" || page_node->label == "Hostname" ||
-            page_node->label == "Account")
-            return SettingsSystemPageKind::Account;
-        if (page_node->label == "Version") return SettingsSystemPageKind::Version;
-        if (page_node->label == "Build") return SettingsSystemPageKind::Build;
-        if (page_node->label == "Ethernet" || page_node->label == "IP" ||
-            page_node->label == "Gateway" || page_node->label == "MAC")
-            return SettingsSystemPageKind::Ethernet;
-    }
-    return SettingsSystemPageKind::Network;
-}
-
-// Keep the OS-info transport private to this page.  The page is the only
-// consumer, so exposing a separate API surface only added an unnecessary
-// coupling between settings modules.
-void request_osinfo(std::list<std::string> arguments,
-                    std::function<void(int, std::string)> callback) noexcept
-{
-    if (!callback) return;
-
-    auto delivered = std::make_shared<std::atomic_bool>(false);
-    auto safe_callback = [callback = std::move(callback), delivered](int code,
-                                                                       std::string data) mutable {
-        bool expected = false;
-        if (!delivered->compare_exchange_strong(expected, true)) return;
-        try {
-            callback(code, std::move(data));
-        } catch (...) {
-        }
-    };
-
+    int result = -1;
     try {
-        cp0_signal_osinfo_api(std::move(arguments), safe_callback);
+        cp0_signal_osinfo_api(std::move(arguments), [&](int code, std::string data) {
+            result = code;
+            payload = std::move(data);
+        });
     } catch (...) {
-        safe_callback(-1, "osinfo service unavailable");
+        payload = "osinfo service unavailable";
     }
+    return result;
 }
 
-template <typename Owner>
-bool start_osinfo_request(Owner *owner,
-                          std::list<std::string> arguments,
-                          std::function<void(int, std::string)> handler,
-                          std::function<void(int, std::string)> stale_handler = {})
-{
-    if (!owner || !handler || !owner->ensure_async_dispatch()) return false;
+class LvSettingUpdatesPage3 : public DComponens::LvglComponensBase {
+public:
+    LvSettingUpdatesPage3(lv_obj_t *parent, std::function<void()> back_callback)
+    {
+        LeaveSelfPage = std::move(back_callback);
+        create_ui(parent);
+    }
 
-    const auto token = owner->async_token();
-    if (!token.valid()) return false;
+    ~LvSettingUpdatesPage3() override
+    {
+        // A check is only a download of metadata; stop it.  An install keeps
+        // running in its systemd unit and must not be interrupted.
+        if (job_ != Job::None && job_ != Job::Launcher) {
+            std::string ignored;
+            osinfo_call({"UpdateJobCancel", job_id_}, ignored);
+        }
+        if (timer_) lv_timer_delete(timer_);
+        timer_ = nullptr;
+        if (ComponensObj) {
+            lv_obj_delete(ComponensObj);
+            ComponensObj = nullptr;
+        }
+    }
 
-    auto callback = [token,
-                    handler = std::move(handler),
-                    stale_handler = std::move(stale_handler)](int code,
-                                                                std::string data) mutable {
-        auto deliver_stale = [&stale_handler](int result_code, std::string result_data) {
-            if (!stale_handler) return;
-            try {
-                stale_handler(result_code, std::move(result_data));
-            } catch (...) {
+    void LoadNextPage() override {}
+
+    void LeaveNextPage() override
+    {
+        if (LeaveSelfPage) LeaveSelfPage();
+    }
+
+    void create_ui(lv_obj_t *parent) override
+    {
+        if (!parent) return;
+        ComponensObj = cp0::ui::box(parent, 0, 0, cp0::theme::kScreenW, cp0::theme::kScreenH, cp0::theme::kBg);
+        if (!ComponensObj) return;
+        DComponens::lvgl_bind_event(ComponensObj, LV_EVENT_KEY, nullptr,
+                                    [this](lv_event_t *event) { handle_key_event(event); });
+
+        title_ = cp0::ui::title_row(ComponensObj, "settings/system/updates");
+        const int half = (cp0::theme::kScreenW - 2 * cp0::theme::kPadX - 4) / 2;
+        installed_ = cp0::ui::readout(ComponensObj, cp0::theme::kPadX, 19, half, 42, "installed");
+        available_ = cp0::ui::readout(ComponensObj, cp0::theme::kPadX + half + 4, 19, half, 42, "available");
+        cp0::ui::set_readout(installed_, launcher_version());
+        cp0::ui::set_readout(available_, "--", {}, cp0::theme::kIdle);
+
+        actions_ = cp0::ui::panel(ComponensObj, cp0::theme::kPadX, 65, cp0::theme::kScreenW - 2 * cp0::theme::kPadX,
+                                  52);
+        for (std::size_t index = 0; index < kActions.size(); ++index) {
+            const int y = 3 + static_cast<int>(index) * 16;
+            rows_[index].band = cp0::ui::box(actions_.box, 2, y, cp0::theme::kScreenW - 2 * cp0::theme::kPadX - 4,
+                                             15, cp0::theme::kSelect);
+            rows_[index].text = cp0::ui::label(actions_.box, 8, y + 1, cp0::theme::kIdle);
+            if (rows_[index].text) lv_label_set_text(rows_[index].text, kActions[index].label);
+        }
+
+        progress_ = cp0::ui::segbar(ComponensObj, cp0::theme::kPadX, 122, cp0::theme::kScreenW - 2 * cp0::theme::kPadX,
+                                    4, cp0::theme::kBg);
+        message_ = cp0::ui::label(ComponensObj, cp0::theme::kPadX, 132, cp0::theme::kIdle);
+        if (message_) {
+            lv_obj_set_width(message_, cp0::theme::kScreenW - 2 * cp0::theme::kPadX);
+            lv_label_set_long_mode(message_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+        }
+        footer_ = cp0::ui::footer(ComponensObj);
+
+        std::string last_state;
+        if (osinfo_call({"UpdateLauncherState"}, last_state) == 0 && !last_state.empty())
+            message_text_ = cp0::ui::lower(settings_system::launcher_state_label(last_state));
+        else
+            message_text_ = "ent runs the selected action";
+        render();
+    }
+
+private:
+    struct Row {
+        lv_obj_t *band = nullptr;
+        lv_obj_t *text = nullptr;
+    };
+
+    void render()
+    {
+        for (std::size_t index = 0; index < kActions.size(); ++index) {
+            const bool selected = static_cast<int>(index) == selected_;
+            if (rows_[index].band) {
+                if (selected)
+                    lv_obj_remove_flag(rows_[index].band, LV_OBJ_FLAG_HIDDEN);
+                else
+                    lv_obj_add_flag(rows_[index].band, LV_OBJ_FLAG_HIDDEN);
             }
-        };
+            const bool dim = job_ != Job::None;
+            cp0::ui::set_text(rows_[index].text, kActions[index].label,
+                              dim ? cp0::theme::kDim : selected ? cp0::theme::kText : cp0::theme::kIdle);
+        }
+        cp0::ui::set_segbar(progress_, static_cast<float>(progress_value_) / 100.0f,
+                            message_color_ == cp0::theme::kDanger ? cp0::theme::kDanger : cp0::theme::kAccent);
+        cp0::ui::set_text(message_, message_text_.c_str(), message_color_);
+        cp0::ui::set_text(title_.status, job_ == Job::None ? "" : "working", cp0::theme::kWarn);
+        if (job_ != Job::None)
+            cp0::ui::set_footer(footer_, {{"esc", "back"}});
+        else
+            cp0::ui::set_footer(footer_, {{"up/dn", "select"}, {"ent", "run"}, {"esc", "back"}});
+    }
 
-        if (!token.valid()) {
-            deliver_stale(code, std::move(data));
+    void set_message(std::string text, uint32_t color)
+    {
+        message_text_ = std::move(text);
+        message_color_ = color;
+    }
+
+    void start(Job job)
+    {
+        if (job_ != Job::None) return;
+        const char *command = job == Job::Check      ? "UpdateLauncherCheckStart"
+                              : job == Job::Launcher ? "UpdateLauncherStart"
+                                                     : "AptUpdateStart";
+        std::string id;
+        if (osinfo_call({command}, id) != 0 || id.empty()) {
+            set_message("could not start: " + cp0::ui::lower(id.empty() ? std::string("no job id") : id),
+                        cp0::theme::kDanger);
+            render();
+            return;
+        }
+        job_ = job;
+        job_id_ = id;
+        progress_value_ = 0;
+        set_message(job == Job::Check      ? "checking for a launcher update"
+                    : job == Job::Launcher ? "refreshing packages, then installing"
+                                           : "refreshing package lists",
+                    cp0::theme::kIdle);
+        if (!timer_) timer_ = lv_timer_create(poll_cb, kPollMs, this);
+        render();
+    }
+
+    static void poll_cb(lv_timer_t *timer)
+    {
+        auto *self = static_cast<LvSettingUpdatesPage3 *>(lv_timer_get_user_data(timer));
+        if (self) self->poll();
+    }
+
+    void poll()
+    {
+        if (job_ == Job::None) return;
+        std::string state;
+        if (osinfo_call({"UpdateJobStatus", job_id_}, state) != 0) {
+            finish();
+            set_message("update job lost", cp0::theme::kDanger);
+            render();
+            return;
+        }
+        const settings_system::UpdateStatusInfo info = settings_system::parse_update_status(state);
+        if (!info.terminal) {
+            if (info.progress >= 0) progress_value_ = info.progress;
+            if (job_ == Job::Launcher && !info.stage.empty() && info.stage != "running") {
+                const std::string stage = state.rfind("recovering:", 0) == 0 ? state : info.stage;
+                std::string text = cp0::ui::lower(settings_system::update_job_label(
+                    settings_system::UpdateAction::UpdateLauncher, 0, stage));
+                if (info.progress >= 0) text += " " + std::to_string(info.progress) + "%";
+                set_message(text, cp0::theme::kIdle);
+            }
+            render();
             return;
         }
 
-        const std::string stale_data = data;
-        const bool queued = SettingsAsync::Dispatch::enqueue_from_callback(
-            token,
-            [handler = std::move(handler), code, data = std::move(data)]() mutable {
-                if (handler) handler(code, std::move(data));
-            });
-        if (!queued) deliver_stale(code, stale_data);
-    };
-
-    return owner->async_tasks().start(
-        [arguments = std::move(arguments), callback = std::move(callback)](auto stop) mutable {
-            if (stop && stop->load(std::memory_order_acquire)) return;
-            request_osinfo(std::move(arguments), std::move(callback));
-        });
-}
-
-void stop_timer(lv_timer_t *&timer)
-{
-    if (!timer) return;
-    lv_timer_delete(timer);
-    timer = nullptr;
-}
-
-} // namespace
-
-struct LvSettingSystemInfoPage3::State
-{
-    SettingsSystemPageKind kind = SettingsSystemPageKind::Network;
-    uint64_t generation = 1;
-    bool request_pending = false;
-    bool used_default_fallback = false;
-    std::chrono::steady_clock::time_point request_deadline;
-    lv_timer_t *request_timer = nullptr;
-    settings_system::NetworkInfo network{"--", "--", "--"};
-    settings_system::AccountInfo account{"--", "--"};
-    SettingsAboutOsInfo os_info;
-    std::string status;
-    lv_obj_t *title = nullptr;
-    lv_obj_t *line_one = nullptr;
-    lv_obj_t *line_two = nullptr;
-    lv_obj_t *line_three = nullptr;
-    lv_obj_t *status_label = nullptr;
-    lv_obj_t *hint = nullptr;
-};
-
-namespace {
-
-constexpr std::chrono::seconds kInfoRequestTimeout{15};
-
-void render_system_info(LvSettingSystemInfoPage3 *page);
-
-template <typename StateT>
-void stop_system_request_timer(StateT *state)
-{
-    if (!state) return;
-    stop_timer(state->request_timer);
-}
-
-void system_info_request_timeout_cb(lv_timer_t *timer);
-
-bool arm_system_request_timer(LvSettingSystemInfoPage3 *page)
-{
-    if (!page || !page->state_) return false;
-    auto *state = page->state_.get();
-    stop_system_request_timer(state);
-    state->request_deadline = std::chrono::steady_clock::now() + kInfoRequestTimeout;
-    state->request_timer = lv_timer_create(system_info_request_timeout_cb, 250, page);
-    return state->request_timer != nullptr;
-}
-
-void system_info_request_timeout_cb(lv_timer_t *timer)
-{
-    auto *page = timer ? static_cast<LvSettingSystemInfoPage3 *>(lv_timer_get_user_data(timer)) : nullptr;
-    if (!page || !page->state_ || timer != page->state_->request_timer) return;
-    auto *state = page->state_.get();
-    if (!state->request_pending) {
-        stop_system_request_timer(state);
-        return;
-    }
-    if (std::chrono::steady_clock::now() < state->request_deadline) return;
-
-    stop_system_request_timer(state);
-    state->request_pending = false;
-    ++state->generation;
-    if (state->generation == 0) state->generation = 1;
-    page->advance_async_generation();
-    state->status = settings_system::backend_error_label(-ETIMEDOUT);
-    render_system_info(page);
-}
-
-void render_system_info(LvSettingSystemInfoPage3 *page)
-{
-    if (!page || !page->Get()) return;
-    auto *state = page->state_.get();
-    if (!state) return;
-
-    switch (state->kind) {
-    case SettingsSystemPageKind::Network:
-    case SettingsSystemPageKind::Ethernet:
-        set_label(state->title, "Ethernet Info");
-        set_label(state->line_one, state->network.ip);
-        set_label(state->line_two, state->network.gateway);
-        set_label(state->line_three, state->network.mac);
-        break;
-    case SettingsSystemPageKind::Account:
-        set_label(state->title, "Account");
-        set_label(state->line_one, "Username: " + state->account.username);
-        set_label(state->line_two, "Password: " + settings_system::password_unsupported_label());
-        set_label(state->line_three, "Hostname: " + state->account.hostname);
-        break;
-    case SettingsSystemPageKind::Password:
-        set_label(state->title, "Account password");
-        set_label(state->line_one, settings_system::password_unsupported_label());
-        set_label(state->line_two, "The backend exposes read-only account information.");
-        set_label(state->line_three, "No password is changed or stored by Settings.");
-        break;
-    case SettingsSystemPageKind::OS:
-        set_label(state->title, "OS");
-        set_label(state->line_one, "Build date: " + state->os_info.build_date);
-        set_label(state->line_two, "Commit: " + state->os_info.commit);
-        set_label(state->line_three, "");
-        break;
-    case SettingsSystemPageKind::Version:
-        set_label(state->title, "Version");
-        set_label(state->line_one, settings_system::version_label(launcher_version()));
-        set_label(state->line_two, settings_system::build_label(
-                                      launcher_build_date(), launcher_channel(), launcher_commit()));
-        set_label(state->line_three, std::string("Commit: ") + launcher_commit());
-        break;
-    case SettingsSystemPageKind::Build:
-        set_label(state->title, "Build");
-        set_label(state->line_one, settings_system::build_label(
-                                      launcher_build_date(), launcher_channel(), launcher_commit()));
-        set_label(state->line_two, std::string("Build date: ") + launcher_build_date());
-        set_label(state->line_three, std::string("Commit: ") + launcher_commit());
-        break;
-    case SettingsSystemPageKind::Auto:
-        break;
-    }
-
-    // Keep machine-readable values (addresses, versions and commits) in a
-    // fixed-width face while account and explanatory text retain CJK coverage.
-    const bool network_table = uses_network_table(state->kind);
-    const bool machine_values = network_table ||
-                                state->kind == SettingsSystemPageKind::OS ||
-                                state->kind == SettingsSystemPageKind::Version ||
-                                state->kind == SettingsSystemPageKind::Build;
-    const lv_font_t *line_font = network_table
-        ? settings_fonts::mono(14)
-        : machine_values ? settings_fonts::mono(11) : settings_fonts::cjk_sans(12);
-    for (lv_obj_t *line : {state->line_one, state->line_two, state->line_three}) {
-        if (!line) continue;
-        lv_obj_set_style_text_font(line, line_font, LV_PART_MAIN);
-        // Hashes and other machine values can be wider than the fixed text box.
-        // Scroll them in place so the complete value remains readable.
-        lv_label_set_long_mode(line, machine_values ? LV_LABEL_LONG_SCROLL_CIRCULAR
-                                                    : LV_LABEL_LONG_CLIP);
-        lv_obj_set_style_anim_duration(line, lv_anim_speed(60), LV_PART_MAIN);
-    }
-
-    set_label(state->status_label, state->status);
-    if (state->hint) {
-        const char *hint = state->request_pending ? "Loading..." : "ENTER: refresh   ESC: back";
-        lv_label_set_text(state->hint, hint);
-    }
-}
-
-void set_system_error(LvSettingSystemInfoPage3 *page, int code, const std::string &payload)
-{
-    if (!page || !page->state_) return;
-    if (code == 0)
-        page->state_->status = "Invalid system information payload";
-    else
-        page->state_->status = settings_system::backend_error_label(code, payload);
-    render_system_info(page);
-}
-
-void request_network(LvSettingSystemInfoPage3 *page)
-{
-    if (!page || !page->state_ || page->state_->request_pending) return;
-    auto *state = page->state_.get();
-    page->advance_async_generation();
-    ++state->generation;
-    if (state->generation == 0) state->generation = 1;
-    const uint64_t request_generation = state->generation;
-    state->request_pending = true;
-    state->status = "reading ethernet";
-    state->used_default_fallback = false;
-    if (!arm_system_request_timer(page)) {
-        state->request_pending = false;
-        state->status = "Unable to create Ethernet timeout timer";
-        render_system_info(page);
-        return;
-    }
-    render_system_info(page);
-
-    const bool use_default = state->kind == SettingsSystemPageKind::Network;
-    const std::string command = use_default ? "NetworkDefaultInfoRead" : "EthInfoRead";
-    if (!start_osinfo_request(
-            page,
-            {command},
-            [page, request_generation, use_default](int code, std::string payload) {
-                auto *state = page ? page->state_.get() : nullptr;
-                if (!state || request_generation != state->generation || !page->Get()) return;
-                stop_system_request_timer(state);
-                state->request_pending = false;
-                settings_system::NetworkInfo candidate;
-                if (code == 0 && settings_system::parse_network_info_strict(payload, candidate)) {
-                    state->network = std::move(candidate);
-                    state->status = "";
-                    render_system_info(page);
-                    return;
-                }
-
-                // No Ethernet link: say so instead of showing the Wi-Fi route
-                // under an Ethernet heading.
-                if (!use_default) {
-                    state->network = settings_system::NetworkInfo{};
-                    state->status = "ethernet not connected";
-                    render_system_info(page);
-                    return;
-                }
-                set_system_error(page, code, payload);
-            })) {
-        state->request_pending = false;
-        stop_system_request_timer(state);
-        state->status = "Unable to schedule Ethernet request";
-        render_system_info(page);
-    }
-}
-
-void request_account(LvSettingSystemInfoPage3 *page)
-{
-    if (!page || !page->state_ || page->state_->request_pending) return;
-    auto *state = page->state_.get();
-    page->advance_async_generation();
-    ++state->generation;
-    if (state->generation == 0) state->generation = 1;
-    const uint64_t request_generation = state->generation;
-    state->request_pending = true;
-    state->status = "Loading account information...";
-    if (!arm_system_request_timer(page)) {
-        state->request_pending = false;
-        state->status = "Unable to create account timeout timer";
-        render_system_info(page);
-        return;
-    }
-    render_system_info(page);
-
-    if (!start_osinfo_request(
-            page,
-            {"AccountInfoRead"},
-            [page, request_generation](int code, std::string payload) {
-                auto *state = page ? page->state_.get() : nullptr;
-                if (!state || request_generation != state->generation || !page->Get()) return;
-                stop_system_request_timer(state);
-                state->request_pending = false;
-                settings_system::AccountInfo candidate;
-                if (code == 0 && settings_system::parse_account_info_strict(payload, candidate)) {
-                    state->account = std::move(candidate);
-                    state->status = "Account information loaded";
-                    render_system_info(page);
+        const Job finished = job_;
+        finish();
+        if (finished == Job::Check) {
+            if (info.stage == "succeeded" && info.availability_known) {
+                progress_value_ = 100;
+                if (info.available) {
+                    cp0::ui::set_readout(available_, info.version.empty() ? "new" : info.version, {},
+                                         cp0::theme::kAccent);
+                    set_message("update available. select update launcher", cp0::theme::kAccent);
+                    selected_ = 1;
                 } else {
-                    set_system_error(page, code, payload);
+                    cp0::ui::set_readout(available_, "current", {}, cp0::theme::kIdle);
+                    set_message("launcher is up to date", cp0::theme::kIdle);
                 }
-            })) {
-        state->request_pending = false;
-        stop_system_request_timer(state);
-        state->status = "Unable to schedule account request";
-        render_system_info(page);
-    }
-}
-
-void refresh_system_info(LvSettingSystemInfoPage3 *page)
-{
-    if (!page || !page->state_) return;
-    switch (page->state_->kind) {
-    case SettingsSystemPageKind::Network:
-    case SettingsSystemPageKind::Ethernet: request_network(page); break;
-    case SettingsSystemPageKind::Account: request_account(page); break;
-    case SettingsSystemPageKind::Password:
-        page->state_->status = "Read-only account information";
-        render_system_info(page);
-        break;
-    case SettingsSystemPageKind::OS:
-        page->state_->os_info = SettingsAboutInfoModel::read_os_issue_file();
-        if (page->state_->os_info.build_date == "unknown" &&
-            page->state_->os_info.commit == "unknown")
-            page->state_->status = "OS build information unavailable";
-        else if (page->state_->os_info.build_date == "unknown" ||
-                 page->state_->os_info.commit == "unknown")
-            page->state_->status = "OS build information is incomplete";
-        else
-            page->state_->status = "OS build information loaded";
-        render_system_info(page);
-        break;
-    case SettingsSystemPageKind::Version:
-    case SettingsSystemPageKind::Build:
-        page->state_->status = "Build information loaded";
-        render_system_info(page);
-        break;
-    case SettingsSystemPageKind::Auto: break;
-    }
-}
-
-void system_info_key_event(LvSettingSystemInfoPage3 *page, lv_event_t *event)
-{
-    if (!page || !event || lv_event_get_code(event) != LV_EVENT_KEY) return;
-    const uint32_t key = lv_event_get_key(event);
-    if (key == LV_KEY_ESC || key == LV_KEY_LEFT) {
-        if (page->state_) {
-            ++page->state_->generation;
-            page->state_->request_pending = false;
-            stop_system_request_timer(page->state_.get());
-            page->advance_async_generation();
+            } else {
+                set_message(failure_text("check failed", state), cp0::theme::kDanger);
+            }
+        } else {
+            const auto action = finished == Job::Launcher ? settings_system::UpdateAction::UpdateLauncher
+                                                          : settings_system::UpdateAction::CheckSystem;
+            const bool succeeded = info.stage == "succeeded";
+            if (succeeded) progress_value_ = 100;
+            set_message(cp0::ui::lower(settings_system::update_job_label(action, succeeded ? 0 : -1, state)),
+                        succeeded ? cp0::theme::kAccent : cp0::theme::kDanger);
         }
-        if (page->LeaveSelfPage) page->LeaveSelfPage();
-    } else if (key == LV_KEY_ENTER || key == LV_KEY_RIGHT) {
-        refresh_system_info(page);
+        render();
     }
-    lv_event_stop_processing(event);
-}
+
+    static std::string failure_text(const char *prefix, const std::string &state)
+    {
+        if (state == "cancelled") return "cancelled";
+        std::string stage = state.rfind("failed:", 0) == 0 ? state.substr(7) : state;
+        const std::size_t code = stage.find(':');
+        if (code != std::string::npos) stage.resize(code);
+        return std::string(prefix) + (stage.empty() ? "" : ": " + cp0::ui::lower(stage));
+    }
+
+    void finish()
+    {
+        job_ = Job::None;
+        job_id_.clear();
+        if (timer_) lv_timer_delete(timer_);
+        timer_ = nullptr;
+    }
+
+    void handle_key_event(lv_event_t *event)
+    {
+        if (!event || lv_event_get_code(event) != LV_EVENT_KEY) return;
+        const uint32_t key = lv_event_get_key(event);
+        if (key == LV_KEY_ESC || key == LV_KEY_LEFT) {
+            if (LeaveSelfPage) LeaveSelfPage();
+        } else if (job_ == Job::None) {
+            const int count = static_cast<int>(kActions.size());
+            if (key == LV_KEY_UP) {
+                selected_ = (selected_ + count - 1) % count;
+                render();
+            } else if (key == LV_KEY_DOWN) {
+                selected_ = (selected_ + 1) % count;
+                render();
+            } else if (key == LV_KEY_ENTER || key == LV_KEY_RIGHT) {
+                start(kActions[static_cast<std::size_t>(selected_)].job);
+            }
+        }
+        lv_event_stop_processing(event);
+    }
+
+    cp0::ui::TitleRow title_{};
+    cp0::ui::Readout installed_{};
+    cp0::ui::Readout available_{};
+    cp0::ui::Panel actions_{};
+    std::array<Row, kActions.size()> rows_{};
+    cp0::ui::SegBar progress_{};
+    lv_obj_t *message_ = nullptr;
+    lv_obj_t *footer_ = nullptr;
+    lv_timer_t *timer_ = nullptr;
+    std::string message_text_;
+    uint32_t message_color_ = cp0::theme::kIdle;
+    std::string job_id_;
+    Job job_ = Job::None;
+    int selected_ = 0;
+    int progress_value_ = 0;
+};
 
 } // namespace
 
-LvSettingSystemInfoPage3::LvSettingSystemInfoPage3(lv_obj_t *parent,
-                                                   const NodeIter &page_node,
-                                                   std::function<void()> back_callback,
-                                                   SettingsSystemPageKind kind)
-    : state_(std::make_unique<State>())
+std::unique_ptr<DComponens::LvglComponensBase> settings_updates_page_factory(lv_obj_t *parent,
+                                                                            const NodeIter &,
+                                                                            std::function<void()> back_callback)
 {
-    state_->kind = resolve_kind(page_node, kind);
-    LeaveSelfPage = std::move(back_callback);
-    create_ui(parent);
+    return std::make_unique<LvSettingUpdatesPage3>(parent, std::move(back_callback));
 }
-
-LvSettingSystemInfoPage3::~LvSettingSystemInfoPage3()
-{
-    if (state_) {
-        ++state_->generation;
-        state_->request_pending = false;
-        stop_system_request_timer(state_.get());
-    }
-    cancel_async_tasks();
-    if (ComponensObj) {
-        lv_obj_delete(ComponensObj);
-        ComponensObj = nullptr;
-    }
-    state_.reset();
-}
-
-void LvSettingSystemInfoPage3::AnimateNextIn(std::function<void()> animate_over_func)
-{
-    if (animate_over_func) animate_over_func();
-}
-
-void LvSettingSystemInfoPage3::AnimateNextOut(std::function<void()> animate_over_func)
-{
-    if (animate_over_func) animate_over_func();
-}
-
-void LvSettingSystemInfoPage3::LoadNextPage()
-{
-}
-
-void LvSettingSystemInfoPage3::LeaveNextPage()
-{
-    if (state_) {
-        ++state_->generation;
-        if (state_->generation == 0) state_->generation = 1;
-        state_->request_pending = false;
-        stop_system_request_timer(state_.get());
-        advance_async_generation();
-    }
-    if (LeaveSelfPage) LeaveSelfPage();
-}
-
-void LvSettingSystemInfoPage3::create_ui(lv_obj_t *parent)
-{
-    if (!parent || !state_) return;
-    using LayoutMetric = LvSettingSystemInfoPage3::LayoutMetric;
-    ComponensObj = lv_obj_create(parent);
-    if (!ComponensObj) return;
-    configure_page(ComponensObj,
-                   LvSettingSystemInfoPage3::metric(LvSettingSystemInfoPage3::LayoutMetric::ScreenW),
-                   LvSettingSystemInfoPage3::metric(LvSettingSystemInfoPage3::LayoutMetric::ScreenH));
-    DComponens::lvgl_bind_event(
-        ComponensObj,
-        LV_EVENT_KEY,
-        nullptr,
-        std::bind(&system_info_key_event, this, std::placeholders::_1));
-
-    const bool network_table = uses_network_table(state_->kind);
-    state_->title = create_label(
-        ComponensObj,
-        LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-        LvSettingSystemInfoPage3::metric(LayoutMetric::TitleY),
-        LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-        "System",
-        0x58A6FF,
-        network_table ? settings_fonts::sans(16, LV_FREETYPE_FONT_STYLE_BOLD) : title_font());
-    if (network_table) {
-        state_->line_one = create_network_table_row(ComponensObj, 0, "IP");
-        state_->line_two = create_network_table_row(ComponensObj, 1, "Gateway");
-        state_->line_three = create_network_table_row(ComponensObj, 2, "MAC");
-    } else {
-        state_->line_one = create_label(ComponensObj,
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::LineOneY),
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-                                        "", 0xECECEC, body_font());
-        state_->line_two = create_label(ComponensObj,
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::LineTwoY),
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-                                        "", 0xCCCCCC, body_font());
-        state_->line_three = create_label(ComponensObj,
-                                          LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-                                          LvSettingSystemInfoPage3::metric(LayoutMetric::LineThreeY),
-                                          LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-                                          "", 0xAAAAAA, body_font());
-    }
-    state_->status_label = create_label(ComponensObj,
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-                                        network_table
-                                            ? LvSettingSystemInfoPage3::metric(LayoutMetric::TableStatusY)
-                                            : LvSettingSystemInfoPage3::metric(LayoutMetric::StatusY),
-                                        LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-                                        "", 0xF0C850,
-                                        network_table ? settings_fonts::sans(11) : body_font(),
-                                        !network_table);
-    state_->hint = create_label(ComponensObj,
-                                LvSettingSystemInfoPage3::metric(LayoutMetric::TextX),
-                                LvSettingSystemInfoPage3::metric(LayoutMetric::HintY),
-                                LvSettingSystemInfoPage3::metric(LayoutMetric::TextW),
-                                "", 0x46DC87,
-                                network_table ? settings_fonts::sans(10, LV_FREETYPE_FONT_STYLE_BOLD)
-                                              : hint_font());
-    if (network_table) {
-        if (state_->status_label) {
-            lv_obj_set_height(
-                state_->status_label,
-                LvSettingSystemInfoPage3::metric(LayoutMetric::TableStatusH));
-            lv_label_set_long_mode(state_->status_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-            lv_obj_set_style_anim_duration(state_->status_label, lv_anim_speed(60), LV_PART_MAIN);
-        }
-        if (state_->hint) {
-            lv_obj_set_height(
-                state_->hint,
-                LvSettingSystemInfoPage3::metric(LayoutMetric::TableHintH));
-            lv_label_set_long_mode(state_->hint, LV_LABEL_LONG_CLIP);
-        }
-    }
-    refresh_system_info(this);
-}
-
-enum class SoftwareDialogOption
-{
-    Apps,
-    Launcher,
-    NotNow,
-};
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_system_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> back_callback)
-{
-    return std::make_unique<LvSettingSystemInfoPage3>(
-        parent, page_node, std::move(back_callback), SettingsSystemPageKind::Auto);
-}
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_ethernet_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> back_callback)
-{
-    return std::make_unique<LvSettingSystemInfoPage3>(
-        parent, page_node, std::move(back_callback), SettingsSystemPageKind::Ethernet);
-}
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_system_info_page3_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> back_callback)
-{
-    return settings_system_page_factory(parent, page_node, std::move(back_callback));
-}
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_ethernet_page3_factory(
-    lv_obj_t *parent,
-    const NodeIter &page_node,
-    std::function<void()> back_callback)
-{
-    return settings_ethernet_page_factory(parent, page_node, std::move(back_callback));
-}
-

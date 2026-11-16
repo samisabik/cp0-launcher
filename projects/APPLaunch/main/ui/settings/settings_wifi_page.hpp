@@ -31,19 +31,23 @@ class LvSettingWifiScanPage3 : public DComponens::LvglComponensBase {
 public:
     enum class LayoutMetric : int {
         ScreenW          = 320,
-        ScreenH          = 150,
-        VisibleRows      = 5,
-        RowH             = 22,
-        RowY             = 30,
-        TitleW           = 300,
+        ScreenH          = 170,
+        VisibleRows      = 6,
+        RowH             = 20,
+        RowY             = 32,
+        HeaderY          = 19,
+        SsidW            = 168,
+        SecurityX        = 176,
+        SignalX          = 264,
+        StatusX          = 110,
         ApMax            = CP0_WIFI_AP_MAX,
         MaxSsidBytes     = 32,
         MaxPasswordBytes = 64,
         HiddenInputX     = 82,
-        HiddenInputW     = 216,
-        HiddenInputH     = 28,
-        PasswordTextX          = 8,
-        PasswordTextRightInset = 8,
+        HiddenInputW     = 234,
+        HiddenInputH     = 20,
+        PasswordTextX          = 4,
+        PasswordTextRightInset = 4,
         CursorGap              = 2,
         CursorWidth            = 2,
         CursorHeight           = 20,
@@ -297,10 +301,12 @@ private:
     int previous_keypad_intercept_                       = 0;
     cp0_keyboard_input_context_t previous_input_context_ = KBD_INPUT_CONTEXT_NAVIGATION;
     lv_obj_t *title_                                     = nullptr;
+    lv_obj_t *title_status_                              = nullptr;
     lv_obj_t *empty_                                     = nullptr;
     lv_obj_t *hint_                                      = nullptr;
     lv_obj_t *password_panel_                            = nullptr;
     lv_obj_t *password_title_                            = nullptr;
+    lv_obj_t *password_title_status_                     = nullptr;
     lv_obj_t *password_network_                          = nullptr;
     lv_obj_t *password_value_                            = nullptr;
     lv_obj_t *password_input_                            = nullptr;

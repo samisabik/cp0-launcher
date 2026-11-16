@@ -20,32 +20,14 @@
 class LvSettingBatteryInfoPage3 : public DComponens::LvglComponensBase {
 public:
     enum class LayoutMetric : int {
-        ScreenW            = 320,
-        ScreenH            = 150,
-        TitleX             = 8,
-        TitleY             = 2,
-        TitleW             = 304,
-        TitleH             = 19,
-        TableX             = 8,
-        TableY             = 23,
-        TableW             = 304,
-        TableCellW         = 152,
-        TableRowH          = 27,
-        TableKeyX          = 7,
-        TableKeyW          = 70,
-        TableValueX        = 77,
-        TableValueW        = 72,
-        TableTextY         = 4,
-        TableTextH         = 18,
-        StatusX            = 8,
-        StatusY            = 108,
-        StatusW            = 304,
-        StatusH            = 14,
-        HintX              = 8,
-        HintY              = 135,
-        HintW              = 304,
-        HintH              = 13,
-        RefreshIntervalMs  = 1000,
+        ScreenW           = 320,
+        ScreenH           = 170,
+        ReadoutY          = 19,
+        ReadoutH          = 42,
+        ReadoutGap        = 4,
+        InfoH             = 40,
+        InfoValueX        = 76,
+        RefreshIntervalMs = 1000,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -71,13 +53,6 @@ private:
 
     bool post_to_lvgl(std::function<void()> task);
     static void refresh_timer_cb(lv_timer_t *timer);
-    lv_obj_t *create_label(int x,
-                           int y,
-                           int width,
-                           int height,
-                           std::uint32_t color,
-                           int font_size);
-    lv_obj_t *create_table_cell(int row, int column, const char *key);
     void request_read();
     void handle_read_result(int outcome, int code, std::uint64_t generation,
                             const std::string &payload);

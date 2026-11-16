@@ -6,6 +6,8 @@
 
 #include "settings_submenu_page.hpp"
 
+#include "cp0_theme.hpp"
+
 #include <exception>
 #include <utility>
 
@@ -123,19 +125,18 @@ void LvSettingRollerPage2::style_label(lv_obj_t *label, int distance, bool compa
     // Same scheme as the top level: the selected row at the 22 px grid of the
     // pixel font, the rest at 11 px dimming with distance. When a value page is
     // open this panel shrinks to context, so every row drops to 11 px.
-    uint32_t color = 0x3C3C3C;
+    uint32_t color = cp0::theme::kDim;
     if (distance == 0) {
-        color = 0xE6E6E6;
+        color = cp0::theme::kText;
     } else if (distance == 1) {
-        color = 0x8A8A8A;
-    } else if (distance == 2) {
-        color = 0x5C5C5C;
+        color = cp0::theme::kIdle;
     }
+    const lv_opa_t opa = distance >= 3 ? LV_OPA_50 : LV_OPA_COVER;
     const int font_px = distance == 0 && !compact ? 22 : kCp0ChromeFontSize;
 
     lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
     lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
-    lv_obj_set_style_opa(label, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_set_width(label, LV_SIZE_CONTENT);
     lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
@@ -229,17 +230,17 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     lv_obj_center(power_warning_);
     lv_obj_set_style_radius(power_warning_, 0, LV_PART_MAIN);
     lv_obj_set_style_border_width(power_warning_, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(power_warning_, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(power_warning_, lv_color_hex(0x171717), LV_PART_MAIN);
+    lv_obj_set_style_border_color(power_warning_, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(power_warning_, lv_color_hex(cp0::theme::kBg), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(power_warning_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_pad_all(power_warning_, 0, LV_PART_MAIN);
     lv_obj_clear_flag(power_warning_, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *title     = lv_msgbox_add_title(power_warning_, title_text ? title_text : "Unavailable");
+    lv_obj_t *title     = lv_msgbox_add_title(power_warning_, title_text ? title_text : "unavailable");
     lv_obj_t *header    = lv_msgbox_get_header(power_warning_);
     lv_obj_t *content   = lv_msgbox_get_content(power_warning_);
     lv_obj_t *message   = lv_msgbox_add_text(power_warning_, message_text ? message_text : "");
-    lv_obj_t *ok_button = lv_msgbox_add_footer_button(power_warning_, "OK");
+    lv_obj_t *ok_button = lv_msgbox_add_footer_button(power_warning_, "ok");
     lv_obj_t *footer    = lv_msgbox_get_footer(power_warning_);
     lv_obj_t *ok_label  = ok_button ? lv_obj_get_child(ok_button, 0) : nullptr;
 
@@ -253,8 +254,8 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
         lv_obj_set_style_pad_bottom(header, 0, LV_PART_MAIN);
     }
     if (title) {
-        lv_obj_set_style_text_color(title, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-        lv_obj_set_style_text_font(title, settings_fonts::sans(14, LV_FREETYPE_FONT_STYLE_BOLD), LV_PART_MAIN);
+        lv_obj_set_style_text_color(title, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
+        lv_obj_set_style_text_font(title, settings_fonts::sans(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
     if (content) {
@@ -269,8 +270,8 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
         lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     }
     if (message) {
-        lv_obj_set_style_text_color(message, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
-        lv_obj_set_style_text_font(message, settings_fonts::sans(12), LV_PART_MAIN);
+        lv_obj_set_style_text_color(message, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
+        lv_obj_set_style_text_font(message, settings_fonts::sans(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(message, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
     if (footer) {
@@ -292,8 +293,8 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
         lv_obj_set_style_pad_all(ok_button, 0, LV_PART_MAIN);
     }
     if (ok_label) {
-        lv_obj_set_style_text_color(ok_label, lv_color_hex(0x58A6FF), LV_PART_MAIN);
-        lv_obj_set_style_text_font(ok_label, settings_fonts::sans(12), LV_PART_MAIN);
+        lv_obj_set_style_text_color(ok_label, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
+        lv_obj_set_style_text_font(ok_label, settings_fonts::sans(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(ok_label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
 
@@ -305,11 +306,6 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     DComponens::lvgl_bind_event(
         power_warning_, LV_EVENT_KEY, nullptr,
         std::bind(&LvSettingRollerPage2::handle_power_warning_key, this, std::placeholders::_1));
-}
-
-void LvSettingRollerPage2::show_power_warning()
-{
-    show_blocked_warning("Bluetooth power is off", "Turn on Power before continuing.");
 }
 
 void LvSettingRollerPage2::set_compact_mode(bool enabled)
@@ -396,13 +392,13 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
                 selected_node->Componens_api(SettingApiReadFlagTimeStart, &result);
             } catch (...) {
                 set_status_error(icon_obj);
-                set_status_hint("Err", 0xEB5F5F);
+                set_status_hint("err", cp0::theme::kDanger);
                 return false;
             }
 
             const bool pending = operation_started.load(std::memory_order_acquire);
             set_status_icon(icon_obj, std::get<0>(result));
-            set_status_hint(pending ? "wait" : "", pending ? 0xF0C850 : 0x3DDC84);
+            set_status_hint(pending ? "wait" : "", pending ? cp0::theme::kWarn : cp0::theme::kAccent);
             return pending;
         };
 
@@ -422,10 +418,10 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
         selected_node->Componens_api(SettingApiReadFlagTimeStart, &result);
         return {true, std::get<0>(result)};
     };
-    callbacks.on_start     = [this](AsyncTaskContext &) { set_status_hint("Sel.", 0xF0C850); };
+    callbacks.on_start     = [this](AsyncTaskContext &) { set_status_hint("sel.", cp0::theme::kWarn); };
     callbacks.on_submitted = [this, last_label_update](AsyncTaskContext &) {
         *last_label_update = AsyncTaskContext::Clock::now();
-        set_status_hint("Chk.", 0xF0C850);
+        set_status_hint("chk.", cp0::theme::kWarn);
     };
     callbacks.on_wait = [this, dot_count, last_label_update](AsyncTaskContext &) {
         const auto now = AsyncTaskContext::Clock::now();
@@ -433,7 +429,7 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
 
         *last_label_update = now;
         *dot_count         = static_cast<uint8_t>((*dot_count + 1) % 2);
-        set_status_hint(*dot_count ? "Wait" : "Chk.", 0xF0C850);
+        set_status_hint(*dot_count ? "wait" : "chk.", cp0::theme::kWarn);
     };
     callbacks.on_complete = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &,
                                                                                 const StatusQueryResult &result) {
@@ -441,31 +437,31 @@ void LvSettingRollerPage2::request_status_refresh(lv_obj_t *row, const NodeIter 
         if (!result.success) {
             std::printf("[LvSettingRollerPage2] status query failed\n");
             set_status_error(icon_obj);
-            set_status_hint("Err", 0xEB5F5F);
+            set_status_hint("err", cp0::theme::kDanger);
             return;
         }
 
         set_status_icon(icon_obj, result.enabled);
-        set_status_hint("", 0x3DDC84);
+        set_status_hint("", cp0::theme::kAccent);
     };
     callbacks.on_exception = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &,
                                                                                  std::exception_ptr) {
         if (selected_node->status_generation != refresh_generation) return;
         std::printf("[LvSettingRollerPage2] status query raised an exception\n");
         set_status_error(icon_obj);
-        set_status_hint("Err", 0xEB5F5F);
+        set_status_hint("err", cp0::theme::kDanger);
     };
     callbacks.on_timeout = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &) {
         if (selected_node->status_generation != refresh_generation) return;
         std::printf("[LvSettingRollerPage2] status query timed out\n");
         set_status_error(icon_obj);
-        set_status_hint("Err", 0xEB5F5F);
+        set_status_hint("err", cp0::theme::kDanger);
     };
     callbacks.on_schedule_failed = [this, icon_obj, selected_node, refresh_generation](AsyncTaskContext &) {
         if (selected_node->status_generation != refresh_generation) return;
         std::printf("[LvSettingRollerPage2] status query could not be scheduled\n");
         set_status_error(icon_obj);
-        set_status_hint("Err", 0xEB5F5F);
+        set_status_hint("err", cp0::theme::kDanger);
     };
 
     run_async_task(std::move(callbacks));
@@ -598,6 +594,7 @@ void LvSettingRollerPage2::animate_first_page_objects(bool entering)
     for (uint32_t index = 0; index < child_count; ++index) {
         lv_obj_t *object = lv_obj_get_child(ui_APP_Container, index);
         if (!object || object == utility_obj_) break;
+        if (lv_obj_has_flag(object, LV_OBJ_FLAG_USER_1)) continue;
         const int offset = entering ? -metric(LayoutMetric::PageWidth) : metric(LayoutMetric::PageWidth);
         animate_object_to(object, lv_obj_get_x(object) + offset);
     }
@@ -789,7 +786,7 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     utility_obj_ = lv_obj_create(parent);
     if (!utility_obj_) return;
     lv_obj_set_size(utility_obj_, metric(LayoutMetric::PageWidth), metric(LayoutMetric::PanelH));
-    lv_obj_set_pos(utility_obj_, 0, 0);
+    lv_obj_set_pos(utility_obj_, 0, cp0::theme::kBodyTop);
     lv_obj_set_style_bg_opa(utility_obj_, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(utility_obj_, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(utility_obj_, 0, LV_PART_MAIN);
@@ -801,9 +798,9 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     if (!selection_bg_) return;
     lv_obj_set_size(selection_bg_, metric(LayoutMetric::PanelW), metric(LayoutMetric::BarH));
     lv_obj_set_pos(selection_bg_, metric(LayoutMetric::PanelX), metric(LayoutMetric::BarY));
-    lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(0x13261B), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(selection_bg_, lv_color_hex(cp0::theme::kSelect), LV_PART_MAIN);
     lv_obj_set_style_border_side(selection_bg_, LV_BORDER_SIDE_LEFT, LV_PART_MAIN);
-    lv_obj_set_style_border_color(selection_bg_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+    lv_obj_set_style_border_color(selection_bg_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(selection_bg_, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(selection_bg_, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(selection_bg_, 0, LV_PART_MAIN);
@@ -866,7 +863,7 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     hint_ = lv_label_create(utility_obj_);
     if (hint_) {
         lv_label_set_text(hint_, "");
-        lv_obj_set_style_text_color(hint_, lv_color_hex(0x3DDC84), LV_PART_MAIN);
+        lv_obj_set_style_text_color(hint_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_update_layout(hint_);
         lv_obj_set_pos(hint_, metric(LayoutMetric::PanelX) + metric(LayoutMetric::PanelW) - 6 - lv_obj_get_width(hint_),

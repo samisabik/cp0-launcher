@@ -8,6 +8,7 @@
 #include "ui_screensaver.h"
 
 #include "low_battery_flow.hpp"
+#include "settings/settings_prefs.hpp"
 #include "cp0_font_service.hpp"
 #include "keyboard_input.h"
 #include "input_keys.h"
@@ -60,9 +61,9 @@ constexpr const char *kCriticalSound = "applaunch-arcade-warning.mp3";
 bool reminder_sound_played = false;
 bool critical_sound_played = false;
 
-// UI sounds are removed from this launcher build; low-battery cues are visual only.
-void play_low_battery_sound(const char *) noexcept
+void play_low_battery_sound(const char *asset) noexcept
 {
+    settings_prefs::play_system_sound(asset);
 }
 
 int reminder_key_filter(const struct key_item *item) noexcept

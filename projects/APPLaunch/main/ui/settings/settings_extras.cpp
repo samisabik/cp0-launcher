@@ -6,6 +6,7 @@
 
 #include "hal_lvgl_bsp.h"
 #include "settings_choice_page.hpp"
+#include "settings_prefs.hpp"
 #include "settings_static_info_page.hpp"
 
 #include <algorithm>
@@ -217,6 +218,93 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_tailscale_page_factory(l
         return true;
     });
     return page;
+}
+
+std::string settings_interface_ipv4(const char *name)
+{
+    return name ? interface_ipv4(name) : std::string();
+}
+
+std::string settings_hostname()
+{
+    char host[65] = {};
+    if (gethostname(host, sizeof(host) - 1) != 0) return {};
+    return host;
+}
+
+namespace {
+
+std::atomic<bool> g_ssh_pending{false};
+std::atomic<bool> g_ssh_active{false};
+
+bool ssh_is_active()
+{
+    std::string output;
+    std::list<std::string> argv{"CaptureArgv", "/usr/bin/systemctl", "is-active", "ssh"};
+    try {
+        cp0_signal_process_api(std::move(argv), [&](int, std::string data) { output = std::move(data); });
+    } catch (...) {
+        return false;
+    }
+    while (!output.empty() && (output.back() == '\n' || output.back() == ' ')) output.pop_back();
+    return output == "active";
+}
+
+} // namespace
+
+void ssh_server_api(int cmd, void *data)
+{
+    if (cmd == SettingApiReadFlag || cmd == SettingApiReadFlagTimeStart) {
+        const bool pending = g_ssh_pending.load();
+        if (!pending) g_ssh_active.store(ssh_is_active());
+        if (cmd == SettingApiReadFlag && data) *static_cast<bool *>(data) = g_ssh_active.load();
+        if (cmd == SettingApiReadFlagTimeStart && data) {
+            auto *result = static_cast<SettingApiReadFlagTimeStartData *>(data);
+            std::get<0>(*result) = g_ssh_active.load();
+            if (std::get<1>(*result)) std::get<1>(*result)->store(pending);
+        }
+        return;
+    }
+    if (cmd != SettingApiActivate || g_ssh_pending.exchange(true)) return;
+    const bool next = !g_ssh_active.load();
+    g_ssh_active.store(next);
+    // enable --now waits for the unit to start; keep it off the UI thread.
+    std::thread([next] {
+        if (!settings_run_admin({"SshSet", next ? "1" : "0"}).empty()) g_ssh_active.store(!next);
+        g_ssh_pending.store(false);
+    }).detach();
+}
+
+void system_sounds_api(int cmd, void *data)
+{
+    if (cmd == SettingApiReadFlag || cmd == SettingApiReadFlagTimeStart) {
+        const bool enabled = settings_prefs::system_sounds_enabled();
+        if (cmd == SettingApiReadFlag && data) *static_cast<bool *>(data) = enabled;
+        if (cmd == SettingApiReadFlagTimeStart && data)
+            std::get<0>(*static_cast<SettingApiReadFlagTimeStartData *>(data)) = enabled;
+        return;
+    }
+    if (cmd != SettingApiActivate) return;
+    settings_prefs::set_int(settings_prefs::kSystemSounds, settings_prefs::system_sounds_enabled() ? 0 : 1);
+}
+
+void append_clock_format_options(Tree &tree, const NodeIter &parent)
+{
+    tree.append_child(parent, SettingEntry{"24h"});
+    tree.append_child(parent, SettingEntry{"12h"});
+}
+
+std::unique_ptr<DComponens::LvglComponensBase> settings_clock_format_page_factory(lv_obj_t *parent,
+                                                                                  const NodeIter &page_node,
+                                                                                  std::function<void()> on_back)
+{
+    return std::make_unique<LvSettingChoicePage3>(
+        parent, page_node, std::move(on_back), [] { return settings_prefs::clock_12h() ? 1 : 0; },
+        [](int index) {
+            if (index != 0 && index != 1) return std::string("invalid format");
+            return settings_prefs::set_int(settings_prefs::kClock12h, index) ? std::string()
+                                                                               : std::string("save failed");
+        });
 }
 
 std::vector<std::string> settings_system_lines()

@@ -26,6 +26,7 @@
 #include "../../../../ext_components/cp0_lvgl/src/cp0_signal_registration.hpp"
 #include "cp0_enum_cast.h"
 #include "settings_fonts.hpp"
+#include "cp0_theme.hpp"
 #include "cp0_lvgl_app.h"
 #include "cp0_lvgl_app_page_assets.h"
 #include "hal_lvgl_bsp.h"
@@ -36,8 +37,6 @@
 #define LVGL_COMPONENTS_ROLLER1_ONLY
 #include "lvgl_components.hpp"
 #undef LVGL_COMPONENTS_ROLLER1_ONLY
-
-bool settings_bluetooth_named_only_enabled();
 
 enum class LvSettingBluetoothListMode { Connected, Scan };
 
@@ -54,14 +53,13 @@ public:
     };
     enum class LayoutMetric : int {
         ScreenW     = 320,
-        ScreenH     = 150,
-        RowH        = 22,
-        RowY        = 22,
-        ConnectedRowY = 22,
-        ScanSectionY = 23,
-        ScanRowY    = 38,
-        VisibleRows = 4,
-        HintY       = ScreenH - 14,
+        ScreenH     = 170,
+        RowH        = 27,
+        RowY        = 17,
+        ConnectedRowY = RowY,
+        ScanRowY    = RowY,
+        VisibleRows = 5,
+        MessageY    = 24,
     };
 
     LvSettingBluetoothPage3() = default;
@@ -133,6 +131,10 @@ private:
     void request_status();
 
     static void status_retry_timer_cb(lv_timer_t *timer) noexcept;
+
+    // The scan page makes the adapter discoverable while it is open so the
+    // other side can find it too, and turns that off again when it closes.
+    void ensure_discoverable(bool currently_discoverable);
 
     void refresh_devices();
 
@@ -206,6 +208,8 @@ private:
     bool scan_stop_required_ = false;
     bool reset_pending_ = false;
     uint64_t reset_generation_ = 0;
+    bool discoverable_pending_ = false;
+    bool restore_discoverable_ = false;
     bool agent_prompt_active_ = false;
     AgentPromptRequest agent_request_{};
     // Device object paths used to scope the one-time pairing/connection
@@ -246,29 +250,34 @@ class LvSettingBluetoothAliasPage3 : public DComponens::LvglComponensBase {
 public:
     enum class LayoutMetric : int {
         ScreenW = 320,
-        ScreenH = 150,
+        ScreenH = 170,
         MaxAliasBytes = CP0_BT_NAME_MAX - 1,
-        AliasLabelX = 8,
-        AliasLabelWidth = 52,
-        AliasInputGap = 12,
-        AliasTextX = AliasLabelX + AliasLabelWidth + AliasInputGap,
-        AliasTextRightInset = 8,
-        AliasErrorY = 84,
+        AliasLabelX = 4,
+        AliasLabelY = 26,
+        AliasLabelWidth = 312,
+        AliasInputY = 40,
+        AliasInputH = 22,
+        AliasTextX = 4,
+        AliasTextRightInset = 4,
+        AliasErrorY = 70,
         AliasInputLetterSpace = 1,
         AliasInputCursorWidth = 1,
         CursorGap = 2,
         CursorWidth = 2,
         CursorHeight = 18,
-        HintY = ScreenH - 14,
     };
 
     LvSettingBluetoothAliasPage3();
+
+    // Writes the hostname on a worker thread; returns an empty string or an error.
+    using DeviceNameWriter = std::function<std::string(const std::string &)>;
 
     LvSettingBluetoothAliasPage3(lv_obj_t *parent,
                                  const NodeIter &parent_node,
                                  std::function<void()> back_callback,
                                  std::string initial_alias,
-                                 std::function<void(std::string)> saved_callback);
+                                 std::function<void(std::string)> saved_callback,
+                                 DeviceNameWriter device_name_writer = {});
 
     ~LvSettingBluetoothAliasPage3() override;
 
@@ -335,11 +344,16 @@ private:
 
     void save();
 
+    void save_device_name();
+
+    bool device_name_mode() const { return static_cast<bool>(device_name_writer_); }
+
     void handle_key_event(lv_event_t *event);
 
     static void keyboard_event_cb(lv_event_t *event);
 
     NodeIter parent_node_;
+    DeviceNameWriter device_name_writer_;
     std::string alias_;
     std::string backend_alias_;
     std::string alias_before_save_;

@@ -6,68 +6,29 @@
 
 #include "settings_rtc_page.hpp"
 #include "settings_fonts.hpp"
-#include "settings_static_info_page.hpp"
+#include "cp0_theme.hpp"
 
 #include <array>
-#include <cstddef>
+#include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <ctime>
 #include <functional>
 #include <list>
-#include <string>
-#include <string_view>
-#include <vector>
-#include "cp0_lvgl_app.h"
-#include "hal_lvgl_bsp.h"
-#include <algorithm>
-#include <atomic>
-#include <charconv>
-#include <cstdio>
-#include <cstring>
 #include <memory>
 #include <mutex>
-#include <system_error>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
-#include <thread>
-#include <atomic>
-#include <cstdint>
-#include <utility>
-#include <vector>
+#include "cp0_lvgl_app.h"
+#include "hal_lvgl_bsp.h"
 
 namespace {
 
 namespace setting {
 
 enum class RtcField { YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, COUNT };
-
-enum class NtpToggleEligibility { ALLOWED, IN_FLIGHT, DIRTY, UNAVAILABLE };
-
-enum class RtcConfirmInput { SELECT_SAVE, SELECT_DISCARD, CONFIRM, CANCEL };
-enum class RtcConfirmAction { NONE, SAVE, DISCARD };
-
-class RtcWriteConfirmModel {
-public:
-    void reset() noexcept { save_selected_ = false; }
-    bool save_selected() const noexcept { return save_selected_; }
-    RtcConfirmAction handle(RtcConfirmInput input) noexcept;
-
-private:
-    bool save_selected_ = false;
-};
-
-class RtcOverlayLifecycleModel {
-public:
-    using Token = std::uint64_t;
-
-    Token open() noexcept;
-    bool close(Token token) noexcept;
-    bool active() const noexcept { return active_; }
-
-private:
-    bool active_ = false;
-    Token generation_ = 0;
-};
 
 class RtcStateModel {
 public:
@@ -80,35 +41,23 @@ public:
 
     void set_ntp_status(int status) noexcept;
     void rollback_ntp(bool previous) noexcept { ntp_on_ = previous; }
-    NtpToggleEligibility ntp_toggle_eligibility(bool in_flight) const noexcept;
 
-    bool load_local_time(std::string_view payload);
     bool load_local_time(const std::tm &value) noexcept;
 
     int field_min(RtcField field) const noexcept;
     int field_max(RtcField field) const noexcept;
     int field_value(RtcField field) const noexcept;
     bool edit_field(RtcField field, int value) noexcept;
-    std::vector<std::string> field_options(RtcField field) const;
-    int field_selection_index(RtcField field) const noexcept;
-    bool edit_field_selection(RtcField field, std::size_t selection) noexcept;
 
     void discard_edits() noexcept { dirty_ = false; }
     void finish_commit(bool succeeded) noexcept { dirty_ = !succeeded; }
     std::string timestamp() const;
-    std::list<std::string> commit_request() const;
 
     static int days_in_month(int year, int month) noexcept;
-    static std::string_view field_name(RtcField field) noexcept;
-    static bool field_from_index(int index, RtcField &field) noexcept;
-    static bool field_from_name(std::string_view name, RtcField &field) noexcept;
-    static bool parse_local_time_payload(std::string_view payload, Values &values) noexcept;
-    static bool parse_timestamp(std::string_view timestamp, Values &values) noexcept;
     static bool is_valid(const Values &values) noexcept;
 
 private:
-    static unsigned field_index(RtcField field) noexcept;
-    static bool parse_decimal(std::string_view value, int &result) noexcept;
+    static unsigned field_index(RtcField field) noexcept { return static_cast<unsigned>(field); }
 
     Values values_ = {2026, 1, 1, 0, 0, 0};
     bool ntp_on_ = true;
@@ -118,276 +67,16 @@ private:
     bool dirty_ = false;
 };
 
-} // namespace setting
-
-namespace settings_rtc {
-
-using RtcField = setting::RtcField;
-using RtcStateModel = setting::RtcStateModel;
-using RtcWriteConfirmModel = setting::RtcWriteConfirmModel;
-using RtcOverlayLifecycleModel = setting::RtcOverlayLifecycleModel;
-using RtcConfirmInput = setting::RtcConfirmInput;
-using RtcConfirmAction = setting::RtcConfirmAction;
-using NtpToggleEligibility = setting::NtpToggleEligibility;
-using RtcValues = RtcStateModel::Values;
-
-enum class PrivilegedResultKind { SUCCESS, AUTH_FAILED, CANCELLED, TIMED_OUT, EXEC_FAILED };
-
-enum class ApiError : int {
-    InvalidArgument = -22,
-    Invocation = -5,
-    InvalidPayload = -74,
-};
-
-constexpr int api_error_code(ApiError error) noexcept
-{
-    return static_cast<int>(error);
-}
-
-struct NtpReadResult {
-    int status = -1;
-    bool available = false;
-    bool enabled = false;
-    std::string payload;
-};
-
-struct TimeReadResult {
-    int code = -1;
-    bool valid = false;
-    RtcValues values{};
-    std::string payload;
-};
-
-struct RefreshResult {
-    NtpReadResult ntp;
-    TimeReadResult time;
-
-    bool valid() const noexcept
-    {
-        return ntp.available && time.valid;
-    }
-};
-
-struct PrivilegedResult {
-    int result_code = 1;
-    int exit_code = 0;
-    PrivilegedResultKind kind = PrivilegedResultKind::EXEC_FAILED;
-
-    bool succeeded() const noexcept
-    {
-        return kind == PrivilegedResultKind::SUCCESS && result_code == 0 && exit_code == 0;
-    }
-};
-
-PrivilegedResultKind classify_privileged_result(int result) noexcept;
-PrivilegedResultKind classify_privileged_result(int result, int exit_code) noexcept;
-
-using NtpReadCallback = std::function<void(NtpReadResult)>;
-using TimeReadCallback = std::function<void(TimeReadResult)>;
-using RefreshCallback = std::function<void(RefreshResult)>;
-using PrivilegedCallback = std::function<void(PrivilegedResult)>;
-using RequestStartedCallback = std::function<void(int, std::uint64_t)>;
-
-int read_ntp_async(NtpReadCallback callback);
-int read_local_time_async(TimeReadCallback callback);
-int refresh_async(RefreshCallback callback);
-int set_ntp_async(bool enabled,
-                  PrivilegedCallback callback,
-                  RequestStartedCallback started = {});
-int set_time_async(std::string timestamp,
-                   PrivilegedCallback callback,
-                   RequestStartedCallback started = {});
-int cancel_request(std::uint64_t request_id);
-void update_ntp_cache(int status) noexcept;
-
-enum class WorkflowOperation { IDLE, NTP_SET, TIME_SET };
-
-enum class CommitEligibility { ALLOWED, NO_EDITS, NTP_ENABLED, IN_FLIGHT };
-
-class RtcWorkflowModel {
-public:
-    RtcStateModel &state() noexcept { return state_; }
-    const RtcStateModel &state() const noexcept { return state_; }
-
-    WorkflowOperation operation() const noexcept { return operation_; }
-    bool pending() const noexcept { return operation_ != WorkflowOperation::IDLE; }
-    bool ntp_pending() const noexcept { return operation_ == WorkflowOperation::NTP_SET; }
-    bool time_pending() const noexcept { return operation_ == WorkflowOperation::TIME_SET; }
-
-    void reset() noexcept;
-    void set_ntp_status(int status) noexcept { state_.set_ntp_status(status); }
-    bool load_local_time(std::string_view payload) { return state_.load_local_time(payload); }
-    bool load_local_time(const std::tm &value) noexcept { return state_.load_local_time(value); }
-    bool edit_field(RtcField field, int value) noexcept { return state_.edit_field(field, value); }
-    bool edit_field_selection(RtcField field, std::size_t selection) noexcept
-    {
-        return state_.edit_field_selection(field, selection);
-    }
-    void discard_edits() noexcept { state_.discard_edits(); }
-
-    CommitEligibility commit_eligibility() const noexcept;
-    bool begin_time_commit() noexcept;
-    void finish_time_commit(bool succeeded) noexcept;
-    void cancel_time_commit() noexcept;
-
-    bool begin_ntp_toggle(bool desired) noexcept;
-    void finish_ntp_toggle(bool succeeded, int actual_status = -1) noexcept;
-    void cancel_ntp_toggle() noexcept;
-
-private:
-    RtcStateModel state_;
-    WorkflowOperation operation_ = WorkflowOperation::IDLE;
-    bool ntp_previous_ = true;
-    bool ntp_desired_ = true;
-};
-
-RtcWorkflowModel &session() noexcept;
-
-} // namespace settings_rtc
-
-
-
-namespace setting {
-namespace {
-
-bool all_digits(std::string_view value)
-{
-    if (value.empty()) return false;
-    return std::all_of(value.begin(), value.end(), [](char character) {
-        return character >= '0' && character <= '9';
-    });
-}
-bool parse_fixed_decimal(std::string_view value, int &result)
-{
-    if (!all_digits(value)) return false;
-    const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
-    return parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size();
-}
-
-bool split_csv(std::string_view payload, RtcStateModel::Values &values)
-{
-    std::size_t start = 0;
-    for (unsigned index = 0; index < static_cast<unsigned>(RtcField::COUNT); ++index) {
-        const std::size_t separator = payload.find(',', start);
-        const std::size_t end = separator == std::string_view::npos ? payload.size() : separator;
-        if (!parse_fixed_decimal(payload.substr(start, end - start), values[index])) return false;
-        if (index + 1 == static_cast<unsigned>(RtcField::COUNT))
-            return separator == std::string_view::npos;
-        if (separator == std::string_view::npos) return false;
-        start = separator + 1;
-    }
-    return false;
-}
-
-bool parse_timestamp_value(std::string_view timestamp, RtcStateModel::Values &values)
-{
-    if (timestamp.size() != 19 || timestamp[4] != '-' || timestamp[7] != '-' ||
-        timestamp[10] != ' ' || timestamp[13] != ':' || timestamp[16] != ':')
-        return false;
-
-    return parse_fixed_decimal(timestamp.substr(0, 4), values[0]) &&
-        parse_fixed_decimal(timestamp.substr(5, 2), values[1]) &&
-        parse_fixed_decimal(timestamp.substr(8, 2), values[2]) &&
-        parse_fixed_decimal(timestamp.substr(11, 2), values[3]) &&
-        parse_fixed_decimal(timestamp.substr(14, 2), values[4]) &&
-        parse_fixed_decimal(timestamp.substr(17, 2), values[5]);
-}
-
-#define SETTINGS_RTC_STRINGIFY_IMPL(value) #value
-#define SETTINGS_RTC_STRINGIFY(value) SETTINGS_RTC_STRINGIFY_IMPL(value)
-
-std::string_view factory_build_date() noexcept
-{
-#ifdef LAUNCHER_BUILD_DATE
-    return LAUNCHER_BUILD_DATE;
-#elif defined(LAUNCHER_BUILD_DATE_RAW)
-    return SETTINGS_RTC_STRINGIFY(LAUNCHER_BUILD_DATE_RAW);
-#else
-    return {};
-#endif
-}
-
-bool timestamp_before_factory_date(std::string_view timestamp) noexcept
-{
-    const std::string_view build_date = factory_build_date();
-    if (timestamp.size() < 10 || build_date.size() != 10) return false;
-    if (build_date[4] != '-' || build_date[7] != '-') return false;
-    static constexpr std::size_t kDateDigitIndexes[] = {0, 1, 2, 3, 5, 6, 8, 9};
-    for (const std::size_t index : kDateDigitIndexes) {
-        if (build_date[index] < '0' || build_date[index] > '9') return false;
-    }
-    return timestamp.substr(0, 10) < build_date;
-}
-
-#undef SETTINGS_RTC_STRINGIFY
-#undef SETTINGS_RTC_STRINGIFY_IMPL
-
-} // namespace
-
-RtcConfirmAction RtcWriteConfirmModel::handle(RtcConfirmInput input) noexcept
-{
-    switch (input) {
-    case RtcConfirmInput::SELECT_SAVE:
-        save_selected_ = true;
-        return RtcConfirmAction::NONE;
-    case RtcConfirmInput::SELECT_DISCARD:
-        save_selected_ = false;
-        return RtcConfirmAction::NONE;
-    case RtcConfirmInput::CONFIRM:
-        return save_selected_ ? RtcConfirmAction::SAVE : RtcConfirmAction::DISCARD;
-    case RtcConfirmInput::CANCEL:
-        return RtcConfirmAction::DISCARD;
-    }
-    return RtcConfirmAction::NONE;
-}
-
-RtcOverlayLifecycleModel::Token RtcOverlayLifecycleModel::open() noexcept
-{
-    if (active_) return 0;
-    active_ = true;
-    if (++generation_ == 0) ++generation_;
-    return generation_;
-}
-
-bool RtcOverlayLifecycleModel::close(Token token) noexcept
-{
-    if (!active_ || token == 0 || token != generation_) return false;
-    active_ = false;
-    return true;
-}
-
 void RtcStateModel::set_ntp_status(int status) noexcept
 {
     ntp_available_ = status == 0 || status == 1;
     if (ntp_available_) ntp_on_ = status == 1;
 }
 
-NtpToggleEligibility RtcStateModel::ntp_toggle_eligibility(bool in_flight) const noexcept
-{
-    if (in_flight) return NtpToggleEligibility::IN_FLIGHT;
-    if (dirty_) return NtpToggleEligibility::DIRTY;
-    if (!ntp_available_) return NtpToggleEligibility::UNAVAILABLE;
-    return NtpToggleEligibility::ALLOWED;
-}
-
-bool RtcStateModel::load_local_time(std::string_view payload)
-{
-    Values parsed{};
-    if (!parse_local_time_payload(payload, parsed) || !is_valid(parsed)) return false;
-    values_ = parsed;
-    dirty_ = false;
-    return true;
-}
-
 bool RtcStateModel::load_local_time(const std::tm &value) noexcept
 {
     Values parsed = {
-        value.tm_year + 1900,
-        value.tm_mon + 1,
-        value.tm_mday,
-        value.tm_hour,
-        value.tm_min,
-        value.tm_sec,
+        value.tm_year + 1900, value.tm_mon + 1, value.tm_mday, value.tm_hour, value.tm_min, value.tm_sec,
     };
     if (!is_valid(parsed)) return false;
     values_ = parsed;
@@ -425,63 +114,18 @@ bool RtcStateModel::edit_field(RtcField field, int value) noexcept
     values_[index] = value;
     if (field == RtcField::YEAR || field == RtcField::MONTH) {
         const int maximum_day = field_max(RtcField::DAY);
-        if (values_[field_index(RtcField::DAY)] > maximum_day)
-            values_[field_index(RtcField::DAY)] = maximum_day;
+        if (values_[field_index(RtcField::DAY)] > maximum_day) values_[field_index(RtcField::DAY)] = maximum_day;
     }
     dirty_ = true;
     return true;
 }
 
-std::vector<std::string> RtcStateModel::field_options(RtcField field) const
-{
-    std::vector<std::string> options;
-    const unsigned index = field_index(field);
-    if (index >= static_cast<unsigned>(RtcField::COUNT)) return options;
-
-    const int minimum = field_min(field);
-    const int maximum = field_max(field);
-    if (maximum < minimum) return options;
-
-    options.reserve(static_cast<std::size_t>(maximum - minimum + 1));
-    for (int value = minimum; value <= maximum; ++value)
-        options.push_back(std::to_string(value));
-    return options;
-}
-
-int RtcStateModel::field_selection_index(RtcField field) const noexcept
-{
-    const unsigned index = field_index(field);
-    if (index >= values_.size()) return -1;
-    const int selection = field_value(field) - field_min(field);
-    return selection >= 0 && selection <= field_max(field) - field_min(field) ? selection : -1;
-}
-
-bool RtcStateModel::edit_field_selection(RtcField field, std::size_t selection) noexcept
-{
-    const int minimum = field_min(field);
-    const int maximum = field_max(field);
-    if (maximum < minimum || selection > static_cast<std::size_t>(maximum - minimum)) return false;
-    return edit_field(field, minimum + static_cast<int>(selection));
-}
-
 std::string RtcStateModel::timestamp() const
 {
     char buffer[32] = {};
-    std::snprintf(buffer,
-                  sizeof(buffer),
-                  "%04d-%02d-%02d %02d:%02d:%02d",
-                  values_[0],
-                  values_[1],
-                  values_[2],
-                  values_[3],
-                  values_[4],
-                  values_[5]);
+    std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d", values_[0], values_[1], values_[2],
+                  values_[3], values_[4], values_[5]);
     return buffer;
-}
-
-std::list<std::string> RtcStateModel::commit_request() const
-{
-    return {"TimeSet", timestamp()};
 }
 
 int RtcStateModel::days_in_month(int year, int month) noexcept
@@ -493,68 +137,169 @@ int RtcStateModel::days_in_month(int year, int month) noexcept
     return leap ? 29 : 28;
 }
 
-std::string_view RtcStateModel::field_name(RtcField field) noexcept
-{
-    static constexpr std::string_view names[] = {
-        "year", "month", "day", "hour", "minute", "second",
-    };
-    const unsigned index = field_index(field);
-    return index < static_cast<unsigned>(RtcField::COUNT) ? names[index] : std::string_view{};
-}
-
-bool RtcStateModel::field_from_index(int index, RtcField &field) noexcept
-{
-    if (index < 0 || index >= static_cast<int>(RtcField::COUNT)) return false;
-    field = static_cast<RtcField>(index);
-    return true;
-}
-
-bool RtcStateModel::field_from_name(std::string_view name, RtcField &field) noexcept
-{
-    for (unsigned index = 0; index < static_cast<unsigned>(RtcField::COUNT); ++index) {
-        const auto candidate = field_name(static_cast<RtcField>(index));
-        if (candidate == name) {
-            field = static_cast<RtcField>(index);
-            return true;
-        }
-    }
-    return false;
-}
-
-bool RtcStateModel::parse_local_time_payload(std::string_view payload, Values &values) noexcept
-{
-    return split_csv(payload, values) || parse_timestamp_value(payload, values);
-}
-
-bool RtcStateModel::parse_timestamp(std::string_view timestamp, Values &values) noexcept
-{
-    return parse_timestamp_value(timestamp, values) && is_valid(values);
-}
-
 bool RtcStateModel::is_valid(const Values &values) noexcept
 {
     if (values[0] < 2000 || values[0] > 2099 || values[1] < 1 || values[1] > 12) return false;
-    return values[2] >= 1 && values[2] <= days_in_month(values[0], values[1]) &&
-        values[3] >= 0 && values[3] <= 23 && values[4] >= 0 && values[4] <= 59 &&
-        values[5] >= 0 && values[5] <= 59;
+    return values[2] >= 1 && values[2] <= days_in_month(values[0], values[1]) && values[3] >= 0 &&
+           values[3] <= 23 && values[4] >= 0 && values[4] <= 59 && values[5] >= 0 && values[5] <= 59;
 }
 
-unsigned RtcStateModel::field_index(RtcField field) noexcept
+#define SETTINGS_RTC_STRINGIFY_IMPL(value) #value
+#define SETTINGS_RTC_STRINGIFY(value) SETTINGS_RTC_STRINGIFY_IMPL(value)
+
+std::string_view factory_build_date() noexcept
 {
-    return static_cast<unsigned>(field);
+#ifdef LAUNCHER_BUILD_DATE
+    return LAUNCHER_BUILD_DATE;
+#elif defined(LAUNCHER_BUILD_DATE_RAW)
+    return SETTINGS_RTC_STRINGIFY(LAUNCHER_BUILD_DATE_RAW);
+#else
+    return {};
+#endif
 }
 
-bool RtcStateModel::parse_decimal(std::string_view value, int &result) noexcept
+#undef SETTINGS_RTC_STRINGIFY
+#undef SETTINGS_RTC_STRINGIFY_IMPL
+
+bool timestamp_before_factory_date(std::string_view timestamp) noexcept
 {
-    return parse_fixed_decimal(value, result);
+    const std::string_view build_date = factory_build_date();
+    if (timestamp.size() < 10 || build_date.size() != 10) return false;
+    if (build_date[4] != '-' || build_date[7] != '-') return false;
+    static constexpr std::size_t kDateDigitIndexes[] = {0, 1, 2, 3, 5, 6, 8, 9};
+    for (const std::size_t index : kDateDigitIndexes) {
+        if (build_date[index] < '0' || build_date[index] > '9') return false;
+    }
+    return timestamp.substr(0, 10) < build_date;
 }
 
 } // namespace setting
 
 namespace settings_rtc {
 
-PrivilegedResultKind classify_privileged_result(int result) noexcept
+using RtcField = setting::RtcField;
+using RtcStateModel = setting::RtcStateModel;
+
+enum class PrivilegedResultKind { SUCCESS, AUTH_FAILED, CANCELLED, TIMED_OUT, EXEC_FAILED };
+
+enum class ApiError : int {
+    InvalidArgument = -22,
+    Invocation = -5,
+};
+
+constexpr int api_error_code(ApiError error) noexcept
 {
+    return static_cast<int>(error);
+}
+
+struct NtpReadResult {
+    int status = -1;
+    bool available = false;
+    bool enabled = false;
+};
+
+struct PrivilegedResult {
+    int result_code = 1;
+    int exit_code = 0;
+    PrivilegedResultKind kind = PrivilegedResultKind::EXEC_FAILED;
+
+    bool succeeded() const noexcept
+    {
+        return kind == PrivilegedResultKind::SUCCESS && result_code == 0 && exit_code == 0;
+    }
+};
+
+using NtpReadCallback = std::function<void(NtpReadResult)>;
+using PrivilegedCallback = std::function<void(PrivilegedResult)>;
+using RequestStartedCallback = std::function<void(int, std::uint64_t)>;
+
+enum class WorkflowOperation { IDLE, NTP_SET, TIME_SET };
+
+enum class CommitEligibility { ALLOWED, NO_EDITS, NTP_ENABLED, IN_FLIGHT };
+
+class RtcWorkflowModel {
+public:
+    RtcStateModel &state() noexcept { return state_; }
+    const RtcStateModel &state() const noexcept { return state_; }
+
+    bool pending() const noexcept { return operation_ != WorkflowOperation::IDLE; }
+    bool ntp_pending() const noexcept { return operation_ == WorkflowOperation::NTP_SET; }
+    bool time_pending() const noexcept { return operation_ == WorkflowOperation::TIME_SET; }
+
+    void set_ntp_status(int status) noexcept { state_.set_ntp_status(status); }
+    void discard_edits() noexcept { state_.discard_edits(); }
+
+    CommitEligibility commit_eligibility() const noexcept
+    {
+        if (pending()) return CommitEligibility::IN_FLIGHT;
+        if (state_.ntp_on()) return CommitEligibility::NTP_ENABLED;
+        if (!state_.dirty()) return CommitEligibility::NO_EDITS;
+        return CommitEligibility::ALLOWED;
+    }
+
+    bool begin_time_commit() noexcept
+    {
+        if (commit_eligibility() != CommitEligibility::ALLOWED) return false;
+        operation_ = WorkflowOperation::TIME_SET;
+        return true;
+    }
+
+    void finish_time_commit(bool succeeded) noexcept
+    {
+        if (!time_pending()) return;
+        state_.finish_commit(succeeded);
+        operation_ = WorkflowOperation::IDLE;
+    }
+
+    void cancel_time_commit() noexcept
+    {
+        if (time_pending()) operation_ = WorkflowOperation::IDLE;
+    }
+
+    bool begin_ntp_toggle(bool desired) noexcept
+    {
+        if (pending() || state_.dirty() || !state_.ntp_available()) return false;
+        ntp_previous_ = state_.ntp_on();
+        ntp_desired_ = desired;
+        operation_ = WorkflowOperation::NTP_SET;
+        return true;
+    }
+
+    void finish_ntp_toggle(bool succeeded, int actual_status = -1) noexcept
+    {
+        if (!ntp_pending()) return;
+        if (succeeded) {
+            const int status = actual_status == 0 || actual_status == 1 ? actual_status : (ntp_desired_ ? 1 : 0);
+            state_.set_ntp_status(status);
+        } else {
+            state_.rollback_ntp(ntp_previous_);
+        }
+        operation_ = WorkflowOperation::IDLE;
+    }
+
+    void cancel_ntp_toggle() noexcept
+    {
+        if (!ntp_pending()) return;
+        state_.rollback_ntp(ntp_previous_);
+        operation_ = WorkflowOperation::IDLE;
+    }
+
+private:
+    RtcStateModel state_;
+    WorkflowOperation operation_ = WorkflowOperation::IDLE;
+    bool ntp_previous_ = true;
+    bool ntp_desired_ = true;
+};
+
+RtcWorkflowModel &session() noexcept
+{
+    static RtcWorkflowModel instance;
+    return instance;
+}
+
+PrivilegedResultKind classify_privileged_result(int result, int exit_code) noexcept
+{
+    if (result == 0 && exit_code != 0) return PrivilegedResultKind::EXEC_FAILED;
     switch (result) {
     case 0: return PrivilegedResultKind::SUCCESS;
     case 1: return PrivilegedResultKind::AUTH_FAILED;
@@ -564,13 +309,15 @@ PrivilegedResultKind classify_privileged_result(int result) noexcept
     }
 }
 
-PrivilegedResultKind classify_privileged_result(int result, int exit_code) noexcept
+template <typename Callback, typename Value>
+void invoke_noexcept(const Callback &callback, Value value) noexcept
 {
-    if (result == 0 && exit_code != 0) return PrivilegedResultKind::EXEC_FAILED;
-    return classify_privileged_result(result);
+    if (!callback) return;
+    try {
+        callback(std::move(value));
+    } catch (...) {
+    }
 }
-
-namespace {
 
 struct NtpAdapterState {
     std::mutex mutex;
@@ -588,11 +335,23 @@ NtpAdapterState &ntp_adapter_state()
     return state;
 }
 
-// The status icon and the "Set Manually" gate read the cached value as soon as
+int read_ntp_async(NtpReadCallback callback)
+{
+    if (!callback) return api_error_code(ApiError::InvalidArgument);
+    cp0_signal_timedate_api({"NtpGet"}, [callback = std::move(callback)](int code, std::string) {
+        NtpReadResult result;
+        result.status = code;
+        result.available = code == 0 || code == 1;
+        result.enabled = code == 1;
+        invoke_noexcept(callback, std::move(result));
+    });
+    return 0;
+}
+
+// The status icon and the "set manually" gate read the cached value as soon as
 // this returns, so the backend must deliver its callback inline.  It does today
 // (osinfo dispatch invokes synchronously); if that ever changes, both readers
-// silently go stale - the gate blocks on an old state and the Info page falls
-// back to the placeholder time.
+// silently go stale.
 void refresh_ntp_cache(bool force = false)
 {
     auto &state = ntp_adapter_state();
@@ -605,13 +364,11 @@ void refresh_ntp_cache(bool force = false)
     const int result = read_ntp_async([](NtpReadResult value) {
         session().set_ntp_status(value.status);
         auto &state = ntp_adapter_state();
-        {
-            std::lock_guard<std::mutex> lock(state.mutex);
-            state.pending = false;
-            state.initialized = true;
-            state.available = value.available;
-            if (value.available) state.enabled = value.enabled;
-        }
+        std::lock_guard<std::mutex> lock(state.mutex);
+        state.pending = false;
+        state.initialized = true;
+        state.available = value.available;
+        if (value.available) state.enabled = value.enabled;
     });
     if (result != 0) {
         std::lock_guard<std::mutex> lock(state.mutex);
@@ -621,146 +378,12 @@ void refresh_ntp_cache(bool force = false)
     }
 }
 
-template <typename Callback, typename Value>
-void invoke_noexcept(const Callback &callback, Value value) noexcept
-{
-    if (!callback) return;
-    try {
-        callback(std::move(value));
-    } catch (...) {
-    }
-}
-
-bool parse_time_of_day(std::string_view value, int &hour, int &minute) noexcept
-{
-    if (value.size() != 5 || value[2] != ':' ||
-        value[0] < '0' || value[0] > '9' || value[1] < '0' || value[1] > '9' ||
-        value[3] < '0' || value[3] > '9' || value[4] < '0' || value[4] > '9')
-        return false;
-    hour = (value[0] - '0') * 10 + value[1] - '0';
-    minute = (value[3] - '0') * 10 + value[4] - '0';
-    return hour <= 23 && minute <= 59;
-}
-
-NtpReadResult make_ntp_result(int status, std::string payload)
-{
-    NtpReadResult result;
-    result.status = status;
-    result.available = status == 0 || status == 1;
-    result.enabled = status == 1;
-    result.payload = std::move(payload);
-    return result;
-}
-
-TimeReadResult make_time_result(int code, std::string payload)
-{
-    TimeReadResult result;
-    result.code = code;
-    result.payload = std::move(payload);
-    if (code == 0)
-        result.valid = RtcStateModel::parse_local_time_payload(result.payload, result.values) &&
-            RtcStateModel::is_valid(result.values);
-    if (!result.valid && result.code == 0) result.code = api_error_code(ApiError::InvalidPayload);
-    return result;
-}
-
-std::string format_timestamp(const RtcValues &values)
-{
-    char buffer[32] = {};
-    std::snprintf(buffer,
-                  sizeof(buffer),
-                  "%04d-%02d-%02d %02d:%02d:%02d",
-                  values[0],
-                  values[1],
-                  values[2],
-                  values[3],
-                  values[4],
-                  values[5]);
-    return buffer;
-}
-
-bool current_local_time(RtcValues &values) noexcept
-{
-    const std::time_t now = std::time(nullptr);
-    std::tm local{};
-#if defined(_WIN32)
-    if (localtime_s(&local, &now) != 0) return false;
-#else
-    if (localtime_r(&now, &local) == nullptr) return false;
-#endif
-    values = {local.tm_year + 1900,
-              local.tm_mon + 1,
-              local.tm_mday,
-              local.tm_hour,
-              local.tm_min,
-              local.tm_sec};
-    return RtcStateModel::is_valid(values);
-}
-
-bool parse_time_usec(std::string_view payload, RtcValues &values) noexcept
-{
-    const auto first_digit = payload.find_first_of("0123456789");
-    if (first_digit == std::string_view::npos) return false;
-    std::uint64_t usec = 0;
-    for (std::size_t i = first_digit; i < payload.size() &&
-                                      payload[i] >= '0' && payload[i] <= '9'; ++i) {
-        const unsigned digit = static_cast<unsigned>(payload[i] - '0');
-        if (usec > (UINT64_MAX - digit) / 10) return false;
-        usec = usec * 10 + digit;
-    }
-    const std::time_t seconds = static_cast<std::time_t>(usec / 1000000ULL);
-    std::tm local{};
-#if defined(_WIN32)
-    if (localtime_s(&local, &seconds) != 0) return false;
-#else
-    if (localtime_r(&seconds, &local) == nullptr) return false;
-#endif
-    values = {local.tm_year + 1900,
-              local.tm_mon + 1,
-              local.tm_mday,
-              local.tm_hour,
-              local.tm_min,
-              local.tm_sec};
-    return RtcStateModel::is_valid(values);
-}
-
-void read_time_fallback(const TimeReadCallback &callback) noexcept
-{
-    char buffer[64] = {};
-    try {
-        cp0_time_str(buffer, static_cast<int>(sizeof(buffer)));
-    } catch (...) {
-        invoke_noexcept(callback, make_time_result(api_error_code(ApiError::Invocation), {}));
-        return;
-    }
-
-    TimeReadResult result = make_time_result(0, buffer);
-    if (!result.valid) {
-        int hour = 0;
-        int minute = 0;
-        RtcValues values{};
-        if (parse_time_of_day(buffer, hour, minute) && current_local_time(values)) {
-            values[3] = hour;
-            values[4] = minute;
-            result.values = values;
-            result.valid = RtcStateModel::is_valid(values);
-            if (result.valid) result.payload = format_timestamp(values);
-        }
-    }
-    if (!result.valid) result.code = api_error_code(ApiError::InvalidPayload);
-    invoke_noexcept(callback, std::move(result));
-}
-
-int submit_privileged(std::list<std::string> arguments,
-                      PrivilegedCallback callback,
-                      RequestStartedCallback started)
+int submit_privileged(std::list<std::string> arguments, PrivilegedCallback callback, RequestStartedCallback started)
 {
     if (!callback) return api_error_code(ApiError::InvalidArgument);
     try {
         cp0_signal_system_admin_async(
-            std::move(arguments),
-            60000,
-            30000,
+            std::move(arguments), 60000, 30000,
             [callback = std::move(callback)](int result_code, int exit_code) mutable {
                 PrivilegedResult result;
                 result.result_code = result_code;
@@ -781,194 +404,267 @@ int submit_privileged(std::list<std::string> arguments,
     return 0;
 }
 
-struct RefreshState {
-    std::mutex mutex;
-    int remaining = 2;
-    bool delivered = false;
-    RefreshResult result;
-    RefreshCallback callback;
-};
-
-template <typename Update>
-void complete_refresh(const std::shared_ptr<RefreshState> &state, Update update) noexcept
+// Writing the clock needs privileges.  The timedated D-Bus API answers an
+// unprivileged session with InteractiveAuthorizationRequired, so the write
+// goes through the sudo coordinator, which also hands back a cancellable
+// request id and writes the hardware RTC via `hwclock -w`.
+int set_ntp_async(bool enabled, PrivilegedCallback callback)
 {
-    RefreshResult result;
-    bool deliver = false;
-    {
-        std::lock_guard<std::mutex> lock(state->mutex);
-        if (state->delivered) return;
-        update(state->result);
-        if (--state->remaining == 0) {
-            state->delivered = true;
-            result = state->result;
-            deliver = true;
-        }
-    }
-    if (deliver) invoke_noexcept(state->callback, std::move(result));
-}
-
-} // namespace
-
-int read_ntp_async(NtpReadCallback callback)
-{
-    if (!callback) return api_error_code(ApiError::InvalidArgument);
-    cp0_signal_timedate_api({"NtpGet"}, [callback = std::move(callback)](int code, std::string) {
-        NtpReadResult result; result.status = code; result.available = code == 0 || code == 1;
-        result.enabled = code == 1; invoke_noexcept(callback, std::move(result));
-    });
-    return 0;
-}
-
-int read_local_time_async(TimeReadCallback callback)
-{
-    if (!callback) return api_error_code(ApiError::InvalidArgument);
-
-    // Mirrors read_ntp_async: the callback is moved exactly once, into the
-    // backend handler.  An earlier revision moved it into a `deliver` wrapper
-    // that was never called, so this lambda captured an already-empty
-    // std::function; invoke_noexcept() then dropped the result and the
-    // LocalTime reply never arrived.  That left refresh_pending set forever,
-    // which made every field edit on Date & Time fail with "Reading RTC
-    // status" and left the model at its placeholder values.
-    cp0_signal_timedate_api({"LocalTime"}, [callback = std::move(callback)](int code, std::string payload) {
-        invoke_noexcept(callback, make_time_result(code, std::move(payload)));
-    });
-    return 0;
-}
-
-int refresh_async(RefreshCallback callback)
-{
-    if (!callback) return api_error_code(ApiError::InvalidArgument);
-
-    auto state = std::make_shared<RefreshState>();
-    state->callback = std::move(callback);
-
-    const int ntp_start = read_ntp_async([state](NtpReadResult result) {
-        complete_refresh(state, [result = std::move(result)](RefreshResult &target) mutable {
-            target.ntp = std::move(result);
-        });
-    });
-    if (ntp_start != 0) {
-        complete_refresh(state, [ntp_start](RefreshResult &target) {
-            target.ntp = make_ntp_result(ntp_start, {});
-        });
-    }
-
-    const int time_start = read_local_time_async([state](TimeReadResult result) {
-        complete_refresh(state, [result = std::move(result)](RefreshResult &target) mutable {
-            target.time = std::move(result);
-        });
-    });
-    if (time_start != 0) {
-        complete_refresh(state, [time_start](RefreshResult &target) {
-            target.time = make_time_result(time_start, {});
-        });
-    }
-
-    return ntp_start != 0 && time_start != 0 ? api_error_code(ApiError::Invocation) : 0;
-}
-
-int set_ntp_async(bool enabled, PrivilegedCallback callback, RequestStartedCallback started)
-{
-    if (!callback) return api_error_code(ApiError::InvalidArgument);
-    // Writing the clock needs privileges.  The timedated D-Bus API answers an
-    // unprivileged session with InteractiveAuthorizationRequired, so the write
-    // has to go through the sudo coordinator - which also hands back a real,
-    // cancellable request id and writes the hardware RTC via `hwclock -w`.
-    return submit_privileged({"NtpSet", enabled ? "1" : "0"}, std::move(callback), std::move(started));
+    return submit_privileged({"NtpSet", enabled ? "1" : "0"}, std::move(callback), {});
 }
 
 int set_time_async(std::string timestamp, PrivilegedCallback callback, RequestStartedCallback started)
 {
-    if (!callback) return api_error_code(ApiError::InvalidArgument);
-    RtcValues parsed{};
-    if (!RtcStateModel::parse_timestamp(timestamp, parsed)) return api_error_code(ApiError::InvalidArgument);
     return submit_privileged({"TimeSet", std::move(timestamp)}, std::move(callback), std::move(started));
 }
 
-int cancel_request(std::uint64_t request_id)
+void cancel_request(std::uint64_t request_id)
 {
-    if (request_id == 0) return api_error_code(ApiError::InvalidArgument);
+    if (request_id == 0) return;
     try {
         cp0_signal_sudo_cancel(request_id, [](int) {});
     } catch (...) {
-        return api_error_code(ApiError::Invocation);
     }
-    return 0;
 }
 
-void RtcWorkflowModel::reset() noexcept
+const char *write_error_message(PrivilegedResultKind result) noexcept
 {
-    state_ = RtcStateModel{};
-    operation_ = WorkflowOperation::IDLE;
-    ntp_previous_ = true;
-    ntp_desired_ = true;
-}
-
-CommitEligibility RtcWorkflowModel::commit_eligibility() const noexcept
-{
-    if (pending()) return CommitEligibility::IN_FLIGHT;
-    if (state_.ntp_on()) return CommitEligibility::NTP_ENABLED;
-    if (!state_.dirty()) return CommitEligibility::NO_EDITS;
-    return CommitEligibility::ALLOWED;
-}
-
-bool RtcWorkflowModel::begin_time_commit() noexcept
-{
-    if (commit_eligibility() != CommitEligibility::ALLOWED) return false;
-    operation_ = WorkflowOperation::TIME_SET;
-    return true;
-}
-
-void RtcWorkflowModel::finish_time_commit(bool succeeded) noexcept
-{
-    if (!time_pending()) return;
-    state_.finish_commit(succeeded);
-    operation_ = WorkflowOperation::IDLE;
-}
-
-void RtcWorkflowModel::cancel_time_commit() noexcept
-{
-    if (time_pending()) operation_ = WorkflowOperation::IDLE;
-}
-
-bool RtcWorkflowModel::begin_ntp_toggle(bool desired) noexcept
-{
-    if (pending() || state_.dirty() || !state_.ntp_available()) return false;
-    ntp_previous_ = state_.ntp_on();
-    ntp_desired_ = desired;
-    operation_ = WorkflowOperation::NTP_SET;
-    return true;
-}
-
-void RtcWorkflowModel::finish_ntp_toggle(bool succeeded, int actual_status) noexcept
-{
-    if (!ntp_pending()) return;
-    if (succeeded) {
-        const int status = actual_status == 0 || actual_status == 1
-                               ? actual_status
-                               : (ntp_desired_ ? 1 : 0);
-        state_.set_ntp_status(status);
-    } else {
-        state_.rollback_ntp(ntp_previous_);
+    switch (result) {
+    case PrivilegedResultKind::AUTH_FAILED: return "authentication failed";
+    case PrivilegedResultKind::CANCELLED: return "write cancelled";
+    case PrivilegedResultKind::TIMED_OUT: return "write timed out";
+    case PrivilegedResultKind::EXEC_FAILED:
+    case PrivilegedResultKind::SUCCESS: break;
     }
-    operation_ = WorkflowOperation::IDLE;
-}
-
-void RtcWorkflowModel::cancel_ntp_toggle() noexcept
-{
-    if (!ntp_pending()) return;
-    state_.rollback_ntp(ntp_previous_);
-    operation_ = WorkflowOperation::IDLE;
-}
-
-RtcWorkflowModel &session() noexcept
-{
-    static RtcWorkflowModel instance;
-    return instance;
+    return "write failed";
 }
 
 } // namespace settings_rtc
+
+// yyyy-mm-dd hh:mm: LEFT/RIGHT picks a field, UP/DOWN changes it with wrap
+// around, ENTER writes, ESC cancels.  Seconds are written as 00.
+class LvSettingTimeEditorPage3 : public DComponens::LvglComponensBase {
+public:
+    LvSettingTimeEditorPage3(lv_obj_t *parent, std::function<void()> back_callback)
+    {
+        LeaveSelfPage = std::move(back_callback);
+        load_now();
+        create_ui(parent);
+    }
+
+    ~LvSettingTimeEditorPage3() override
+    {
+        cancel_request();
+        settings_rtc::session().discard_edits();
+        cancel_async_tasks();
+        if (ComponensObj) {
+            lv_obj_delete(ComponensObj);
+            ComponensObj = nullptr;
+        }
+    }
+
+    void LoadNextPage() override {}
+
+    void LeaveNextPage() override
+    {
+        if (LeaveSelfPage) LeaveSelfPage();
+    }
+
+    void create_ui(lv_obj_t *parent) override
+    {
+        if (!parent) return;
+        ensure_async_dispatch();
+        ComponensObj = cp0::ui::box(parent, 0, 0, cp0::theme::kScreenW, cp0::theme::kScreenH, cp0::theme::kBg);
+        if (!ComponensObj) return;
+        DComponens::lvgl_bind_event(ComponensObj, LV_EVENT_KEY, nullptr,
+                                    [this](lv_event_t *event) { handle_key_event(event); });
+
+        cp0::ui::dot_grid(ComponensObj, 0, cp0::theme::kBodyTop, cp0::theme::kScreenW, cp0::theme::kBodyH);
+        title_ = cp0::ui::title_row(ComponensObj, "settings/time/set manually");
+
+        static constexpr const char *kCaptions[kFieldCount] = {"year", "month", "day", "hour", "min"};
+        static constexpr int kWidths[kFieldCount] = {70, 44, 44, 44, 44};
+        static constexpr const char *kSeparators[kFieldCount - 1] = {"-", "-", "", ":"};
+        int x = 21;
+        for (int index = 0; index < kFieldCount; ++index) {
+            fields_[index] = cp0::ui::readout(ComponensObj, x, 42, kWidths[index], 44, kCaptions[index]);
+            x += kWidths[index];
+            if (index + 1 < kFieldCount) {
+                lv_obj_t *separator = cp0::ui::label(ComponensObj, x + 1, 64, cp0::theme::kDim);
+                if (separator) lv_label_set_text(separator, kSeparators[index]);
+                x += 8;
+            }
+        }
+        status_ = cp0::ui::label(ComponensObj, cp0::theme::kPadX + 14, 100, cp0::theme::kIdle);
+        if (status_) {
+            lv_obj_set_width(status_, cp0::theme::kScreenW - 2 * (cp0::theme::kPadX + 14));
+            lv_label_set_long_mode(status_, LV_LABEL_LONG_WRAP);
+        }
+        footer_ = cp0::ui::footer(ComponensObj);
+        render();
+    }
+
+private:
+    static constexpr int kFieldCount = 5;
+    static constexpr settings_rtc::RtcField kFields[kFieldCount] = {
+        settings_rtc::RtcField::YEAR, settings_rtc::RtcField::MONTH, settings_rtc::RtcField::DAY,
+        settings_rtc::RtcField::HOUR, settings_rtc::RtcField::MINUTE};
+
+    struct RequestState {
+        std::atomic<std::uint64_t> request_id{0};
+        std::atomic_bool cancelled{false};
+    };
+
+    static void load_now()
+    {
+        const std::time_t now = std::time(nullptr);
+        std::tm local{};
+        if (localtime_r(&now, &local)) settings_rtc::session().state().load_local_time(local);
+    }
+
+    void render()
+    {
+        const auto &state = settings_rtc::session().state();
+        for (int index = 0; index < kFieldCount; ++index) {
+            char text[8];
+            std::snprintf(text, sizeof(text), index == 0 ? "%04d" : "%02d", state.field_value(kFields[index]));
+            const bool focus = index == focus_;
+            cp0::ui::set_readout(fields_[index], text, {}, focus ? cp0::theme::kText : cp0::theme::kIdle);
+            cp0::ui::set_panel_focus(fields_[index].panel, focus);
+        }
+        if (writing_) {
+            cp0::ui::set_text(title_.status, "writing", cp0::theme::kWarn);
+            cp0::ui::set_footer_message(footer_, "writing clock and rtc...", cp0::theme::kIdle);
+        } else {
+            cp0::ui::set_text(title_.status, "", cp0::theme::kIdle);
+            cp0::ui::set_footer(footer_, {{"l/r", "field"}, {"up/dn", "change"}, {"ent", "write"}, {"esc", "cancel"}});
+        }
+    }
+
+    void set_status(const char *text, uint32_t color)
+    {
+        cp0::ui::set_text(status_, text, color);
+    }
+
+    void step(int delta)
+    {
+        auto &state = settings_rtc::session().state();
+        const settings_rtc::RtcField field = kFields[focus_];
+        const int minimum = state.field_min(field);
+        const int maximum = state.field_max(field);
+        int value = state.field_value(field) + delta;
+        if (value > maximum) value = minimum;
+        if (value < minimum) value = maximum;
+        state.edit_field(field, value);
+        confirm_old_date_ = false;
+        set_status("", cp0::theme::kIdle);
+        render();
+    }
+
+    void write()
+    {
+        if (writing_) return;
+        auto &workflow = settings_rtc::session();
+        if (const ActivationBlock *block = settings_rtc_manual_edit_block()) {
+            set_status(block->title, cp0::theme::kDanger);
+            return;
+        }
+        auto &state = workflow.state();
+        state.edit_field(settings_rtc::RtcField::SECOND, 0);
+        const std::string timestamp = state.timestamp();
+        if (!confirm_old_date_ && setting::timestamp_before_factory_date(timestamp)) {
+            confirm_old_date_ = true;
+            set_status("this date is before the launcher build. ent again to write it.", cp0::theme::kWarn);
+            return;
+        }
+        if (!workflow.begin_time_commit()) {
+            set_status("another clock change is in progress", cp0::theme::kDanger);
+            return;
+        }
+
+        auto request = std::make_shared<RequestState>();
+        request_ = request;
+        writing_ = true;
+        set_status("", cp0::theme::kIdle);
+        render();
+        const auto token = async_token();
+        const int start = settings_rtc::set_time_async(
+            timestamp,
+            [this, token, request](settings_rtc::PrivilegedResult result) {
+                SettingsAsync::Dispatch::enqueue_from_callback(token, [this, request, result] {
+                    if (request_ != request) return;
+                    finish_write(result);
+                });
+            },
+            [request](int start_code, std::uint64_t request_id) {
+                if (start_code != 0) return;
+                request->request_id.store(request_id);
+                if (request->cancelled.load()) settings_rtc::cancel_request(request->request_id.exchange(0));
+            });
+        if (start != 0) {
+            settings_rtc::PrivilegedResult failed;
+            finish_write(failed);
+        }
+    }
+
+    void finish_write(const settings_rtc::PrivilegedResult &result)
+    {
+        request_.reset();
+        writing_ = false;
+        settings_rtc::session().finish_time_commit(result.succeeded());
+        if (result.succeeded()) {
+            if (LeaveSelfPage) LeaveSelfPage();
+            return;
+        }
+        set_status(settings_rtc::write_error_message(result.kind), cp0::theme::kDanger);
+        render();
+    }
+
+    void cancel_request()
+    {
+        if (request_) {
+            request_->cancelled.store(true);
+            settings_rtc::cancel_request(request_->request_id.exchange(0));
+            request_.reset();
+        }
+        settings_rtc::session().cancel_time_commit();
+        writing_ = false;
+    }
+
+    void handle_key_event(lv_event_t *event)
+    {
+        if (!event || lv_event_get_code(event) != LV_EVENT_KEY) return;
+        const uint32_t key = lv_event_get_key(event);
+        if (key == LV_KEY_ESC) {
+            cancel_request();
+            if (LeaveSelfPage) LeaveSelfPage();
+        } else if (!writing_) {
+            if (key == LV_KEY_LEFT && focus_ > 0) {
+                --focus_;
+                render();
+            } else if (key == LV_KEY_RIGHT && focus_ + 1 < kFieldCount) {
+                ++focus_;
+                render();
+            } else if (key == LV_KEY_UP) {
+                step(1);
+            } else if (key == LV_KEY_DOWN) {
+                step(-1);
+            } else if (key == LV_KEY_ENTER) {
+                write();
+            }
+        }
+        lv_event_stop_processing(event);
+    }
+
+    std::array<cp0::ui::Readout, kFieldCount> fields_{};
+    cp0::ui::TitleRow title_{};
+    lv_obj_t *status_ = nullptr;
+    lv_obj_t *footer_ = nullptr;
+    int focus_ = 0;
+    bool writing_ = false;
+    bool confirm_old_date_ = false;
+    std::shared_ptr<RequestState> request_;
+};
 
 } // namespace
 
@@ -992,8 +688,7 @@ void settings_rtc_ntp_api(int command, void *data) noexcept
         } else {
             auto *result = static_cast<SettingApiReadFlagTimeStartData *>(data);
             std::get<0>(*result) = enabled;
-            if (std::get<1>(*result))
-                std::get<1>(*result)->store(pending, std::memory_order_release);
+            if (std::get<1>(*result)) std::get<1>(*result)->store(pending, std::memory_order_release);
         }
         return;
     }
@@ -1007,9 +702,7 @@ void settings_rtc_ntp_api(int command, void *data) noexcept
         desired = !state.enabled;
         state.pending = true;
     }
-    // Switching the NTP mode supersedes any manual edits that have not been
-    // written yet.  Without this the workflow's dirty flag made the toggle a
-    // dead key with no feedback at all.
+    // Switching the NTP mode supersedes any manual edit that was not written.
     session.discard_edits();
     if (!session.begin_ntp_toggle(desired)) {
         std::lock_guard<std::mutex> lock(state.mutex);
@@ -1017,21 +710,17 @@ void settings_rtc_ntp_api(int command, void *data) noexcept
         return;
     }
 
-    const int result = settings_rtc::set_ntp_async(
-        desired,
-        [desired](settings_rtc::PrivilegedResult value) {
-            settings_rtc::session().finish_ntp_toggle(value.succeeded(), desired ? 1 : 0);
-            auto &state = settings_rtc::ntp_adapter_state();
-            {
-                std::lock_guard<std::mutex> lock(state.mutex);
-                state.pending = false;
-                if (value.succeeded()) {
-                    state.available = true;
-                    state.enabled = desired;
-                }
-                state.initialized = true;
-            }
-        });
+    const int result = settings_rtc::set_ntp_async(desired, [desired](settings_rtc::PrivilegedResult value) {
+        settings_rtc::session().finish_ntp_toggle(value.succeeded(), desired ? 1 : 0);
+        auto &state = settings_rtc::ntp_adapter_state();
+        std::lock_guard<std::mutex> lock(state.mutex);
+        state.pending = false;
+        if (value.succeeded()) {
+            state.available = true;
+            state.enabled = desired;
+        }
+        state.initialized = true;
+    });
     if (result != 0) {
         std::lock_guard<std::mutex> lock(state.mutex);
         state.pending = false;
@@ -1039,697 +728,13 @@ void settings_rtc_ntp_api(int command, void *data) noexcept
     }
 }
 
-namespace {
-
-// The status label is an error banner, not a page footer.  It lives in the
-// value page's empty top-left corner: x .. x+w must stay clear of the value
-// column, whose left-most glyph starts at ValueListX + ValueBoxX = 116, so
-// 4 + 104 leaves 8px of margin.  Keeping it here instead of the bottom edge
-// means the value list never loses rows to it.
-enum class LayoutMetric : int {
-    StatusLabelW    = 104,
-    StatusLabelX    = 4,
-    StatusLabelY    = 4,
-    StatusTextColor = 0xFF6666,
-    StatusFontSize  = 10,
-};
-
-constexpr int metric(LayoutMetric value) noexcept
-{
-    return static_cast<int>(value);
-}
-
-} // namespace
-
-struct LvSettingRtcPage3::Impl {
-    struct ActionBackup {
-        SettingEntry *entry = nullptr;
-        SettingApiAsyncCallBackFunc async_api;
-        SettingActivationPolicy policy = SettingActivationPolicy::LeaveImmediately;
-    };
-
-    std::vector<ActionBackup> actions;
-    lv_obj_t *status_label = nullptr;
-    std::string last_error;
-    bool refresh_pending = false;
-};
-
-struct LvSettingRtcConfirmPage3::Impl {
-    struct ActionBackup {
-        SettingEntry *entry = nullptr;
-        SettingApiAsyncCallBackFunc async_api;
-        SettingActivationPolicy policy = SettingActivationPolicy::LeaveImmediately;
-    };
-
-    struct RequestState {
-        std::atomic<std::uint64_t> request_id{0};
-        std::atomic_bool cancelled{false};
-        std::atomic_bool terminal{false};
-    };
-
-    std::function<void()> back_callback;
-    std::vector<ActionBackup> actions;
-    std::shared_ptr<RequestState> request_state;
-    LvSettingValuePage3Base::ActivationSink factory_warning_sink;
-    lv_obj_t *factory_warning_overlay = nullptr;
-    lv_obj_t *factory_warning_dialog = nullptr;
-    lv_obj_t *factory_warning_cancel = nullptr;
-    lv_obj_t *factory_warning_confirm = nullptr;
-    bool factory_warning_confirm_selected = false;
-    lv_obj_t *status_label = nullptr;
-    std::string last_error;
-
-    static void enqueue_outcome(const LvSettingValuePage3Base::ActivationSink &sink,
-                                const std::shared_ptr<RequestState> &request,
-                                settings_rtc::PrivilegedResultKind outcome) noexcept;
-    static const char *error_message(settings_rtc::PrivilegedResultKind result) noexcept;
-};
-
-LvSettingRtcPage3::LvSettingRtcPage3() : impl_(std::make_unique<Impl>()) {}
-
-LvSettingRtcPage3::LvSettingRtcPage3(lv_obj_t *parent, const NodeIter &parent_node)
-    : LvSettingValuePage3Base(parent_node, {}), impl_(std::make_unique<Impl>())
-{
-    // Always derive the highlighted row from the model.  activate_selected()
-    // stores the chosen index on the tree node, and once the model clamps the
-    // day to the selected month that stored index can point at a value the
-    // model no longer holds.
-    parent_node->selected_index = -1;
-    install_actions();
-    initialize(parent);
-    create_status_label();
-    start_refresh();
-}
-
-LvSettingRtcPage3::LvSettingRtcPage3(lv_obj_t *parent,
-                                     const NodeIter &parent_node,
-                                     std::function<void()> back_callback)
-    : LvSettingValuePage3Base(parent_node, std::move(back_callback)), impl_(std::make_unique<Impl>())
-{
-    // Always derive the highlighted row from the model.  activate_selected()
-    // stores the chosen index on the tree node, and once the model clamps the
-    // day to the selected month that stored index can point at a value the
-    // model no longer holds.
-    parent_node->selected_index = -1;
-    install_actions();
-    initialize(parent);
-    create_status_label();
-    start_refresh();
-}
-
-LvSettingRtcPage3::~LvSettingRtcPage3()
-{
-    cancel_async_tasks();
-    restore_actions();
-    impl_->status_label = nullptr;
-}
-
-const std::string &LvSettingRtcPage3::last_error() const noexcept { return impl_->last_error; }
-
-int LvSettingRtcPage3::initial_selection() const
-{
-    settings_rtc::RtcField field = settings_rtc::RtcField::YEAR;
-    if (!settings_rtc::RtcStateModel::field_from_name(parent_node()->label, field)) return 0;
-    const int selection = settings_rtc::session().state().field_selection_index(field);
-    return selection < 0 ? 0 : selection;
-}
-
-void LvSettingRtcPage3::install_actions()
-{
-    settings_rtc::RtcField field = settings_rtc::RtcField::YEAR;
-    if (!settings_rtc::RtcStateModel::field_from_name(parent_node()->label, field)) return;
-
-    for (auto child = parent_node().begin(); child != parent_node().end(); ++child) {
-        impl_->actions.push_back({&*child, child->Async_api, child->activation_policy});
-        child->Async_api = [this, field](int command, void *data) -> SettingApiResult {
-            if (command != SettingApiActivate) return SettingApiResult::NotHandled;
-            auto *value_page = static_cast<LvSettingValuePage3Base *>(data);
-            if (!value_page || value_page->selected_index < 0) {
-                set_error("Invalid RTC value");
-                return SettingApiResult::Failure;
-            }
-
-            auto &workflow = settings_rtc::session();
-            if (impl_->refresh_pending) {
-                set_error("Reading RTC status");
-                return SettingApiResult::Failure;
-            }
-            if (workflow.pending()) {
-                set_error("RTC operation is pending");
-                return SettingApiResult::Failure;
-            }
-            if (workflow.state().ntp_on()) {
-                set_error("Disable NTP before editing time");
-                return SettingApiResult::Failure;
-            }
-            if (!workflow.edit_field_selection(field,
-                                               static_cast<std::size_t>(value_page->selected_index))) {
-                set_error("Invalid calendar date");
-                return SettingApiResult::Failure;
-            }
-
-            clear_error();
-            return SettingApiResult::Success;
-        };
-        child->activation_policy = SettingActivationPolicy::WaitForResult;
-    }
-}
-
-void LvSettingRtcPage3::restore_actions() noexcept
-{
-    for (const auto &backup : impl_->actions) {
-        if (!backup.entry) continue;
-        backup.entry->Async_api = backup.async_api;
-        backup.entry->activation_policy = backup.policy;
-    }
-    impl_->actions.clear();
-}
-
-void LvSettingRtcPage3::create_status_label()
-{
-    if (!ComponensObj) return;
-    impl_->status_label = lv_label_create(ComponensObj);
-    if (!impl_->status_label) return;
-    lv_obj_set_width(impl_->status_label, ::metric(::LayoutMetric::StatusLabelW));
-    // WRAP, never CLIP: the longer messages ("Disable NTP before editing
-    // time") do not fit on one 104px line and must not be truncated.
-    lv_label_set_long_mode(impl_->status_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_pos(impl_->status_label,
-                   ::metric(::LayoutMetric::StatusLabelX),
-                   ::metric(::LayoutMetric::StatusLabelY));
-    lv_obj_set_style_text_color(
-        impl_->status_label, lv_color_hex(::metric(::LayoutMetric::StatusTextColor)), LV_PART_MAIN);
-    lv_obj_set_style_text_font(
-        impl_->status_label,
-        settings_fonts::sans(::metric(::LayoutMetric::StatusFontSize), LV_FREETYPE_FONT_STYLE_BOLD),
-        LV_PART_MAIN);
-    lv_label_set_text(impl_->status_label, "");
-    lv_obj_add_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-}
-
-void LvSettingRtcPage3::start_refresh()
-{
-    impl_->refresh_pending = true;
-    if (!ensure_async_dispatch()) {
-        impl_->refresh_pending = false;
-        set_error("RTC refresh unavailable");
-        return;
-    }
-
-    const auto token = async_token();
-    const int start_result = settings_rtc::refresh_async(
-        [this, token](settings_rtc::RefreshResult result) mutable {
-            SettingsAsync::Dispatch::enqueue_from_callback(
-                token,
-                [this, token, result = std::move(result)]() mutable {
-                    if (!token.valid() || !ComponensObj) return;
-                    impl_->refresh_pending = false;
-                    auto &workflow = settings_rtc::session();
-                    workflow.set_ntp_status(result.ntp.status);
-                    // Adopt the freshly read clock only while nothing has been
-                    // edited yet.  Reloading on every field page used to wipe the
-                    // previous page's edit, so setting two fields before writing
-                    // was impossible - the second page reset the first one's
-                    // value.  Short-circuit keeps load_local_time() (and its
-                    // clearing of dirty_) out of the pending-edit path.
-                    const bool keep_edits = workflow.state().dirty();
-                    const bool time_ok =
-                        keep_edits ||
-                        (result.time.valid && workflow.load_local_time(result.time.payload));
-                    if (!result.ntp.available) set_error("NTP status unavailable");
-                    else if (!time_ok) set_error("RTC time unavailable");
-                    else clear_error();
-                    select(initial_selection());
-                });
-        });
-    if (start_result != 0) {
-        impl_->refresh_pending = false;
-        set_error("Unable to read RTC status");
-    }
-}
-
-void LvSettingRtcPage3::set_error(const char *message)
-{
-    impl_->last_error = message ? message : "RTC operation failed";
-    if (impl_->status_label) {
-        lv_label_set_text(impl_->status_label, impl_->last_error.c_str());
-        lv_obj_clear_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-void LvSettingRtcPage3::clear_error()
-{
-    impl_->last_error.clear();
-    if (impl_->status_label) {
-        lv_label_set_text(impl_->status_label, "");
-        lv_obj_add_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-LvSettingRtcConfirmPage3::LvSettingRtcConfirmPage3() : impl_(std::make_unique<Impl>()) {}
-
-LvSettingRtcConfirmPage3::LvSettingRtcConfirmPage3(lv_obj_t *parent,
-                                                   const NodeIter &parent_node,
-                                                   std::function<void()> back_callback)
-    : LvSettingValuePage3Base(parent_node, {}), impl_(std::make_unique<Impl>())
-{
-    impl_->back_callback = std::move(back_callback);
-    LeaveSelfPage = [this] { leave_page(); };
-    install_actions();
-    initialize(parent);
-    if (ComponensObj) {
-        // PREPROCESS lets the warning own the key before the base value-page
-        // handler can move the page or activate the selected entry.
-        DComponens::lvgl_bind_event(
-            ComponensObj,
-            static_cast<lv_event_code_t>(static_cast<uint32_t>(LV_EVENT_KEY) |
-                                          static_cast<uint32_t>(LV_EVENT_PREPROCESS)),
-            nullptr,
-            [this](lv_event_t *event) { handle_factory_time_warning_key(event); });
-    }
-    create_status_label();
-}
-
-LvSettingRtcConfirmPage3::~LvSettingRtcConfirmPage3()
-{
-    close_factory_time_warning();
-    cancel_backend_request();
-    cancel_async_tasks();
-    restore_actions();
-    impl_->status_label = nullptr;
-}
-
-const std::string &LvSettingRtcConfirmPage3::last_error() const noexcept { return impl_->last_error; }
-
-int LvSettingRtcConfirmPage3::initial_selection() const { return 1; }
-
-void LvSettingRtcConfirmPage3::install_actions()
-{
-    for (auto child = parent_node().begin(); child != parent_node().end(); ++child) {
-        impl_->actions.push_back({&*child, child->Async_api, child->activation_policy});
-        const bool save = child->label == "yes";
-        child->Async_api = [this, save](int command, void *) -> SettingApiResult {
-            if (command != SettingApiActivate) return SettingApiResult::NotHandled;
-            return save ? begin_save() : discard_and_leave();
-        };
-        child->activation_policy = SettingActivationPolicy::WaitForResult;
-    }
-}
-
-void LvSettingRtcConfirmPage3::restore_actions() noexcept
-{
-    for (const auto &backup : impl_->actions) {
-        if (!backup.entry) continue;
-        backup.entry->Async_api = backup.async_api;
-        backup.entry->activation_policy = backup.policy;
-    }
-    impl_->actions.clear();
-}
-
-SettingApiResult LvSettingRtcConfirmPage3::discard_and_leave()
-{
-    // activation_pending() is true for this very activation (the base class
-    // sets it before calling this handler), so it cannot mean "a write is
-    // already running" - guarding on it made "No" fail every time.
-    // request_state is only set between begin_save() and its outcome, which is
-    // exactly the condition we want.
-    if (impl_->request_state) {
-        set_error("RTC write in progress");
-        return SettingApiResult::Failure;
-    }
-    cancel_backend_request();
-    settings_rtc::session().discard_edits();
-    clear_error();
-    return SettingApiResult::Success;
-}
-
-void LvSettingRtcConfirmPage3::show_factory_time_warning(const ActivationSink &sink)
-{
-    if (!ComponensObj || impl_->factory_warning_overlay) return;
-
-    impl_->factory_warning_sink = sink;
-    impl_->factory_warning_confirm_selected = false;
-    impl_->factory_warning_overlay = lv_obj_create(ComponensObj);
-    if (!impl_->factory_warning_overlay) return;
-
-    lv_obj_remove_style_all(impl_->factory_warning_overlay);
-    lv_obj_set_size(impl_->factory_warning_overlay,
-                    static_cast<int>(LayoutMetric::ScreenW),
-                    static_cast<int>(LayoutMetric::ScreenH));
-    lv_obj_set_pos(impl_->factory_warning_overlay, 0, 0);
-    lv_obj_set_style_bg_color(impl_->factory_warning_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(impl_->factory_warning_overlay, LV_OPA_70, LV_PART_MAIN);
-    lv_obj_clear_flag(impl_->factory_warning_overlay, LV_OBJ_FLAG_SCROLLABLE);
-
-    impl_->factory_warning_dialog = lv_msgbox_create(impl_->factory_warning_overlay);
-    if (!impl_->factory_warning_dialog) {
-        close_factory_time_warning();
-        return;
-    }
-    lv_obj_set_size(impl_->factory_warning_dialog, 280, 96);
-    lv_obj_center(impl_->factory_warning_dialog);
-    lv_obj_set_style_radius(impl_->factory_warning_dialog, 0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(impl_->factory_warning_dialog, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(impl_->factory_warning_dialog, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(impl_->factory_warning_dialog, lv_color_hex(0x171717), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(impl_->factory_warning_dialog, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(impl_->factory_warning_dialog, 0, LV_PART_MAIN);
-    lv_obj_clear_flag(impl_->factory_warning_dialog, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *title = lv_msgbox_add_title(impl_->factory_warning_dialog, "Warning");
-    lv_obj_t *message = lv_msgbox_add_text(
-        impl_->factory_warning_dialog, "Can't set before factory time");
-    impl_->factory_warning_cancel =
-        lv_msgbox_add_footer_button(impl_->factory_warning_dialog, "Cancel");
-    impl_->factory_warning_confirm =
-        lv_msgbox_add_footer_button(impl_->factory_warning_dialog, "Confirm");
-
-    lv_obj_t *header = lv_msgbox_get_header(impl_->factory_warning_dialog);
-    lv_obj_t *content = lv_msgbox_get_content(impl_->factory_warning_dialog);
-    lv_obj_t *footer = lv_msgbox_get_footer(impl_->factory_warning_dialog);
-    if (header) {
-        lv_obj_set_height(header, 26);
-        lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, LV_PART_MAIN);
-        lv_obj_set_style_border_width(header, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_left(header, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_right(header, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_top(header, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_bottom(header, 0, LV_PART_MAIN);
-    }
-    if (title) {
-        lv_obj_set_style_text_color(title, lv_color_hex(0xFFAA00), LV_PART_MAIN);
-        lv_obj_set_style_text_font(
-            title, settings_fonts::sans(13, LV_FREETYPE_FONT_STYLE_BOLD), LV_PART_MAIN);
-    }
-    if (content) {
-        lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, LV_PART_MAIN);
-        lv_obj_set_style_border_width(content, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_left(content, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_right(content, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_top(content, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_bottom(content, 0, LV_PART_MAIN);
-    }
-    if (message) {
-        lv_obj_set_style_text_color(message, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
-        lv_obj_set_style_text_font(message, settings_fonts::sans(12), LV_PART_MAIN);
-    }
-    if (footer) {
-        lv_obj_set_height(footer, 30);
-        lv_obj_set_style_bg_opa(footer, LV_OPA_TRANSP, LV_PART_MAIN);
-        lv_obj_set_style_border_width(footer, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_left(footer, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_right(footer, 12, LV_PART_MAIN);
-        lv_obj_set_style_pad_top(footer, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_bottom(footer, 0, LV_PART_MAIN);
-        lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER,
-                              LV_FLEX_ALIGN_CENTER);
-    }
-
-    for (lv_obj_t *button : {impl_->factory_warning_cancel, impl_->factory_warning_confirm}) {
-        if (!button) continue;
-        lv_obj_set_height(button, 26);
-        lv_obj_set_style_pad_all(button, 0, LV_PART_MAIN);
-        lv_obj_t *label = lv_obj_get_child(button, 0);
-        if (label) lv_obj_set_style_text_font(label, settings_fonts::sans(12), LV_PART_MAIN);
-        if (lv_obj_get_group(button)) lv_group_remove_obj(button);
-        DComponens::lvgl_bind_event(
-            button, LV_EVENT_CLICKED, nullptr,
-            [this](lv_event_t *event) { handle_factory_time_warning_click(event); });
-    }
-
-    const auto style_button = [](lv_obj_t *button, bool selected) {
-        if (!button) return;
-        lv_obj_set_style_bg_color(button, lv_color_hex(selected ? 0x2878C8 : 0x333333), LV_PART_MAIN);
-        lv_obj_set_style_border_width(button, selected ? 2 : 0, LV_PART_MAIN);
-        lv_obj_set_style_border_color(button, lv_color_hex(0x8FCBFF), LV_PART_MAIN);
-    };
-    style_button(impl_->factory_warning_cancel, true);
-    style_button(impl_->factory_warning_confirm, false);
-
-    lv_obj_move_foreground(impl_->factory_warning_overlay);
-    if (lv_group_t *group = lv_obj_get_group(ComponensObj)) lv_group_focus_obj(ComponensObj);
-    lv_obj_update_layout(impl_->factory_warning_dialog);
-}
-
-void LvSettingRtcConfirmPage3::close_factory_time_warning() noexcept
-{
-    if (impl_->factory_warning_overlay) lv_obj_delete(impl_->factory_warning_overlay);
-    impl_->factory_warning_overlay = nullptr;
-    impl_->factory_warning_dialog = nullptr;
-    impl_->factory_warning_cancel = nullptr;
-    impl_->factory_warning_confirm = nullptr;
-    impl_->factory_warning_sink = {};
-    impl_->factory_warning_confirm_selected = false;
-}
-
-void LvSettingRtcConfirmPage3::resolve_factory_time_warning(bool confirm)
-{
-    if (!impl_->factory_warning_overlay) return;
-
-    const auto sink = impl_->factory_warning_sink;
-    close_factory_time_warning();
-    if (!sink.valid()) return;
-
-    if (!confirm) {
-        finish_activation(sink, SettingApiResult::Cancelled);
-        return;
-    }
-
-    // The warning is a deliberate confirmation step: Confirm acknowledges the
-    // older timestamp and continues through the normal privileged RTC write.
-    const SettingApiResult result = begin_save(true);
-    if (result != SettingApiResult::Pending) finish_activation(sink, result);
-}
-
-void LvSettingRtcConfirmPage3::handle_factory_time_warning_key(lv_event_t *event)
-{
-    if (!event || lv_event_get_code(event) != LV_EVENT_KEY ||
-        !impl_->factory_warning_overlay)
-        return;
-
-    const uint32_t key = lv_event_get_key(event);
-    if (key == LV_KEY_LEFT || key == LV_KEY_UP) {
-        impl_->factory_warning_confirm_selected = false;
-        if (impl_->factory_warning_cancel) {
-            lv_obj_set_style_bg_color(impl_->factory_warning_cancel, lv_color_hex(0x2878C8), LV_PART_MAIN);
-            lv_obj_set_style_border_width(impl_->factory_warning_cancel, 2, LV_PART_MAIN);
-        }
-        if (impl_->factory_warning_confirm) {
-            lv_obj_set_style_bg_color(impl_->factory_warning_confirm, lv_color_hex(0x333333), LV_PART_MAIN);
-            lv_obj_set_style_border_width(impl_->factory_warning_confirm, 0, LV_PART_MAIN);
-        }
-    } else if (key == LV_KEY_RIGHT || key == LV_KEY_DOWN) {
-        impl_->factory_warning_confirm_selected = true;
-        if (impl_->factory_warning_cancel) {
-            lv_obj_set_style_bg_color(impl_->factory_warning_cancel, lv_color_hex(0x333333), LV_PART_MAIN);
-            lv_obj_set_style_border_width(impl_->factory_warning_cancel, 0, LV_PART_MAIN);
-        }
-        if (impl_->factory_warning_confirm) {
-            lv_obj_set_style_bg_color(impl_->factory_warning_confirm, lv_color_hex(0x2878C8), LV_PART_MAIN);
-            lv_obj_set_style_border_width(impl_->factory_warning_confirm, 2, LV_PART_MAIN);
-        }
-    } else if (key == LV_KEY_ENTER) {
-        resolve_factory_time_warning(impl_->factory_warning_confirm_selected);
-    } else if (key == LV_KEY_ESC) {
-        resolve_factory_time_warning(false);
-    }
-    lv_event_stop_processing(event);
-}
-
-void LvSettingRtcConfirmPage3::handle_factory_time_warning_click(lv_event_t *event)
-{
-    if (!event || !impl_->factory_warning_overlay) return;
-    const lv_obj_t *target = lv_event_get_target(event);
-    if (target == impl_->factory_warning_cancel)
-        resolve_factory_time_warning(false);
-    else if (target == impl_->factory_warning_confirm)
-        resolve_factory_time_warning(true);
-}
-
-SettingApiResult LvSettingRtcConfirmPage3::begin_save()
-{
-    return begin_save(false);
-}
-
-SettingApiResult LvSettingRtcConfirmPage3::begin_save(bool allow_before_factory_time)
-{
-    auto &workflow = settings_rtc::session();
-    const auto eligibility = workflow.commit_eligibility();
-    if (eligibility == settings_rtc::CommitEligibility::NTP_ENABLED) {
-        set_error("Disable NTP before writing RTC");
-        return SettingApiResult::Failure;
-    }
-    if (eligibility == settings_rtc::CommitEligibility::NO_EDITS) {
-        set_error("No time changes to save");
-        return SettingApiResult::Failure;
-    }
-
-    const std::string timestamp = workflow.state().timestamp();
-    if (!allow_before_factory_time && setting::timestamp_before_factory_date(timestamp)) {
-        show_factory_time_warning(activation_sink());
-        return SettingApiResult::Pending;
-    }
-
-    if (!workflow.begin_time_commit()) {
-        set_error("RTC write is already pending");
-        return SettingApiResult::Failure;
-    }
-
-    auto request = std::make_shared<Impl::RequestState>();
-    impl_->request_state = request;
-    const auto sink = activation_sink();
-    const int start_result = settings_rtc::set_time_async(
-        timestamp,
-        [sink, request](settings_rtc::PrivilegedResult result) {
-            Impl::enqueue_outcome(sink, request, result.kind);
-        },
-        [sink, request](int start_code, std::uint64_t request_id) {
-            if (start_code != 0) {
-                Impl::enqueue_outcome(sink, request, settings_rtc::PrivilegedResultKind::EXEC_FAILED);
-                return;
-            }
-
-            request->request_id.store(request_id, std::memory_order_release);
-            if (request->cancelled.load(std::memory_order_acquire)) {
-                const std::uint64_t active_request = request->request_id.exchange(0, std::memory_order_acq_rel);
-                if (active_request != 0) settings_rtc::cancel_request(active_request);
-            }
-        });
-
-    if (start_result != 0) {
-        workflow.finish_time_commit(false);
-        impl_->request_state.reset();
-        set_error("Unable to start RTC write");
-        return SettingApiResult::Failure;
-    }
-    clear_error();
-    return SettingApiResult::Pending;
-}
-
-void LvSettingRtcConfirmPage3::Impl::enqueue_outcome(
-    const LvSettingValuePage3Base::ActivationSink &sink,
-    const std::shared_ptr<RequestState> &request,
-    settings_rtc::PrivilegedResultKind outcome) noexcept
-{
-    if (request->terminal.exchange(true, std::memory_order_acq_rel)) return;
-    // A stale outcome must not touch the workflow: cancel_time_commit() is not
-    // ownership-checked, so releasing here could cancel a *newer* commit.  The
-    // page's own teardown (cancel_backend_request) already releases its commit.
-    if (!sink.valid()) return;
-
-    const bool queued = SettingsAsync::Dispatch::enqueue_from_callback(
-        sink.dispatch_token,
-        [sink, request, outcome] {
-            if (!sink.valid()) return;
-            auto *page = static_cast<LvSettingRtcConfirmPage3 *>(sink.owner);
-            const bool succeeded = outcome == settings_rtc::PrivilegedResultKind::SUCCESS;
-            settings_rtc::session().finish_time_commit(succeeded);
-            if (page) {
-                request->request_id.store(0, std::memory_order_release);
-                if (!succeeded) page->set_error(Impl::error_message(outcome));
-                else page->clear_error();
-                if (page->impl_->request_state == request) page->impl_->request_state.reset();
-            }
-            page->finish_activation(
-                sink,
-                succeeded ? SettingApiResult::Success
-                          : (outcome == settings_rtc::PrivilegedResultKind::CANCELLED
-                                 ? SettingApiResult::Cancelled
-                                 : SettingApiResult::Failure));
-        });
-    if (!queued) settings_rtc::session().cancel_time_commit();
-}
-
-const char *LvSettingRtcConfirmPage3::Impl::error_message(settings_rtc::PrivilegedResultKind result) noexcept
-{
-    switch (result) {
-    case settings_rtc::PrivilegedResultKind::AUTH_FAILED: return "RTC authentication failed";
-    case settings_rtc::PrivilegedResultKind::CANCELLED: return "RTC write cancelled";
-    case settings_rtc::PrivilegedResultKind::TIMED_OUT: return "RTC write timed out";
-    case settings_rtc::PrivilegedResultKind::EXEC_FAILED: return "RTC write failed";
-    case settings_rtc::PrivilegedResultKind::SUCCESS: break;
-    }
-    return "RTC write failed";
-}
-
-void LvSettingRtcConfirmPage3::create_status_label()
-{
-    if (!ComponensObj) return;
-    impl_->status_label = lv_label_create(ComponensObj);
-    if (!impl_->status_label) return;
-    lv_obj_set_width(impl_->status_label, ::metric(::LayoutMetric::StatusLabelW));
-    // WRAP, never CLIP: the longer messages ("Disable NTP before editing
-    // time") do not fit on one 104px line and must not be truncated.
-    lv_label_set_long_mode(impl_->status_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_pos(impl_->status_label,
-                   ::metric(::LayoutMetric::StatusLabelX),
-                   ::metric(::LayoutMetric::StatusLabelY));
-    lv_obj_set_style_text_color(
-        impl_->status_label, lv_color_hex(::metric(::LayoutMetric::StatusTextColor)), LV_PART_MAIN);
-    lv_obj_set_style_text_font(
-        impl_->status_label,
-        settings_fonts::sans(::metric(::LayoutMetric::StatusFontSize), LV_FREETYPE_FONT_STYLE_BOLD),
-        LV_PART_MAIN);
-    lv_label_set_text(impl_->status_label, "");
-    lv_obj_add_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-}
-
-void LvSettingRtcConfirmPage3::set_error(const char *message)
-{
-    impl_->last_error = message ? message : "RTC write failed";
-    if (impl_->status_label) {
-        lv_label_set_text(impl_->status_label, impl_->last_error.c_str());
-        lv_obj_clear_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-void LvSettingRtcConfirmPage3::clear_error()
-{
-    impl_->last_error.clear();
-    if (impl_->status_label) {
-        lv_label_set_text(impl_->status_label, "");
-        lv_obj_add_flag(impl_->status_label, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-void LvSettingRtcConfirmPage3::cancel_backend_request() noexcept
-{
-    if (impl_->request_state) {
-        const auto request = impl_->request_state;
-        request->cancelled.store(true, std::memory_order_release);
-        request->terminal.store(true, std::memory_order_release);
-        const std::uint64_t request_id = request->request_id.exchange(0, std::memory_order_acq_rel);
-        if (request_id != 0) settings_rtc::cancel_request(request_id);
-        impl_->request_state.reset();
-    }
-    settings_rtc::session().cancel_time_commit();
-}
-
-void LvSettingRtcConfirmPage3::leave_page()
-{
-    cancel_backend_request();
-    settings_rtc::session().discard_edits();
-    if (impl_->back_callback) impl_->back_callback();
-}
-
-int settings_rtc_days_in_current_month() noexcept
-{
-    return settings_rtc::session().state().field_max(settings_rtc::RtcField::DAY);
-}
-
-void settings_rtc_discard_edits() noexcept
-{
-    settings_rtc::session().discard_edits();
-}
-
 const ActivationBlock *settings_rtc_manual_edit_block() noexcept
 {
-    static constexpr ActivationBlock kInFlight{
-        "RTC operation in progress", "Wait for it to finish, then try again."};
-    static constexpr ActivationBlock kUnavailable{
-        "Network Time status unavailable", "Cannot change the clock right now."};
-    static constexpr ActivationBlock kNetworkTimeOn{
-        "Network Time is on", "Turn off Network Time to set the clock manually."};
+    static constexpr ActivationBlock kInFlight{"rtc operation in progress", "wait for it to finish, then try again."};
+    static constexpr ActivationBlock kUnavailable{"network time status unavailable",
+                                                  "cannot change the clock right now."};
+    static constexpr ActivationBlock kNetworkTimeOn{"network time is on",
+                                                    "turn off network time to set the clock manually."};
 
     auto &workflow = settings_rtc::session();
     if (workflow.pending()) return &kInFlight;
@@ -1747,119 +752,9 @@ void settings_rtc_refresh_ntp() noexcept
     settings_rtc::refresh_ntp_cache(true);
 }
 
-std::unique_ptr<DComponens::LvglComponensBase> settings_rtc_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &parent_node,
-    std::function<void()> back_callback)
+std::unique_ptr<DComponens::LvglComponensBase> settings_rtc_editor_page_factory(lv_obj_t *parent,
+                                                                               const NodeIter &,
+                                                                               std::function<void()> back_callback)
 {
-    return std::make_unique<LvSettingRtcPage3>(parent, parent_node, std::move(back_callback));
-}
-
-std::string settings_rtc_local_time_text()
-{
-    const std::time_t now = std::time(nullptr);
-    std::tm local{};
-    if (now == 0) return {};
-#if defined(_WIN32)
-    if (localtime_s(&local, &now) != 0) return {};
-#else
-    if (localtime_r(&now, &local) == nullptr) return {};
-#endif
-    char buffer[32] = {};
-    // No truncation check needed: with an int tm_year the longest possible
-    // "%Y-%m-%d %H:%M:%S" is 25 characters, which always fits in 32 bytes.
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &local);
-    return buffer;
-}
-
-std::string settings_rtc_timezone_text()
-{
-    const std::time_t now = std::time(nullptr);
-    std::tm local{};
-#if defined(_WIN32)
-    _tzset();
-    if (localtime_s(&local, &now) != 0) return "Unavailable";
-    const bool dst = local.tm_isdst > 0;
-    const char *abbreviation = dst ? _tzname[1] : _tzname[0];
-    if (abbreviation == nullptr || abbreviation[0] == '\0') abbreviation = _tzname[0];
-    const long utc_offset = -(_timezone - (dst ? _dstbias : 0));
-#else
-    if (localtime_r(&now, &local) == nullptr) return "Unavailable";
-    const char *abbreviation = local.tm_zone;
-    const long utc_offset = local.tm_gmtoff; // Seconds east of UTC.
-#endif
-
-    char buffer[32] = {};
-    if (utc_offset == 0) {
-        std::snprintf(buffer, sizeof(buffer), "UTC");
-    } else {
-        const long magnitude = utc_offset < 0 ? -utc_offset : utc_offset;
-        std::snprintf(buffer,
-                      sizeof(buffer),
-                      "UTC%c%02ld:%02ld",
-                      utc_offset < 0 ? '-' : '+',
-                      magnitude / 3600,
-                      (magnitude % 3600) / 60);
-    }
-
-    if (abbreviation == nullptr || abbreviation[0] == '\0' ||
-        std::strcmp(abbreviation, "UTC") == 0) {
-        return buffer;
-    }
-    return std::string(buffer) + " (" + abbreviation + ")";
-}
-
-std::string settings_rtc_ntp_status_text()
-{
-    const auto &state = settings_rtc::session().state();
-    if (!state.ntp_available()) return "Unavailable";
-    return state.ntp_on() ? "On" : "Off";
-}
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_rtc_info_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &parent_node,
-    std::function<void()> back_callback)
-{
-    // Nothing on this path used to load the local time, so the Info page always
-    // reported the model's placeholder (2026-01-01) unless a field page had
-    // been visited first.  LocalTime is answered from the host clock, so this
-    // read completes inline and cannot block the UI.
-    auto &workflow = settings_rtc::session();
-
-    auto time      = std::make_shared<settings_rtc::TimeReadResult>();
-    auto delivered = std::make_shared<std::atomic_bool>(false);
-    settings_rtc::read_local_time_async([time, delivered](settings_rtc::TimeReadResult result) {
-        *time = std::move(result);
-        delivered->store(true, std::memory_order_release);
-    });
-    if (delivered->load(std::memory_order_acquire) && time->valid) {
-        workflow.load_local_time(time->payload);
-    }
-
-    settings_t12b::about_help::Content content{
-        "Date & Time",
-        {"Current: " + settings_rtc_local_time_text(),
-         "Network Time: " + settings_rtc_ntp_status_text(),
-         "Time Zone: " + settings_rtc_timezone_text()}};
-    auto page = std::make_unique<LvSettingStaticInfoPage3>(
-        parent, parent_node, std::move(back_callback), std::move(content));
-    // A frozen clock is the one thing an Info page must not show, so keep all
-    // lines fresh while it is on screen.
-    page->set_lines_provider([](std::vector<std::string> &lines) {
-        if (lines.size() < 3) return false;
-        lines[0] = "Current: " + settings_rtc_local_time_text();
-        lines[1] = "Network Time: " + settings_rtc_ntp_status_text();
-        lines[2] = "Time Zone: " + settings_rtc_timezone_text();
-        return true;
-    });
-    return page;
-}
-
-std::unique_ptr<DComponens::LvglComponensBase> settings_rtc_confirm_page_factory(
-    lv_obj_t *parent,
-    const NodeIter &parent_node,
-    std::function<void()> back_callback)
-{
-    return std::make_unique<LvSettingRtcConfirmPage3>(parent, parent_node, std::move(back_callback));
+    return std::make_unique<LvSettingTimeEditorPage3>(parent, std::move(back_callback));
 }

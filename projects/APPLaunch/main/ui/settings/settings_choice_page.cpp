@@ -3,6 +3,8 @@
  */
 
 #include "settings_choice_page.hpp"
+
+#include "cp0_theme.hpp"
 #include "settings_fonts.hpp"
 
 #include <chrono>
@@ -61,7 +63,7 @@ LvSettingChoicePage3::LvSettingChoicePage3(lv_obj_t *parent, const NodeIter &par
             lv_obj_set_width(status_label_, 200);
             lv_label_set_long_mode(status_label_, LV_LABEL_LONG_CLIP);
             lv_obj_set_style_text_font(status_label_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
-            lv_obj_set_pos(status_label_, 4, 150 - 14);
+            lv_obj_set_pos(status_label_, 4, metric(LayoutMetric::ScreenH) - 14);
             lv_label_set_text(status_label_, "");
         }
     }
@@ -96,8 +98,8 @@ void LvSettingChoicePage3::request_back()
 void LvSettingChoicePage3::set_status(const std::string &text, bool error)
 {
     if (!status_label_) return;
-    lv_label_set_text(status_label_, text.c_str());
-    lv_obj_set_style_text_color(status_label_, lv_color_hex(error ? 0xFF5F56 : 0x5F7A66), LV_PART_MAIN);
+    lv_label_set_text(status_label_, cp0::ui::lower(text).c_str());
+    lv_obj_set_style_text_color(status_label_, lv_color_hex(error ? cp0::theme::kDanger : cp0::theme::kDim), LV_PART_MAIN);
 }
 
 bool LvSettingChoicePage3::request_is_current(std::uint64_t generation) const

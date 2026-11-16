@@ -2,19 +2,15 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Layout and behaviour contracts for Settings -> Date & Time.
+"""Behaviour contracts for Settings -> time and the submenu that hosts it.
 
-These guard the fixes that made the RTC pages usable on real hardware:
-
-* the error banner sits in the value page's empty top-left corner and wraps,
-  instead of overlapping the value list;
+* "set manually" is one editor page: LEFT/RIGHT picks a field, UP/DOWN
+  changes it, ENTER writes through the privileged TimeSet path, ESC cancels;
+* the editor is refused up front while Network Time owns the clock, and
+  re-checks that gate before it writes;
+* switching Network Time drops any unwritten edit first;
 * a nested roller page comes to rest in the right-hand column, so the
-  second-level panel and the third-level page never paint over each other;
-* the confirm-page title fits its title box;
-* the local-time read moves its callback exactly once;
-* "No" on the confirm page really discards, and switching the NTP mode is not
-  blocked by unsaved manual edits;
-* the "Day" option list is rebuilt from the selected month.
+  second-level panel and the third-level page never paint over each other.
 
 The checks are static (regex over the sources) so they need no toolchain and
 run with the rest of the Python contracts.
@@ -33,9 +29,6 @@ SUBMENU_CPP = (ROOT / "main/ui/settings/settings_submenu_page.cpp").read_text(
 SUBMENU_HPP = (ROOT / "main/ui/settings/settings_submenu_page.hpp").read_text(
     encoding="utf-8"
 )
-STATIC_CPP = (ROOT / "main/ui/settings/settings_static_info_page.cpp").read_text(
-    encoding="utf-8"
-)
 PAGE_CPP = (ROOT / "main/ui/settings/settings_page.cpp").read_text(encoding="utf-8")
 TREE_HPP = (ROOT / "main/ui/settings/settings_tree_types.hpp").read_text(
     encoding="utf-8"
@@ -43,11 +36,6 @@ TREE_HPP = (ROOT / "main/ui/settings/settings_tree_types.hpp").read_text(
 COMPONENTS_HPP = (ROOT / "main/ui/settings/lvgl_components.hpp").read_text(
     encoding="utf-8"
 )
-
-# Line height used by the 10px bold status font, and the row geometry of the
-# value page (LvSettingValuePage3Base::LayoutMetric).
-STATUS_LINE_HEIGHT = 13
-
 
 def strip_comments(source: str) -> str:
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
@@ -83,23 +71,6 @@ def metric(source: str, name: str) -> int:
     return int(match.group(1))
 
 
-def test_status_banner_never_overlaps_the_value_column():
-    status_x = metric(RTC_CPP, "StatusLabelX")
-    status_w = metric(RTC_CPP, "StatusLabelW")
-    status_y = metric(RTC_CPP, "StatusLabelY")
-    value_left = metric(COMPONENTS_HPP, "ValueListX") + metric(COMPONENTS_HPP, "ValueBoxX")
-    bar_top = metric(COMPONENTS_HPP, "BarY")
-
-    # Value text never starts left of the value column's text box, so the
-    # banner must stay clear of it.
-    assert status_x + status_w < value_left, (status_x, status_w, value_left)
-    # The longest message ("Disable NTP before editing time") wraps to two
-    # lines; even four lines must stay above the selection bar.
-    assert status_y + 4 * STATUS_LINE_HEIGHT < bar_top, (status_y, bar_top)
-    # And it must not be truncated instead of wrapped.
-    assert RTC_CPP.count("LV_LABEL_LONG_WRAP") >= 2
-
-
 def test_nested_roller_page_rests_in_the_right_hand_column():
     assert "int panel_x() const override;" in SUBMENU_HPP
 
@@ -132,40 +103,6 @@ def test_nested_roller_page_rests_in_the_right_hand_column():
     assert "lv_obj_set_x(roller3_->Get(), roller3_->panel_x());" in finish
 
 
-def test_confirm_page_title_fits_the_title_box():
-    title_box_width = metric(COMPONENTS_HPP, "TitleBoxW")
-    # Only the short label is used; the long one was clipped to "Write hardv".
-    assert 'SettingEntry{"write rtc?", settings_rtc_confirm_page_factory}' in PAGE_CPP
-    assert "Write hardware RTC?" not in PAGE_CPP
-    # 16px CJK text: "Write RTC?" measures ~80px, leaving headroom in the box.
-    assert len("write rtc?") * 8 <= title_box_width
-
-
-def test_local_time_read_moves_its_callback_exactly_once():
-    # A forward declaration of this function exists, so anchor on the definition.
-    body = function_body(
-        RTC_CPP, "int read_local_time_async(TimeReadCallback callback)\n{"
-    )
-    assert body.count("std::move(callback)") == 1
-    # The old revision moved it into an unused wrapper first, so the backend
-    # handler captured an empty std::function and never delivered a result.
-    assert "deliver" not in body
-
-
-def test_confirm_page_no_path_discards_instead_of_failing():
-    body = normalized(
-        function_body(
-            RTC_CPP, "SettingApiResult LvSettingRtcConfirmPage3::discard_and_leave()"
-        )
-    )
-    # activation_pending() is true for this very activation, so guarding on it
-    # made "No" fail every time.
-    assert "activation_pending()" not in body
-    assert "impl_->request_state" in body
-    assert "discard_edits();" in body
-    assert "SettingApiResult::Success" in body
-
-
 def test_ntp_toggle_is_not_blocked_by_unsaved_edits():
     body = normalized(
         function_body(RTC_CPP, "void settings_rtc_ntp_api(int command, void *data) noexcept")
@@ -173,23 +110,6 @@ def test_ntp_toggle_is_not_blocked_by_unsaved_edits():
     discard_at = body.index("session.discard_edits();")
     toggle_at = body.index("begin_ntp_toggle")
     assert discard_at < toggle_at
-    assert "void settings_rtc_discard_edits() noexcept;" in RTC_HPP
-
-
-def test_day_options_are_rebuilt_from_the_selected_month():
-    body = normalized(
-        function_body(PAGE_CPP, "static std::unique_ptr<DComponens::LvglComponensBase> rtc_page3_factory")
-    )
-    assert 'page_node->label == "day"' in body
-    assert "settings_tree_factory_context()" in body
-    assert "erase_children(page_node)" in body
-    assert "settings_rtc_days_in_current_month()" in body
-
-    days_body = normalized(
-        function_body(RTC_CPP, "int settings_rtc_days_in_current_month() noexcept")
-    )
-    # Month-aware by construction: the model owns the leap-year rule.
-    assert "field_max(settings_rtc::RtcField::DAY)" in days_body
 
 
 def test_manual_entry_is_gated_while_network_time_is_on():
@@ -209,13 +129,16 @@ def test_manual_entry_is_gated_while_network_time_is_on():
     assert "show_blocked_warning(block->title, block->message)" in handler
 
     # Set Manually carries a gate, and the reason is chosen per NTP state.
-    assert 'SettingEntry manual_entry{"set manually", roller_page_factory};' in PAGE_CPP
+    assert (
+        'SettingEntry manual_entry{"set manually", settings_rtc_editor_page_factory, PageType::FullCustom};'
+        in PAGE_CPP
+    )
     assert (
         "manual_entry.activation_gate = [] { return settings_rtc_manual_edit_block(); };"
         in PAGE_CPP
     )
-    # Set Manually is a nested roller workflow.  Only the Network Time status
-    # icon from its parent menu is hidden while the manual editor is open.
+    # Only the Network Time status icon from the parent menu is hidden while
+    # the manual editor is open.
     submenu = normalized(SUBMENU_CPP)
     assert 'page3_hides_network_time_icon_ = selected_node->label == "set manually";' in submenu
     transition = normalized(
@@ -252,8 +175,8 @@ def test_manual_entry_is_gated_while_network_time_is_on():
     assert "state.ntp_available()" in block
     assert "state.ntp_on()" in block
     # Honest copy per case: an unknown status must not claim Network Time is on.
-    assert '"Network Time is on"' in block
-    assert '"Network Time status unavailable"' in block
+    assert '"network time is on"' in block
+    assert '"network time status unavailable"' in block
     assert "return nullptr;" in block
 
     # The gate's input is refreshed once per visit, so it cannot consult a stale
@@ -266,17 +189,7 @@ def test_manual_entry_is_gated_while_network_time_is_on():
     assert "refresh_ntp_cache(true)" in refresh
 
 
-def test_generalised_warning_keeps_the_bluetooth_copy():
-    wrapper = normalized(
-        function_body(SUBMENU_CPP, "void LvSettingRollerPage2::show_power_warning()")
-    )
-    assert '"Bluetooth power is off"' in wrapper
-    assert '"Turn on Power before continuing."' in wrapper
-    # The Bluetooth entry point is unchanged.
-    assert "void show_power_warning();" in SUBMENU_HPP
-    assert "page->show_power_warning();" in PAGE_CPP
-
-    # The modal itself is text-driven now, with a sane fallback.
+def test_blocked_warning_is_text_driven_with_a_fallback():
     modal = normalized(
         function_body(
             SUBMENU_CPP,
@@ -383,60 +296,6 @@ def test_page2_own_offset_still_matches_page_object_base_x():
     assert "public LvSettingRollerPage2" not in SUBMENU_CPP
 
 
-def test_set_manually_does_not_offer_seconds():
-    """Seconds stay in the model (a timestamp needs them) but are not editable."""
-    source = strip_comments(PAGE_CPP)
-    body = normalized(
-        source[
-            source.index("NodeIter manual = mode_tree.append_child(date_time") : source.index(
-                "NodeIter write_rtc"
-            )
-        ]
-    )
-    for label in ('"year"', '"month"', '"day"', '"hour"', '"minute"'):
-        assert f"SettingEntry{{{label}, rtc_page3_factory}}" in body, label
-    assert 'SettingEntry{"Second"' not in body
-    assert 'SettingEntry{"Second"' not in PAGE_CPP
-    # The model still holds seconds: parse/format address the field by index.
-    assert "SECOND" in RTC_CPP
-
-
-def test_info_page_clock_keeps_ticking():
-    """A frozen clock is the one thing an Info page must not show."""
-    factory = normalized(
-        function_body(
-            RTC_CPP,
-            "std::unique_ptr<DComponens::LvglComponensBase> settings_rtc_info_page_factory(",
-        )
-    )
-    assert "page->set_lines_provider(" in factory
-    assert 'lines[0] = "Current: " + settings_rtc_local_time_text();' in factory
-    assert 'lines[1] = "Network Time: " + settings_rtc_ntp_status_text();' in factory
-    assert 'lines[2] = "Time Zone: " + settings_rtc_timezone_text();' in factory
-
-    # A timer drives the provider, and the page owns and deletes it.
-    static = normalized(STATIC_CPP)
-    assert "lv_timer_create(&LvSettingStaticInfoPage3::refresh_lines_cb, 1000, this)" in static
-    assert "lv_timer_delete(lines_timer_)" in static
-
-    # The per-second read must stay cheap: std::time, never D-Bus.
-    text = normalized(function_body(RTC_CPP, "std::string settings_rtc_local_time_text()"))
-    assert "std::time(nullptr)" in text
-    assert "localtime_r" in text
-
-
-def test_field_page_keeps_edits_made_on_an_earlier_field_page():
-    """Opening a second field page must not wipe the first page's edit."""
-    refresh = normalized(
-        function_body(RTC_CPP, "void LvSettingRtcPage3::start_refresh()")
-    )
-    assert "const bool keep_edits = workflow.state().dirty();" in refresh
-    # Short-circuit: load_local_time() (which clears dirty_) must not run while
-    # edits are pending, or setting more than one field becomes impossible.
-    assert "keep_edits ||" in refresh
-    assert refresh.index("keep_edits ||") < refresh.index("load_local_time(result.time.payload)")
-
-
 def test_status_hint_records_its_target_without_a_stale_read_back():
     """The page-2 return animation targets the hint's resting x.
 
@@ -503,6 +362,61 @@ def test_page3_completion_snaps_hint_after_stale_animation_frames():
     assert "lv_anim_del(object, nullptr);" in body
     assert "snap(hint_, page2_target_x(hint_, entering));" in body
     assert body.index("snap(hint_,") < body.index("if (entering)")
+
+
+def test_set_manually_is_one_editor_page():
+    assert "rtc_page3_factory" not in PAGE_CPP
+    assert '"write rtc?"' not in PAGE_CPP
+    assert "settings_rtc_info_page_factory" not in RTC_CPP + RTC_HPP + PAGE_CPP
+    assert "class LvSettingTimeEditorPage3" in RTC_CPP
+    assert "settings_rtc_editor_page_factory(" in RTC_HPP
+
+    keys = normalized(
+        function_body(RTC_CPP, "void handle_key_event(lv_event_t *event)")
+    )
+    assert "if (key == LV_KEY_ESC) { cancel_request();" in keys
+    assert "key == LV_KEY_LEFT && focus_ > 0" in keys
+    assert "key == LV_KEY_RIGHT && focus_ + 1 < kFieldCount" in keys
+    assert "key == LV_KEY_UP) { step(1);" in keys
+    assert "key == LV_KEY_DOWN) { step(-1);" in keys
+    assert "key == LV_KEY_ENTER) { write();" in keys
+
+    fields = normalized(RTC_CPP)
+    for field in ("YEAR", "MONTH", "DAY", "HOUR", "MINUTE"):
+        assert f"settings_rtc::RtcField::{field}" in fields
+    assert '{"year", "month", "day", "hour", "min"}' in fields
+
+
+def test_editor_writes_through_the_privileged_time_path():
+    write = normalized(function_body(RTC_CPP, "void write()"))
+    assert write.index("settings_rtc_manual_edit_block()") < write.index("begin_time_commit()")
+    assert "state.edit_field(settings_rtc::RtcField::SECOND, 0);" in write
+    assert "settings_rtc::set_time_async(" in write
+    assert "SettingsAsync::Dispatch::enqueue_from_callback(token" in write
+
+    submit = normalized(
+        function_body(RTC_CPP, "int set_time_async(std::string timestamp, PrivilegedCallback callback, RequestStartedCallback started)")
+    )
+    assert '{"TimeSet", std::move(timestamp)}' in submit
+    assert "cp0_signal_system_admin_async(" in normalized(
+        function_body(RTC_CPP, "int submit_privileged(")
+    )
+
+    # Leaving cancels the sudo request and abandons the edit.
+    destructor = normalized(function_body(RTC_CPP, "~LvSettingTimeEditorPage3() override"))
+    assert "cancel_request();" in destructor
+    assert "settings_rtc::session().discard_edits();" in destructor
+
+
+def test_up_and_down_wrap_within_the_field_range():
+    step = normalized(function_body(RTC_CPP, "void step(int delta)"))
+    assert "if (value > maximum) value = minimum;" in step
+    assert "if (value < minimum) value = maximum;" in step
+    # The model clamps the day to the month that is actually selected.
+    edit = normalized(
+        function_body(RTC_CPP, "bool RtcStateModel::edit_field(RtcField field, int value) noexcept")
+    )
+    assert "const int maximum_day = field_max(RtcField::DAY);" in edit
 
 
 if __name__ == "__main__":
