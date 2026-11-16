@@ -28,6 +28,7 @@ private:
 
     lv_timer_t *poll_timer_ = nullptr;
     EscHoldLifecycleModel model_;
+    uint32_t pressed_at_ = 0;
     ForceHomeCallback force_home_callback_ = nullptr;
     void *force_home_user_data_ = nullptr;
     bool return_home_enabled_ = false;

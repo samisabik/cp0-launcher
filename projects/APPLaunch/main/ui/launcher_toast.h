@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "cp0_theme.hpp"
 #include "lvgl/lvgl.h"
 
 class LauncherToast
@@ -13,6 +14,8 @@ class LauncherToast
 public:
     void show(const char *text) noexcept;
     void show_persistent(const char *text, bool centered = false) noexcept;
+    // Shows a progress bar under the text of a persistent toast (0..1).
+    void set_progress(float fraction) noexcept;
     void hide();
     void shutdown();
 
@@ -24,6 +27,7 @@ private:
 
     lv_obj_t *container_ = nullptr;
     lv_obj_t *label_ = nullptr;
+    cp0::ui::SegBar progress_;
     lv_timer_t *hide_timer_ = nullptr;
 };
 

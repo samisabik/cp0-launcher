@@ -13,12 +13,12 @@
 namespace {
 
 constexpr uint32_t kShowDurationMs = 1500;
-constexpr uint32_t kBackgroundColor = 0x000000;
-constexpr uint32_t kBorderColor = 0x3DDC84;
-constexpr uint32_t kTextColor = 0xE6E6E6;
-constexpr lv_coord_t kWidth = 280;
+constexpr uint32_t kBackgroundColor = cp0::theme::kSelect;
+constexpr uint32_t kTextColor = cp0::theme::kText;
+constexpr lv_coord_t kWidth = 240;
 constexpr lv_coord_t kHeight = 22;
 constexpr lv_coord_t kMultilineHeight = 38;
+constexpr lv_coord_t kProgressHeight = 40;
 constexpr lv_coord_t kTopOffset = 4;
 
 } // namespace
@@ -43,8 +43,8 @@ bool LauncherToast::ensure_created() noexcept
     lv_obj_set_style_bg_color(container_, lv_color_hex(kBackgroundColor), 0);
     lv_obj_set_style_bg_opa(container_, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(container_, 0, 0);
-    lv_obj_set_style_border_width(container_, 1, 0);
-    lv_obj_set_style_border_color(container_, lv_color_hex(kBorderColor), 0);
+    lv_obj_set_style_border_width(container_, 0, 0);
+    cp0::ui::brackets(container_, cp0::theme::kAccent);
     lv_obj_set_style_pad_all(container_, 0, 0);
     lv_obj_set_style_shadow_width(container_, 0, 0);
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_CLICKABLE);
@@ -83,6 +83,7 @@ void LauncherToast::show(const char *text) noexcept
     lv_label_set_text(label_, text ? text : "");
     lv_obj_set_height(container_, text && std::strchr(text, '\n') ? kMultilineHeight : kHeight);
     lv_obj_center(label_);
+    if (progress_.track) lv_obj_add_flag(progress_.track, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(container_, LV_ALIGN_TOP_MID, 0, kTopOffset);
     lv_obj_move_foreground(container_);
     lv_obj_clear_flag(container_, LV_OBJ_FLAG_HIDDEN);
@@ -107,6 +108,20 @@ void LauncherToast::show_persistent(const char *text, bool centered) noexcept
     if (hide_timer_) lv_timer_pause(hide_timer_);
 }
 
+void LauncherToast::set_progress(float fraction) noexcept
+{
+    try {
+        if (!container_ || !label_) return;
+        if (!progress_.track) progress_ = cp0::ui::segbar(container_, 12, 26, kWidth - 24, 7, kBackgroundColor);
+        if (!progress_.track) return;
+        lv_obj_set_height(container_, kProgressHeight);
+        lv_obj_align(label_, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_clear_flag(progress_.track, LV_OBJ_FLAG_HIDDEN);
+        cp0::ui::set_segbar(progress_, fraction, cp0::theme::kAccent);
+    } catch (...) {
+    }
+}
+
 void LauncherToast::hide()
 {
     if (container_)
@@ -125,6 +140,7 @@ void LauncherToast::shutdown()
     }
     container_ = nullptr;
     label_ = nullptr;
+    progress_ = {};
 }
 
 void LauncherToast::hide_timer_cb(lv_timer_t *timer) noexcept
@@ -147,6 +163,7 @@ void LauncherToast::container_delete_cb(lv_event_t *event) noexcept
             return;
         toast->container_ = nullptr;
         toast->label_ = nullptr;
+        toast->progress_ = {};
         if (toast->hide_timer_) {
             lv_timer_delete(toast->hide_timer_);
             toast->hide_timer_ = nullptr;
