@@ -115,7 +115,7 @@ Wi-Fi のコマンドは `Status`、`Scan [0..32]`、`Connect ssid [password]`�
 
 Settings のコマンドは `BacklightRead`、`BacklightMax`、`BacklightWrite value`、`Log topic message`、`TimeStr`、`GpioSet name 0|1`、`GpioGet name`。GPIO 名は `GROVE5V`/`extport_usb`、`EXT5V`/`extport_5vout`、`BACKLIGHT` です。
 
-Process のコマンドは `ExecBlocking executable keep_root`、`Spawn executable keep_root`、`Stop pid`、`CheckLock path`、`Kill pid grace_ms`、`RunArgv background argv...`、legacy の `RunSudo`、`CaptureArgv argv...`、`AdbStatus`、`DesktopExecIsSafe executable`、`Shutdown`、`Reboot`、`DelayMs milliseconds`。OS 情報と timedate は同じ service で、network/account 情報、`TimeSet`、`LocalTime`、`RandomU32`、`NtpGet`、`NtpSet`、背景更新を処理します。
+Process のコマンドは `ExecBlocking executable keep_root`、`Spawn executable keep_root`、`Stop pid`、`CheckLock path`、`Kill pid grace_ms`、`RunArgv background argv...`、legacy の `RunSudo`、`CaptureArgv argv...`、`AdbStatus`、`DesktopExecIsSafe executable`、`Shutdown`、`Reboot`、`DelayMs milliseconds`。`Shutdown` と `Reboot` は `systemctl poweroff|reboot --check-inhibitors=yes` を実行するため、block inhibitor（パッケージのインストールや更新）があると拒否されます。拒否時の code は systemctl の終了コード、data はその出力の 1 行目です。OS 情報と timedate は同じ service で、network/account 情報、`TimeSet`、`LocalTime`、`RandomU32`、`NtpGet`、`NtpSet`、背景更新を処理します。
 
 ### Battery、screenshot、camera、soundcard
 
@@ -129,7 +129,7 @@ Process のコマンドは `ExecBlocking executable keep_root`、`Spawn executab
 
 `cp0_signal_sudo_argv_async` は `(argv, auth_timeout_ms, exec_timeout_ms, complete, started)` を受け取ります。先に `started(ret, request_id)`、その後に `complete(result_code, exit_code)` が 1 回呼ばれます。`cp0_signal_sudo_cancel(request_id, done)` でキャンセルし、`done(0)` は受理を意味します。
 
-`cp0_signal_system_admin_async` は `AdbSet 0|1`、`AdbAuthorize public_key`（680..2048 byte、改行なし）、`AdbRevoke fingerprint`（64 桁の小文字 hex）、`AdbClearAuthorizations`、`NtpSet 0|1`、`TimeSet YYYY-MM-DD HH:MM:SS` のみを受け付けます。不正引数では `started(-EINVAL, 0)` だけが呼ばれ、complete は呼ばれません。画面を離れる時や timeout 時には request id をキャンセルしてください。
+`cp0_signal_system_admin_async` は `AdbSet 0|1`、`AdbAuthorize public_key`（680..2048 byte、改行なし）、`AdbRevoke fingerprint`（64 桁の小文字 hex）、`AdbClearAuthorizations`、`NtpSet 0|1`、`TimezoneSet zone`、`TailscaleSet 0|1`、`SshSet 0|1`（`systemctl enable|disable --now ssh`）、`HostnameSet name`（`A-Za-z0-9-` の 1..63 文字、先頭と末尾に `-` は不可。`/etc/hosts` の `127.0.1.1` 行も書き換えます）、`MicGainSet 0..14`、`TimeSet YYYY-MM-DD HH:MM:SS` のみを受け付けます。許可リストは `src/cp0_admin_command.hpp` にあります。不正引数では `started(-EINVAL, 0)` だけが呼ばれ、complete は呼ばれません。画面を離れる時や timeout 時には request id をキャンセルしてください。
 
 `cp0_signal_network()` と `cp0_signal_forkexec()` は plan に残る予約宣言ですが、現在の `cp0_lvgl` には登録実装がありません。呼び出す前に実装の存在を確認してください。
 

@@ -256,7 +256,7 @@ int cp0_time_ntp_set(int enable);
 
 ### 进程：`cp0_signal_process_api(args, cb)`
 
-命令和参数：`ExecBlocking executable keep_root`、`Spawn executable keep_root`、`Stop pid`、`CheckLock path`、`Kill pid grace_ms`、`RunArgv background argv...`、`RunSudo password argv...`（旧接口，禁止新增使用）、`CaptureArgv argv...`、`AdbStatus`、`DesktopExecIsSafe executable`、`Shutdown`、`Reboot`、`DelayMs milliseconds`。`Spawn` data 为 PID；`CaptureArgv` data 为 stdout；`AdbStatus` data 为 `adbd=active|inactive` 和 `enabled=enabled|disabled` 两行。
+命令和参数：`ExecBlocking executable keep_root`、`Spawn executable keep_root`、`Stop pid`、`CheckLock path`、`Kill pid grace_ms`、`RunArgv background argv...`、`RunSudo password argv...`（旧接口，禁止新增使用）、`CaptureArgv argv...`、`AdbStatus`、`DesktopExecIsSafe executable`、`Shutdown`、`Reboot`、`DelayMs milliseconds`。`Shutdown` 和 `Reboot` 执行 `systemctl poweroff|reboot --check-inhibitors=yes`，存在 block inhibitor（安装软件包、更新）时会被拒绝；拒绝时 code 为 systemctl 退出码，data 为其输出的第一行。`Spawn` data 为 PID；`CaptureArgv` data 为 stdout；`AdbStatus` data 为 `adbd=active|inactive` 和 `enabled=enabled|disabled` 两行。
 
 ### OS 信息和时间：`cp0_signal_osinfo_api` / `cp0_signal_timedate_api`
 
@@ -293,7 +293,14 @@ int cp0_time_ntp_set(int enable);
 | `{"AdbRevoke","指纹"}` | 撤销 64 位十六进制指纹 |
 | `{"AdbClearAuthorizations"}` | 清理全部授权 |
 | `{"NtpSet","0|1"}` | 设置 NTP |
+| `{"TimezoneSet","zone"}` | 设置时区 |
+| `{"TailscaleSet","0|1"}` | `tailscale up|down` |
+| `{"SshSet","0|1"}` | `systemctl enable|disable --now ssh` |
+| `{"HostnameSet","name"}` | 设置主机名（1..63 个 `A-Za-z0-9-`，首尾不能是 `-`），并改写 `/etc/hosts` 的 `127.0.1.1` 行 |
+| `{"MicGainSet","0..14"}` | 设置麦克风增益并保存 |
 | `{"TimeSet","YYYY-MM-DD HH:MM:SS"}` | 设置系统时间并写 RTC |
+
+白名单位于 `src/cp0_admin_command.hpp`。
 
 参数校验失败只调用 `started(-EINVAL, 0)`，不会产生 complete 回调。UI 页面应保存 request id，并在离开页面或超时路径调用取消。
 

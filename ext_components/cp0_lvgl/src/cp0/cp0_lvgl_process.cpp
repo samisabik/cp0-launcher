@@ -125,11 +125,14 @@ public:
             report(callback, safe ? 0 : -1, reason);
         } else if (cmd == "Shutdown") {
             if (!cp0_process_api_contract::has_exact_arguments(arg, 1)) return invalid(callback);
-            report(callback, system_shutdown(), "");
+            std::string reason;
+            const int result = system_shutdown(reason);
+            report(callback, result, reason);
         } else if (cmd == "Reboot") {
             if (!cp0_process_api_contract::has_exact_arguments(arg, 1)) return invalid(callback);
-            system_reboot();
-            report(callback, 0, "");
+            std::string reason;
+            const int result = system_reboot(reason);
+            report(callback, result, reason);
         } else if (cmd == "DelayMs") {
             int delay_ms = 0;
             const auto *text = cp0_process_api_contract::argument_at(arg, 1);
@@ -146,15 +149,30 @@ public:
         }
     }
 
-    int system_shutdown()
+    // Without a TTY systemctl defaults to --check-inhibitors=auto, which skips
+    // the check; ask for it so a running package install or update can veto.
+    // On refusal the first line systemctl printed comes back as the reason.
+    static int request_power_state(const char *verb, std::string &reason)
+    {
+        std::string output;
+        const int result = cp0_process_commands::capture_argv(
+            {"/bin/sh", "-c", std::string("exec systemctl ") + verb + " --check-inhibitors=yes 2>&1"}, output);
+        reason.clear();
+        if (result == 0) return 0;
+        reason = output.substr(0, output.find('\n'));
+        if (reason.empty()) reason = "systemctl " + std::string(verb) + " failed (" + std::to_string(result) + ")";
+        return result;
+    }
+
+    int system_shutdown(std::string &reason)
     {
 #if defined(_WIN32)
+        (void)reason;
         std::printf("[CP0] shutdown (emulator exit)\n");
         std::exit(0);
 #else
         std::printf("[CP0] shutdown\n");
-        const std::vector<std::string> argv = {"systemctl", "poweroff", "-i"};
-        const int result = cp0_process_commands::run_argv(argv, false);
+        const int result = request_power_state("poweroff", reason);
         // Only darken the panel once logind has accepted the request; a refused
         // poweroff must leave a lit, usable screen rather than one that only
         // looks switched off.
@@ -163,15 +181,15 @@ public:
 #endif
     }
 
-    void system_reboot()
+    int system_reboot(std::string &reason)
     {
 #if defined(_WIN32)
+        (void)reason;
         std::printf("[CP0] reboot (emulator exit)\n");
         std::exit(0);
 #else
         std::printf("[CP0] reboot\n");
-        const std::vector<std::string> argv = {"systemctl", "reboot", "-i"};
-        cp0_process_commands::run_argv(argv, true);
+        return request_power_state("reboot", reason);
 #endif
     }
 

@@ -21,6 +21,7 @@
 #include "cp0_dispatch_shutdown_gate.hpp"
 #include "cp0_sudo_worker_registry.hpp"
 #include "cp0_sudo_c_api_boundary.hpp"
+#include "cp0_admin_command.hpp"
 
 #include "lvgl/lvgl.h"
 
@@ -985,86 +986,9 @@ extern "C" void init_sudo_signals(void)
             if (started) started(-EINVAL, 0);
             return;
         }
-        const std::string command = args.front();
-        const std::string value = args.size() > 1 ? *std::next(args.begin()) : std::string();
         std::list<std::string> argv;
-        if (command == "AdbSet") {
-            if (args.size() != 2 || (value != "0" && value != "1")) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {cp0_file_path("adb_helper"), "set", value};
-        } else if (command == "AdbAuthorize") {
-            if (value.size() < 680 || value.size() > 2048 || value.find('\n') != std::string::npos ||
-                value.find('\r') != std::string::npos) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {cp0_file_path("adb_helper"), "authorize", value};
-        } else if (command == "AdbRevoke") {
-            const bool valid = value.size() == 64 && std::all_of(value.begin(), value.end(),
-                [](unsigned char c) { return std::isdigit(c) || (c >= 'a' && c <= 'f'); });
-            if (!valid) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {cp0_file_path("adb_helper"), "revoke", value};
-        } else if (command == "AdbClearAuthorizations") {
-            argv = {cp0_file_path("adb_helper"), "clear-authorizations"};
-        } else if (command == "NtpSet") {
-            argv = {"timedatectl", "set-ntp", value == "1" ? "true" : "false"};
-        } else if (command == "TimezoneSet") {
-            // Zone names are paths under /usr/share/zoneinfo such as Europe/London.
-            const bool valid = !value.empty() && value.size() <= 64 && value.front() != '/' &&
-                value.find("..") == std::string::npos &&
-                std::all_of(value.begin(), value.end(), [](unsigned char c) {
-                    return std::isalnum(c) || c == '/' || c == '_' || c == '-' || c == '+';
-                });
-            if (args.size() != 2 || !valid) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {"timedatectl", "set-timezone", value};
-        } else if (command == "TailscaleSet") {
-            if (args.size() != 2 || (value != "0" && value != "1")) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {"tailscale", value == "1" ? "up" : "down"};
-        } else if (command == "MicGainSet") {
-            // ES8389 ADC PGA steps of 3 dB, 0..14 (0 to +42 dB); stored so it survives a reboot.
-            const bool valid = !value.empty() && value.size() <= 2 &&
-                std::all_of(value.begin(), value.end(), [](unsigned char c) { return std::isdigit(c); }) &&
-                std::stoi(value) <= 14;
-            if (args.size() != 2 || !valid) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {"/bin/sh", "-c",
-                    "amixer -c0 -q sset 'ADCL PGA' " + value + " && amixer -c0 -q sset 'ADCR PGA' " + value +
-                        " && alsactl store 0"};
-        } else if (command == "TimeSet") {
-            const bool valid_shape = value.size() == 19 && value[4] == '-' && value[7] == '-' &&
-                value[10] == ' ' && value[13] == ':' && value[16] == ':';
-            bool digits_valid = valid_shape;
-            for (size_t i = 0; digits_valid && i < value.size(); ++i) {
-                if (i == 4 || i == 7 || i == 10 || i == 13 || i == 16) continue;
-                digits_valid = std::isdigit(static_cast<unsigned char>(value[i])) != 0;
-            }
-            int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
-            const bool parsed = digits_valid && std::sscanf(value.c_str(), "%d-%d-%d %d:%d:%d",
-                &year, &month, &day, &hour, &minute, &second) == 6;
-            const bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-            static constexpr int days_per_month[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-            const int max_day = month == 2 ? days_per_month[month] + (leap ? 1 : 0)
-                                           : (month >= 1 && month <= 12 ? days_per_month[month] : 0);
-            if (!parsed || year < 1970 || month < 1 || month > 12 || day < 1 || day > max_day ||
-                hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
-                if (started) started(-EINVAL, 0);
-                return;
-            }
-            argv = {"/bin/sh", "-c", "date -s '" + value + "'; hwclock -w"};
-        } else {
+        if (!cp0::admin::command_argv(args, [](const char *name) { return std::string(cp0_file_path(name)); },
+                                      argv)) {
             if (started) started(-EINVAL, 0);
             return;
         }

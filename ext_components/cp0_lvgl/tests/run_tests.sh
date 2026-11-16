@@ -11,6 +11,9 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$(dirname "$0")/test_launcher_updater.cpp" -o "$build_dir/test_launcher_updater"
 "$build_dir/test_launcher_updater"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    -I"$(dirname "$0")/../src" "$(dirname "$0")/test_admin_command.cpp" -o "$build_dir/test_admin_command"
+"$build_dir/test_admin_command"
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 binary="${TMPDIR:-/tmp}/cp0_lvgl_test_async_utils.$$"
