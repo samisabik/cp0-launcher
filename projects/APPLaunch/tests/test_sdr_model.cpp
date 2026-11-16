@@ -2,13 +2,39 @@
 
 #include "../main/ui/model/sdr_model.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <vector>
 #include <string>
 
 using namespace sdr;
 
+void test_iq_spectrum()
+{
+    // A tone 256 kHz above centre at kIqRate lands 128 bins right of DC.
+    std::vector<uint8_t> iq(2 * sdr::kIqFft);
+    const double f = 256000.0 / sdr::kIqRate;
+    for (int i = 0; i < sdr::kIqFft; ++i) {
+        iq[2 * i] = static_cast<uint8_t>(127.5 + 100.0 * std::cos(2 * 3.14159265358979 * f * i));
+        iq[2 * i + 1] = static_cast<uint8_t>(127.5 + 100.0 * std::sin(2 * 3.14159265358979 * f * i));
+    }
+    const std::vector<float> bins = sdr::iq_spectrum_db(iq.data(), iq.size());
+    assert(bins.size() == static_cast<std::size_t>(sdr::kIqFft));
+    const int peak = static_cast<int>(std::max_element(bins.begin(), bins.end()) - bins.begin());
+    assert(std::abs(peak - (sdr::kIqFft / 2 + 128)) <= 1);
+    assert(bins[peak] > sdr::median_db(bins) + 30.0f);
+
+    const std::vector<float> cols = sdr::span_columns(bins, 1024000u, 256);
+    const int col = static_cast<int>(std::max_element(cols.begin(), cols.end()) - cols.begin());
+    assert(std::abs(col - (128 + 64)) <= 1);
+    assert(sdr::iq_cmd(433920000u, -1) == "rtl_sdr -f 433920000 -s 2048000 -");
+}
+
 int main()
 {
+    test_iq_spectrum();
     assert(clamp_hz(0) == kMinHz);
     assert(clamp_hz(2000000000) == kMaxHz);
     assert(clamp_hz(433920000) == 433920000u);
@@ -31,6 +57,9 @@ int main()
     assert(listen.find("rtl_fm -M wbfm -f 98000000 -s 200000 -r 48000 -g 20 -") != std::string::npos);
     assert(listen.find("aplay -q -r 48000 -f S16_LE -t raw -c 1") != std::string::npos);
     assert(listen_cmd(124000000, Demod::AM, -1).find("-M am") != std::string::npos);
+    const std::string muted = listen_cmd(98000000, Demod::WFM, 20, false);
+    assert(muted.find("aplay") == std::string::npos);
+    assert(muted.find("rtl_fm") != std::string::npos);
 
     assert(decode_cmd(433920000, 40, "/tmp/d").find("rtl_433 -f 433920000 -F json -g 40 > '/tmp/d'") !=
            std::string::npos);

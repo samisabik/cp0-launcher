@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <complex>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -85,6 +87,83 @@ std::string detect_cmd()
     return "rtl_test -t 2>&1 | head -30";
 }
 
+std::string iq_cmd(uint32_t center_hz, int gain_db)
+{
+    std::string cmd = "rtl_sdr -f " + std::to_string(center_hz) + " -s " + std::to_string(kIqRate);
+    if (gain_db >= 0) cmd += " -g " + std::to_string(gain_db);
+    return cmd + " -";
+}
+
+std::vector<float> iq_spectrum_db(const uint8_t *iq, std::size_t bytes)
+{
+    constexpr float kPi = 3.14159265358979f;
+    std::vector<float> out(kIqFft, -120.0f);
+    if (!iq || bytes < static_cast<std::size_t>(2 * kIqFft)) return out;
+    std::vector<std::complex<float>> a(kIqFft);
+    float window_sum = 0.0f;
+    for (int i = 0; i < kIqFft; ++i) {
+        const float w = 0.5f - 0.5f * std::cos(2.0f * kPi * static_cast<float>(i) / static_cast<float>(kIqFft - 1));
+        window_sum += w;
+        a[i] = {w * (static_cast<float>(iq[2 * i]) - 127.5f) / 127.5f,
+                w * (static_cast<float>(iq[2 * i + 1]) - 127.5f) / 127.5f};
+    }
+    for (std::size_t i = 1, j = 0; i < a.size(); ++i) {
+        std::size_t bit = a.size() >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(a[i], a[j]);
+    }
+    for (std::size_t len = 2; len <= a.size(); len <<= 1) {
+        const float angle = -2.0f * kPi / static_cast<float>(len);
+        const std::complex<float> step(std::cos(angle), std::sin(angle));
+        for (std::size_t i = 0; i < a.size(); i += len) {
+            std::complex<float> w(1.0f, 0.0f);
+            for (std::size_t k = 0; k < len / 2; ++k) {
+                const std::complex<float> u = a[i + k];
+                const std::complex<float> v = a[i + k + len / 2] * w;
+                a[i + k] = u + v;
+                a[i + k + len / 2] = u - v;
+                w *= step;
+            }
+        }
+    }
+    for (int i = 0; i < kIqFft; ++i) {
+        const int src = (i + kIqFft / 2) % kIqFft;
+        const float mag = std::abs(a[src]) / window_sum;
+        out[i] = std::max(-120.0f, 20.0f * std::log10(mag + 1e-9f));
+    }
+    const int dc = kIqFft / 2;
+    const float fill = 0.5f * (out[dc - 3] + out[dc + 3]);
+    for (int i = dc - 2; i <= dc + 2; ++i) out[i] = fill;
+    return out;
+}
+
+std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width)
+{
+    std::vector<float> out(std::max(0, width), -120.0f);
+    if (bins.empty() || width <= 0) return out;
+    const double used = std::clamp(static_cast<double>(span_hz) / kIqRate, 0.01, 1.0) * static_cast<double>(bins.size());
+    const double first = (static_cast<double>(bins.size()) - used) / 2.0;
+    for (int x = 0; x < width; ++x) {
+        int lo = static_cast<int>(first + used * x / width);
+        int hi = static_cast<int>(first + used * (x + 1) / width);
+        lo = std::clamp(lo, 0, static_cast<int>(bins.size()) - 1);
+        hi = std::clamp(std::max(hi, lo + 1), lo + 1, static_cast<int>(bins.size()));
+        float best = -120.0f;
+        for (int i = lo; i < hi; ++i) best = std::max(best, bins[i]);
+        out[x] = best;
+    }
+    return out;
+}
+
+float median_db(std::vector<float> values)
+{
+    if (values.empty()) return -120.0f;
+    const std::size_t mid = values.size() / 2;
+    std::nth_element(values.begin(), values.begin() + static_cast<long>(mid), values.end());
+    return values[mid];
+}
+
 std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const std::string &outpath)
 {
     span_hz = std::clamp<uint32_t>(span_hz, 200000u, kMaxSpanHz);
@@ -98,7 +177,7 @@ std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const s
     return cmd;
 }
 
-std::string listen_cmd(uint32_t hz, Demod demod, int gain_db)
+std::string listen_cmd(uint32_t hz, Demod demod, int gain_db, bool audio_out)
 {
     const char *mode = demod == Demod::WFM ? "wbfm" : demod == Demod::AM ? "am" : "fm";
     const int rate = demod == Demod::WFM ? 48000 : 24000;
@@ -107,6 +186,7 @@ std::string listen_cmd(uint32_t hz, Demod demod, int gain_db)
                      std::to_string(sample) + " -r " + std::to_string(rate);
     if (gain_db >= 0) fm += " -g " + std::to_string(gain_db);
     fm += " -";
+    if (!audio_out) return fm + " > /dev/null";
     return fm + " | aplay -q -r " + std::to_string(rate) + " -f S16_LE -t raw -c 1";
 }
 

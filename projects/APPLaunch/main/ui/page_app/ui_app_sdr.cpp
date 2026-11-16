@@ -6,9 +6,13 @@
 #include "ui_app_sdr.hpp"
 
 #include "cp0_lvgl_app.h"
+#include "cp0_theme.hpp"
 #include "input_keys.h"
 
 #include <algorithm>
+#include <cmath>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -17,19 +21,38 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = 0x3DDC84;
-constexpr uint32_t kColorText = 0xE6E6E6;
-constexpr uint32_t kColorIdle = 0x8A8A8A;
-constexpr uint32_t kColorDim = 0x5F7A66;
-constexpr uint32_t kColorGrid = 0x1E2B23;
+constexpr uint32_t kColorAccent = cp0::theme::kAccent;
+constexpr uint32_t kColorText = cp0::theme::kText;
+constexpr uint32_t kColorIdle = cp0::theme::kIdle;
+constexpr uint32_t kColorDim = cp0::theme::kDim;
+constexpr uint32_t kColorGrid = cp0::theme::kLine;
 constexpr uint32_t kColorFill = 0x0D2216;
-constexpr uint32_t kColorRec = 0xFF5F56;
-constexpr uint32_t kRefreshMs = 200;
+constexpr uint32_t kColorRec = cp0::theme::kDanger;
+constexpr uint32_t kRefreshMs = 66;
 constexpr uint32_t kMessageMs = 3000;
 constexpr uint32_t kDetectEveryMs = 3000;
-constexpr int kScopeFloor = -75;
-constexpr int kScopeCeil = -15;
+// The scope scale follows the noise floor: 6 dB below it to 54 dB above.
+constexpr float kScopeBelowFloor = 6.0f;
+constexpr float kScopeRange = 60.0f;
+constexpr float kScopeSmoothing = 0.5f;
 constexpr int kMaxDevices = 8;
+
+constexpr const char *kAudioOutConfigKey = "sdr_audio_out";
+
+bool config_audio_out()
+{
+    int value = 1;
+    cp0_signal_config_api({"GetInt", kAudioOutConfigKey, "1"}, [&](int code, std::string data) {
+        if (code == 0) value = std::atoi(data.c_str());
+    });
+    return value != 0;
+}
+
+void set_config_audio_out(bool on)
+{
+    cp0_signal_config_api({"SetInt", kAudioOutConfigKey, on ? "1" : "0"}, nullptr);
+    cp0_signal_config_api({"Save"}, nullptr);
+}
 
 uint16_t rgb565(uint32_t rgb)
 {
@@ -68,12 +91,14 @@ UISdrPage::UISdrPage() : AppPage()
 {
     set_page_title("SDR");
     reclaim_top_bar();
+    audio_out_ = config_audio_out();
     detect_path_ = runtime_dir() + "/cp0-sdr-detect";
     out_path_ = runtime_dir() + "/cp0-sdr-out";
+    iq_path_ = runtime_dir() + "/cp0-sdr-iq-" + std::to_string(getpid());
     for (int i = 0; i < 64; ++i)
         palette_[i] = rgb565(spectrum_like_color(i));
-    pixels_.assign(static_cast<std::size_t>(kWidth) * kCanvasH, rgb565(0x000000));
-    peak_.fill(static_cast<int8_t>(kScopeFloor));
+    pixels_.assign(static_cast<std::size_t>(kWidth) * kCanvasH, rgb565(cp0::theme::kPanel));
+    peak_.fill(-120.0f);
     tools_ok_ = tool_present();
     create_ui();
     render();
@@ -117,46 +142,73 @@ uint32_t UISdrPage::spectrum_like_color(int index)
 
 lv_obj_t *UISdrPage::make_label(int x, int y, int px, uint32_t color)
 {
-    lv_obj_t *label = lv_label_create(ui_APP_Container);
-    if (!label) return nullptr;
-    lv_obj_set_style_text_font(label, launcher_fonts().get_chrome(px), 0);
-    lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
-    lv_obj_set_pos(label, x, y);
-    lv_label_set_text(label, "");
-    return label;
+    return cp0::ui::label(ui_APP_Container, x, y, color, px > 11);
 }
 
 void UISdrPage::create_ui()
 {
     if (!ui_APP_Container) return;
-    lv_obj_set_style_bg_color(ui_APP_Container, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(ui_APP_Container, LV_OPA_COVER, 0);
+    cp0::ui::paint_background(ui_APP_Container);
+    const cp0::ui::TitleRow row = cp0::ui::title_row(ui_APP_Container, "sdr");
+    title_ = row.title;
+    status_ = row.status;
 
-    title_ = make_label(4, 1, 11, kColorIdle);
-    status_ = make_label(200, 1, 11, kColorIdle);
-    if (status_) {
-        lv_obj_set_width(status_, 116);
-        lv_obj_set_style_text_align(status_, LV_TEXT_ALIGN_RIGHT, 0);
-    }
+    centre_ = cp0::ui::readout(ui_APP_Container, 4, 19, 186, 40, "centre  MHz");
+    gain_ = cp0::ui::readout(ui_APP_Container, 194, 19, 122, 40, "peak  MHz");
+    const cp0::ui::Panel body = cp0::ui::panel(ui_APP_Container, 4, 63, 312, 88);
 
     canvas_ = lv_canvas_create(ui_APP_Container);
     if (canvas_) {
         lv_canvas_set_buffer(canvas_, pixels_.data(), kWidth, kCanvasH, LV_COLOR_FORMAT_RGB565);
-        lv_obj_set_pos(canvas_, 0, kCanvasTop);
+        lv_obj_set_pos(canvas_, 5, kCanvasTop);
     }
+    edge_low_ = cp0::ui::label(ui_APP_Container, 8, kCanvasTop + 1, cp0::theme::kDim);
+    edge_high_ = cp0::ui::label(ui_APP_Container, 312 - 4 - 80, kCanvasTop + 1, cp0::theme::kDim);
+    if (edge_high_) {
+        lv_obj_set_width(edge_high_, 80);
+        lv_obj_set_style_text_align(edge_high_, LV_TEXT_ALIGN_RIGHT, 0);
+    }
+    if (!body.box) return;
 
-    big_ = make_label(14, 40, 22, kColorText);
-    sub_ = make_label(16, 70, 11, kColorDim);
+    big_ = cp0::ui::label(body.box, 8, 10, kColorText, true);
+    sub_ = cp0::ui::label(body.box, 8, 42, kColorIdle);
 
-    list_ = make_label(6, kCanvasTop, 11, kColorText);
+    list_ = cp0::ui::label(body.box, 8, 6, kColorText);
     if (list_) {
-        lv_obj_set_width(list_, 308);
+        lv_obj_set_width(list_, 296);
         lv_label_set_long_mode(list_, LV_LABEL_LONG_CLIP);
         lv_obj_set_style_text_line_space(list_, 4, 0);
     }
 
-    hint_ = make_label(4, kFooterY, 11, kColorDim);
-    if (hint_) lv_obj_set_width(hint_, 312);
+    listen_ = cp0::ui::box(body.box, 0, 0, 312, 88, cp0::theme::kPanel);
+    if (listen_) {
+        lv_obj_set_style_bg_opa(listen_, LV_OPA_TRANSP, 0);
+        const auto row_label = [this](int y, const char *key) {
+            if (lv_obj_t *k = cp0::ui::label(listen_, 8, y, kColorIdle)) lv_label_set_text(k, key);
+            cp0::ui::dotted_rule(listen_, 8, y + 15, 296);
+            lv_obj_t *v = cp0::ui::label(listen_, 304 - 160, y, kColorText);
+            if (v) {
+                lv_obj_set_width(v, 160);
+                lv_obj_set_style_text_align(v, LV_TEXT_ALIGN_RIGHT, 0);
+            }
+            return v;
+        };
+        demod_value_ = row_label(6, "demod");
+        state_value_ = row_label(26, "state");
+        if (lv_obj_t *k = cp0::ui::label(listen_, 8, 46, kColorIdle)) lv_label_set_text(k, "audio out");
+        audio_pill_ = cp0::ui::box(listen_, 304 - 30, 45, 30, 13, kColorAccent);
+        if (audio_pill_) {
+            audio_pill_text_ = cp0::ui::label(audio_pill_, 0, 0, cp0::theme::kBg);
+            if (audio_pill_text_) {
+                lv_obj_set_width(audio_pill_text_, 30);
+                lv_obj_set_style_text_align(audio_pill_text_, LV_TEXT_ALIGN_CENTER, 0);
+            }
+        }
+        if (lv_obj_t *presets = cp0::ui::label(listen_, 8, 68, kColorIdle))
+            lv_label_set_text(presets, "presets  1 fm  2 air  3 433  4 pmr  5 noaa  6 ads-b");
+    }
+
+    hint_ = cp0::ui::footer(ui_APP_Container);
 }
 
 void UISdrPage::show_message(const std::string &text)
@@ -216,11 +268,18 @@ std::string UISdrPage::tail()
 
 void UISdrPage::stop_proc()
 {
+    // Close the IQ pipe before signalling: rtl_sdr blocked on a full pipe
+    // cannot act on SIGTERM and gets SIGKILLed with the dongle still open,
+    // and the next open resets the dongle, which this board does not survive.
+    // A closed pipe gives it SIGPIPE, which it handles by closing cleanly.
+    if (iq_fd_ >= 0) close(iq_fd_);
+    iq_fd_ = -1;
     if (proc_pid_ > 0) {
         const int pid = proc_pid_;
         proc_pid_ = -1;
         cp0_signal_process_api({"Stop", std::to_string(pid)}, [](int, std::string) {});
     }
+    unlink(iq_path_.c_str());
     playing_ = false;
     decoding_ = false;
 }
@@ -229,10 +288,42 @@ void UISdrPage::start_scope()
 {
     stop_proc();
     if (!present_) return;
-    out_offset_ = 0;
-    truncate(out_path_.c_str(), 0);
-    peak_.fill(static_cast<int8_t>(kScopeFloor));
-    proc_pid_ = spawn(sdr::power_cmd(center_hz_, span_hz_, gain_db_, out_path_));
+    peak_.fill(-120.0f);
+    smooth_valid_ = false;
+    iq_tail_.clear();
+    unlink(iq_path_.c_str());
+    if (mkfifo(iq_path_.c_str(), 0600) != 0) return;
+    // Open the read end first, non-blocking, so neither side waits on the other.
+    iq_fd_ = open(iq_path_.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (iq_fd_ < 0) return;
+    proc_pid_ = spawn("exec " + sdr::iq_cmd(center_hz_, gain_db_) + " > '" + iq_path_ + "' 2>/dev/null");
+}
+
+void UISdrPage::read_iq()
+{
+    if (iq_fd_ < 0) return;
+    const std::size_t keep = static_cast<std::size_t>(2 * sdr::kIqFft);
+    uint8_t buffer[65536];
+    bool fresh = false;
+    for (int i = 0; i < 16; ++i) {
+        const ssize_t n = read(iq_fd_, buffer, sizeof(buffer));
+        if (n <= 0) break;
+        fresh = true;
+        if (static_cast<std::size_t>(n) >= keep) {
+            iq_tail_.assign(buffer + n - static_cast<ssize_t>(keep) - (n % 2), buffer + n - (n % 2));
+        } else {
+            iq_tail_.insert(iq_tail_.end(), buffer, buffer + n);
+            if (iq_tail_.size() > keep) iq_tail_.erase(iq_tail_.begin(), iq_tail_.end() - static_cast<long>(keep));
+        }
+    }
+    if (!fresh || iq_tail_.size() < keep) return;
+    if (iq_tail_.size() % 2) iq_tail_.erase(iq_tail_.begin());
+    const std::vector<float> bins = sdr::iq_spectrum_db(iq_tail_.data(), iq_tail_.size());
+    const std::vector<float> cols = sdr::span_columns(bins, span_hz_, kWidth);
+    for (int x = 0; x < kWidth; ++x)
+        smooth_[x] = smooth_valid_ ? smooth_[x] + kScopeSmoothing * (cols[x] - smooth_[x]) : cols[x];
+    smooth_valid_ = true;
+    draw_scope(std::vector<float>(smooth_.begin(), smooth_.end()));
 }
 
 void UISdrPage::start_decode()
@@ -255,7 +346,7 @@ void UISdrPage::toggle_listen()
         return;
     }
     if (!present_) return;
-    proc_pid_ = spawn(sdr::listen_cmd(center_hz_, demod_, gain_db_));
+    proc_pid_ = spawn(sdr::listen_cmd(center_hz_, demod_, gain_db_, audio_out_));
     playing_ = proc_pid_ > 0;
     render();
 }
@@ -282,15 +373,19 @@ void UISdrPage::set_mode(Mode mode)
     render();
 }
 
-void UISdrPage::draw_scope(const sdr::PowerRow &row)
+void UISdrPage::draw_scope(const std::vector<float> &cols)
 {
-    if (!canvas_) return;
-    const std::vector<int> cols = sdr::power_columns(row, kWidth);
-    const uint16_t black = rgb565(0x000000);
+    if (!canvas_ || cols.size() < static_cast<std::size_t>(kWidth)) return;
+    const uint16_t bg = rgb565(cp0::theme::kPanel);
     const uint16_t grid = rgb565(kColorGrid);
     const uint16_t fill = rgb565(kColorFill);
     const uint16_t accent = rgb565(kColorAccent);
     const uint16_t peak = rgb565(kColorIdle);
+    const uint16_t centre = rgb565(cp0::theme::kDim);
+    const float floor_db = sdr::median_db(cols) - kScopeBelowFloor;
+    auto level_of = [floor_db](float db) {
+        return std::clamp(static_cast<int>((db - floor_db) / kScopeRange * 63.0f), 0, 63);
+    };
     auto y_for = [](int level) { return (kTraceH - 1) - level * (kTraceH - 1) / 63; };
 
     // Scroll the waterfall down by one row.
@@ -298,19 +393,28 @@ void UISdrPage::draw_scope(const sdr::PowerRow &row)
     const std::size_t rows = kCanvasH - kTraceH - 1;
     std::memmove(wf + kWidth, wf, (rows - 1) * kWidth * sizeof(uint16_t));
 
-    for (int y = 0; y < kTraceH; ++y) std::fill_n(&pixels_[static_cast<std::size_t>(y) * kWidth], kWidth, black);
+    for (int y = 0; y < kTraceH; ++y) std::fill_n(&pixels_[static_cast<std::size_t>(y) * kWidth], kWidth, bg);
+    for (int y = 0; y < kTraceH; y += 2) pixels_[static_cast<std::size_t>(y) * kWidth + kWidth / 2] = centre;
+    int best = 0;
     for (int x = 0; x < kWidth; ++x) {
-        const int level = sdr::level_index(cols[x], kScopeFloor, kScopeCeil, 64);
+        const int level = level_of(cols[x]);
         const int top = y_for(level);
         for (int y = top + 1; y < kTraceH; ++y) pixels_[static_cast<std::size_t>(y) * kWidth + x] = fill;
         pixels_[static_cast<std::size_t>(top) * kWidth + x] = accent;
-        peak_[x] = static_cast<int8_t>(std::max<int>(peak_[x], cols[x]));
-        const int peak_y = y_for(sdr::level_index(peak_[x], kScopeFloor, kScopeCeil, 64));
+        peak_[x] = std::max(peak_[x], cols[x]);
+        const int peak_y = y_for(level_of(peak_[x]));
         if (peak_y < top) pixels_[static_cast<std::size_t>(peak_y) * kWidth + x] = peak;
         wf[x] = palette_[level];
+        if (cols[x] > cols[best]) best = x;
     }
     for (int x = 0; x < kWidth; ++x) pixels_[static_cast<std::size_t>(kTraceH) * kWidth + x] = grid;
     lv_obj_invalidate(canvas_);
+
+    const float above = cols[best] - (floor_db + kScopeBelowFloor);
+    const double hz = static_cast<double>(center_hz_) - span_hz_ / 2.0 + (best + 0.5) * span_hz_ / kWidth;
+    char unit[16];
+    std::snprintf(unit, sizeof(unit), "+%d dB", static_cast<int>(std::lround(above)));
+    cp0::ui::set_readout(gain_, sdr::format_mhz(static_cast<uint32_t>(hz)), unit, above >= 20.0f ? kColorAccent : kColorIdle);
 }
 
 void UISdrPage::render()
@@ -328,14 +432,22 @@ void UISdrPage::render()
         else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     };
     vis(canvas_, show_scope);
-    vis(big_, show_listen || (!present_));
-    vis(sub_, show_listen || (!present_));
+    vis(big_, !present_);
+    vis(sub_, !present_);
     vis(list_, show_decode);
+    vis(listen_, show_listen);
 
     const char *mode_name = scope ? "scope" : listen ? "listen" : "decode";
-    if (title_) {
-        std::string text = std::string(mode_name) + "  " + sdr::format_hz(center_hz_);
-        lv_label_set_text(title_, text.c_str());
+    cp0::ui::set_readout(centre_, sdr::format_mhz(center_hz_), "", kColorText);
+    if (centre_.label)
+        cp0::ui::set_text(centre_.label, ("step " + sdr::format_hz(sdr::kSteps[step_index_])).c_str(),
+                          cp0::theme::kDim);
+    vis(edge_low_, show_scope);
+    vis(edge_high_, show_scope);
+    vis(gain_.panel.box, show_scope);
+    if (show_scope) {
+        cp0::ui::set_text(edge_low_, sdr::format_mhz(center_hz_ - span_hz_ / 2).c_str(), cp0::theme::kDim);
+        cp0::ui::set_text(edge_high_, sdr::format_mhz(center_hz_ + span_hz_ / 2).c_str(), cp0::theme::kDim);
     }
     if (status_) {
         std::string text;
@@ -352,22 +464,24 @@ void UISdrPage::render()
             text = "live";
             color = kColorRec;
         } else {
-            text = "g " + sdr::gain_label(gain_db_);
+            text = std::string(mode_name) + "  g " + sdr::gain_label(gain_db_);
         }
         lv_label_set_text(status_, text.c_str());
-        lv_obj_set_style_text_color(status_, lv_color_hex(color), 0);
+        cp0::ui::set_text_color(status_, color);
     }
 
     if (!present_) {
         if (big_) lv_label_set_text(big_, "no sdr");
         if (sub_) lv_label_set_text(sub_, tools_ok_ ? "plug in the rtl-sdr dongle" : "run: sudo apt install rtl-sdr");
     } else if (listen) {
-        if (big_) lv_label_set_text(big_, (sdr::format_mhz(center_hz_) + " MHz").c_str());
-        if (sub_) {
-            std::string s = std::string(sdr::demod_label(demod_)) + (playing_ ? "   playing" : "   stopped");
-            lv_label_set_text(sub_, s.c_str());
-            lv_obj_set_style_text_color(sub_, lv_color_hex(playing_ ? kColorAccent : kColorDim), 0);
+        cp0::ui::set_text(demod_value_, sdr::demod_label(demod_), kColorText);
+        cp0::ui::set_text(state_value_, playing_ ? "playing" : "stopped", playing_ ? kColorAccent : kColorIdle);
+        if (audio_pill_ && lv_obj_get_style_border_width(audio_pill_, LV_PART_MAIN) != (audio_out_ ? 0 : 1)) {
+            lv_obj_set_style_bg_opa(audio_pill_, audio_out_ ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(audio_pill_, audio_out_ ? 0 : 1, 0);
+            lv_obj_set_style_border_color(audio_pill_, lv_color_hex(kColorIdle), 0);
         }
+        cp0::ui::set_text(audio_pill_text_, audio_out_ ? "on" : "off", audio_out_ ? cp0::theme::kBg : kColorIdle);
     }
 
     if (decode && list_) {
@@ -381,13 +495,15 @@ void UISdrPage::render()
         lv_label_set_text(list_, body.c_str());
     }
 
-    if (hint_) {
-        const char *text = !present_ ? "tab mode   esc back"
-                           : scope   ? "< > tune  , . step  g gain  s span  tab"
-                           : listen  ? "< > tune  1-6 preset  m mode  ent play"
-                                     : "< > tune  ent start/stop  s save  tab";
-        lv_label_set_text(hint_, text);
-    }
+    if (!present_)
+        cp0::ui::set_footer(hint_, {{"tab", "mode"}});
+    else if (scope)
+        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"up/dn", "step"}, {"g", "gain"}, {"s", "span"}, {"tab", "mode"}});
+    else if (listen)
+        cp0::ui::set_footer(hint_, {{"ent", playing_ ? "stop" : "play"}, {"o", audio_out_ ? "mute" : "unmute"},
+                                    {"< >", "tune"}, {"m", "demod"}, {"1-6", "preset"}, {"tab", "mode"}});
+    else
+        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"ent", "start"}, {"s", "save"}, {"tab", "mode"}});
 }
 
 void UISdrPage::timer_cb(lv_timer_t *timer) noexcept
@@ -407,19 +523,7 @@ void UISdrPage::on_timer()
     if (detect_pid_ > 0) poll_detect();
 
     if (present_ && mode_ == Mode::Scope && proc_pid_ > 0) {
-        const std::string chunk = tail();
-        std::size_t start = 0;
-        std::string last;
-        while (true) {
-            const std::size_t nl = chunk.find('\n', start);
-            if (nl == std::string::npos) break;
-            last = chunk.substr(start, nl - start);
-            start = nl + 1;
-        }
-        if (!last.empty()) {
-            const sdr::PowerRow row = sdr::parse_power_row(last);
-            if (row.valid) draw_scope(row);
-        }
+        read_iq();
     } else if (present_ && mode_ == Mode::Decode && decoding_) {
         const std::string chunk = tail();
         std::size_t start = 0;
@@ -489,10 +593,10 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
         retune();
         return;
     }
-    if (key == KEY_COMMA || key == KEY_DOT) {
+    if (key == KEY_UP || key == KEY_DOWN) {
         const int count = static_cast<int>(sdr::kSteps.size());
-        step_index_ = (step_index_ + (key == KEY_DOT ? 1 : count - 1)) % count;
-        show_message("step " + sdr::format_hz(sdr::kSteps[step_index_]));
+        step_index_ = std::clamp(step_index_ + (key == KEY_UP ? 1 : -1), 0, count - 1);
+        render();
         return;
     }
     if (key >= KEY_1 && key <= KEY_6) {
@@ -510,12 +614,12 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
 
     if (mode_ == Mode::Scope) {
         if (key == KEY_S) {
-            span_hz_ = span_hz_ >= 2000000u ? 1000000u : 2000000u;
+            span_hz_ = span_hz_ >= 2000000u ? 1000000u : span_hz_ >= 1000000u ? 500000u : span_hz_ >= 500000u ? 250000u : 2000000u;
             show_message("span " + sdr::format_hz(span_hz_));
             if (present_) start_scope();
             render();
         } else if (key == KEY_H) {
-            peak_.fill(static_cast<int8_t>(kScopeFloor));
+            peak_.fill(-120.0f);
         }
         return;
     }
@@ -531,6 +635,12 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
             toggle_listen();
         } else if (key == KEY_SPACE) {
             if (playing_) toggle_listen();
+        } else if (key == KEY_O) {
+            audio_out_ = !audio_out_;
+            set_config_audio_out(audio_out_);
+            show_message(audio_out_ ? "audio on" : "audio off");
+            if (playing_) toggle_listen(), toggle_listen();
+            render();
         }
         return;
     }

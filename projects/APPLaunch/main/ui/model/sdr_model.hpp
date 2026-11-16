@@ -55,7 +55,8 @@ std::string gain_label(int gain_db);
 // output the page tails; it is quoted by the caller's directory, assumed safe.
 std::string detect_cmd();
 std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const std::string &outpath);
-std::string listen_cmd(uint32_t hz, Demod demod, int gain_db);
+// Without audio_out the demodulator still runs but its audio is discarded.
+std::string listen_cmd(uint32_t hz, Demod demod, int gain_db, bool audio_out = true);
 std::string decode_cmd(uint32_t hz, int gain_db, const std::string &outpath);
 
 // rtl_test output -> is a device present, and its name if any.
@@ -77,6 +78,24 @@ PowerRow parse_power_row(const std::string &line);
 // Resample a power row to width columns of dBm (nearest bin), for the trace
 // and waterfall.
 std::vector<int> power_columns(const PowerRow &row, int width);
+
+// Live scope: rtl_sdr streams 8-bit unsigned IQ at kIqRate into a FIFO and the
+// page takes a kIqFft-point FFT of the newest block.
+constexpr uint32_t kIqRate = 2048000u;
+constexpr int kIqFft = 1024;
+std::string iq_cmd(uint32_t center_hz, int gain_db);
+
+// Power per FFT bin in dB relative to full scale, ordered low to high
+// frequency (DC in the middle). The DC spike of the RTL2832U is replaced by
+// its neighbours. `iq` must hold 2 * kIqFft bytes.
+std::vector<float> iq_spectrum_db(const uint8_t *iq, std::size_t bytes);
+
+// Max of the bins covering each of `width` columns across the central
+// `span_hz` of the kIqRate-wide spectrum.
+std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width);
+
+// Median of the values: a robust noise-floor estimate for auto scaling.
+float median_db(std::vector<float> values);
 
 // dBm -> 0..levels-1 on the display scale.
 int level_index(int db, int floor_db, int ceil_db, int levels);
