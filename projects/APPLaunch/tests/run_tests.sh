@@ -173,6 +173,11 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_sdr_model.cpp" \
     "$test_root/../main/ui/model/sdr_model.cpp" \
     -o "$build_dir/test_sdr_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_audio_model.cpp" \
+    "$test_root/../main/ui/model/audio_model.cpp" \
+    -o "$build_dir/test_audio_model"
+"$build_dir/test_audio_model"
 "$build_dir/test_sdr_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_rec_model.cpp" \

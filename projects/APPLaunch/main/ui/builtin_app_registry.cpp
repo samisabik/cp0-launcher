@@ -89,6 +89,8 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_page_app<UIPowerPage>},
     {{"SDR", "line/sdr.png", "app_SDR", true, false},
      nullptr, false, true, false, append_page_app<UISdrPage>},
+    {{"Audio", "line/audio.png", "app_Audio", true, false},
+     nullptr, false, true, false, append_page_app<UIAudioPage>},
 #endif
 };
 
