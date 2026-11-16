@@ -5,6 +5,7 @@
 #pragma once
 #include "../launcher_ui_app_page.hpp"
 #include "../spectrum_scanner.hpp"
+#include "cp0_theme.hpp"
 
 #include <array>
 #include <cstdint>
@@ -34,11 +35,12 @@ private:
     enum class Tab { Rx, Tx };
 
     static constexpr int kWidth = 320;
-    static constexpr int kTabTop = 0;
-    static constexpr int kTabH = 15;
+    static constexpr int kTabX = 110;
+    static constexpr int kBarX = 52;
+    static constexpr int kBarW = 222;
+    static constexpr int kTxRows = 4;
     static constexpr int kBodyTop = 17;
     static constexpr int kBodyH = 136; // 17..153
-    static constexpr int kHintY = 156;
 
     SpectrumScanner scanner_;
     bool scanner_ok_ = false;
@@ -56,29 +58,53 @@ private:
         std::string label;
         uint32_t freq_hz = 0;
         bool allowed = false;
+        int pulses = 0;
+        uint32_t duration_ms = 0;
+        long mtime = 0;
     };
     int send_selection_ = 0;
     std::vector<SendEntry> send_entries_;
 
     // Tab bar
     std::array<lv_obj_t *, 2> tab_labels_{};
-    lv_obj_t *tab_hl_ = nullptr;
+    std::array<lv_obj_t *, 2> tab_lines_{};
+    lv_obj_t *status_ = nullptr;
 
     // RX
     lv_obj_t *rx_panel_ = nullptr;
     std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_freq_{};
-    std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_bar_{};
+    std::array<cp0::ui::SegBar, spectrum::kFinderChannels.size()> finder_bar_{};
     std::array<lv_obj_t *, spectrum::kFinderChannels.size()> finder_value_{};
-    lv_obj_t *hit_title_ = nullptr;
-    lv_obj_t *hit_freq_ = nullptr;
-    lv_obj_t *hit_detail_ = nullptr;
-    lv_obj_t *hit_history_ = nullptr;
-    lv_obj_t *rx_status_ = nullptr;
+    cp0::ui::Readout hit_;
+    cp0::ui::Readout peak_;
+    lv_obj_t *mode_ = nullptr;
+    lv_obj_t *trigger_line_ = nullptr;
+    lv_obj_t *trigger_label_ = nullptr;
 
     // TX
+    struct TxRow {
+        lv_obj_t *row = nullptr;
+        lv_obj_t *mark = nullptr;
+        lv_obj_t *time = nullptr;
+        lv_obj_t *freq = nullptr;
+        lv_obj_t *pulses = nullptr;
+    };
     lv_obj_t *tx_panel_ = nullptr;
-    lv_obj_t *tx_list_ = nullptr;
-    lv_obj_t *tx_detail_ = nullptr;
+    cp0::ui::Readout tx_freq_;
+    lv_obj_t *tx_signal_ = nullptr;
+    lv_obj_t *tx_length_ = nullptr;
+    lv_obj_t *tx_empty_ = nullptr;
+    std::array<TxRow, kTxRows> tx_rows_{};
+
+    // Rename
+    bool renaming_ = false;
+    std::string rename_text_;
+    cp0::ui::Panel rename_panel_;
+    lv_obj_t *rename_value_ = nullptr;
+    lv_obj_t *rename_cursor_ = nullptr;
+    bool input_context_saved_ = false;
+    int previous_input_context_ = 0;
+    int previous_keypad_intercept_ = 0;
 
     lv_obj_t *hint_label_ = nullptr;
     lv_timer_t *timer_ = nullptr;
@@ -92,6 +118,10 @@ private:
     void build_send_entries();
     void refresh_tx_list();
     void delete_selected();
+    void start_rename();
+    void finish_rename(bool save);
+    void render_rename();
+    void handle_rename_key(uint32_t key, const struct key_item *item);
     void render_rx();
     void update_hint();
     void on_timer();

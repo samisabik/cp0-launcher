@@ -9,8 +9,18 @@
 
 using namespace spectrum;
 
+void test_capture_name()
+{
+    assert(spectrum::capture_name("Door Bell") == "door-bell");
+    assert(spectrum::capture_name("gate/../x") == "gatex");
+    assert(spectrum::capture_name("  car key  ") == "car-key");
+    assert(spectrum::capture_name("abcdefghijklmnopq").size() == spectrum::kCaptureNameMax);
+    assert(spectrum::capture_name("...").empty());
+}
+
 int main()
 {
+    test_capture_name();
     // Datasheet example: 433.92 MHz with a 26 MHz crystal is FREQ 0x10B071.
     assert(freq_word(433920000) == 0x10B071);
     assert(freq_word(868000000) == 0x216276);

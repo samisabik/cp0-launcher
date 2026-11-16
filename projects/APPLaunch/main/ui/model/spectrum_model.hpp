@@ -84,6 +84,11 @@ struct Capture {
 // 779-928 MHz). Regulatory limits on a given frequency are the operator's call.
 bool tx_allowed(uint32_t hz);
 
+// Capture names are file stems: lowercase letters, digits, '-' and '_', at
+// most kCaptureNameMax characters. Spaces become '-'; anything else is dropped.
+constexpr std::size_t kCaptureNameMax = 13;
+std::string capture_name(const std::string &typed);
+
 // Parse a Flipper Sub-GHz RAW file (the format sub_file_header/sub_raw_lines
 // write) back into a frequency and signed durations.
 Capture parse_sub(const std::string &contents);

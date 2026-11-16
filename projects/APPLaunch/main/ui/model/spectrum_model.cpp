@@ -260,4 +260,18 @@ FinderHit FinderDetector::update(const int8_t *rssi, uint32_t now_ms)
     return result;
 }
 
+std::string capture_name(const std::string &typed)
+{
+    std::string out;
+    for (unsigned char c : typed) {
+        if (out.size() >= kCaptureNameMax) break;
+        if (c == ' ') c = '-';
+        else if (c >= 'A' && c <= 'Z') c = static_cast<unsigned char>(c - 'A' + 'a');
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_') out.push_back(static_cast<char>(c));
+    }
+    while (!out.empty() && out.front() == '-') out.erase(out.begin());
+    while (!out.empty() && out.back() == '-') out.pop_back();
+    return out;
+}
+
 } // namespace spectrum
