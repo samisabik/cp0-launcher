@@ -6,6 +6,8 @@
 
 #include "ui_app_page.hpp"
 #include "cp0_font_service.hpp"
+#include "cp0_theme.hpp"
+#include <cstdio>
 #include <cstring>
 #include "cp0_callback_contract.hpp"
 #include "cp0_pointer_lifecycle.hpp"
@@ -357,7 +359,7 @@ void AppTopBarTitleComponent::on_create(lv_obj_t *obj)
     lv_obj_add_event_cb(label_, child_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_set_size(label_, LV_PCT(100), LV_PCT(100));
     lv_label_set_long_mode(label_, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_color(label_, lv_color_hex(0x3DDC84), 0);
+    lv_obj_set_style_text_color(label_, lv_color_hex(cp0::theme::kAccent), 0);
     lv_obj_set_style_text_font(label_, cp0_fonts().get_chrome(kCp0ChromeFontSize), 0);
     lv_obj_set_style_text_align(label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_label_set_text(label_, title_.c_str());
@@ -403,7 +405,7 @@ lv_obj_t *create_centered_status_label(lv_obj_t *obj)
     lv_obj_t *label = lv_label_create(obj);
     if (!label) return nullptr;
     lv_obj_center(label);
-    lv_obj_set_style_text_color(label, lv_color_hex(0x8A8A8A), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(cp0::theme::kIdle), 0);
     lv_obj_set_style_text_font(label, cp0_fonts().get_chrome(kCp0ChromeFontSize), 0);
     lv_label_set_text(label, "--");
     return label;
@@ -441,6 +443,21 @@ void AppTopBarTimeComponent::refresh()
     if (!label_) return;
     char text[16] = "--:--";
     cp0_time_str(text, sizeof(text));
+    // Settings -> time -> clock format stores 1 under "clock_12h" for a 12-hour clock.
+    int twelve_hour = 0;
+    try {
+        cp0_signal_config_api({"GetInt", "clock_12h", "0"}, [&](int code, std::string data) {
+            if (code == 0 && data == "1") twelve_hour = 1;
+        });
+    } catch (...) {
+    }
+    int hour = 0;
+    int minute = 0;
+    if (twelve_hour && std::sscanf(text, "%d:%d", &hour, &minute) == 2 && hour >= 0 && hour < 24)
+        std::snprintf(text, sizeof(text), "%d:%02d%s", hour % 12 == 0 ? 12 : hour % 12, minute,
+                      hour < 12 ? "am" : "pm");
+    const int width = twelve_hour ? 52 : recommended_width();
+    if (obj() && lv_obj_get_style_width(obj(), LV_PART_MAIN) != width) set_width(width);
     const char *next = text[0] ? text : "--:--";
     const char *current = lv_label_get_text(label_);
     if (!current || std::strcmp(current, next) != 0)
@@ -486,7 +503,7 @@ void AppTopBarBatteryComponent::on_create(lv_obj_t *obj)
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_radius(battery_bar_, 0, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(battery_bar_, lv_color_hex(0x66CC33),
+    lv_obj_set_style_bg_color(battery_bar_, lv_color_hex(cp0::theme::kAccent),
                               LV_PART_INDICATOR | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -501,7 +518,7 @@ void AppTopBarBatteryComponent::on_create(lv_obj_t *obj)
     lv_obj_clear_flag(charge_wave_, static_cast<lv_obj_flag_t>(
         LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
     lv_obj_set_style_radius(charge_wave_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(charge_wave_, lv_color_hex(0x3DDC84),
+    lv_obj_set_style_bg_color(charge_wave_, lv_color_hex(cp0::theme::kAccent),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(charge_wave_, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(charge_wave_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -568,7 +585,7 @@ void AppTopBarBatteryComponent::set_charging(bool charging)
                             LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(label_, lv_color_hex(charging ? 0x3DDC84 : 0x8A8A8A),
+    lv_obj_set_style_text_color(label_, lv_color_hex(charging ? cp0::theme::kAccent : cp0::theme::kIdle),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // The charging state shows as a green percentage; no animation runs.
@@ -635,21 +652,26 @@ void AppTopBarNetworkComponent::on_create(lv_obj_t *obj)
     lv_obj_add_event_cb(ethernet_image_, child_delete_cb, LV_EVENT_DELETE, this);
     lv_image_set_src(ethernet_image_, &cp0_status_ethernet);
 
-    static constexpr int HEIGHTS[] = {6, 9, 12, 15};
+    // Pixel bars sized to the 11 px chrome font: 3 px wide, 1 px apart,
+    // stepping 2 px up to the font's cap height.
+    static constexpr int kBarW = 3;
+    static constexpr int kBarGap = 1;
+    static constexpr int kPanelH = 9;
+    static constexpr int HEIGHTS[] = {3, 5, 7, 9};
     wifi_panel_ = lv_obj_create(obj);
     if (!wifi_panel_) return;
     lv_obj_add_event_cb(wifi_panel_, child_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_remove_style_all(wifi_panel_);
-    lv_obj_set_size(wifi_panel_, 22, 15);
+    lv_obj_set_size(wifi_panel_, 4 * kBarW + 3 * kBarGap, kPanelH);
     for (int index = 0; index < 4; ++index) {
         wifi_bars_[index] = lv_obj_create(wifi_panel_);
         if (!wifi_bars_[index]) return;
         lv_obj_add_event_cb(wifi_bars_[index], child_delete_cb, LV_EVENT_DELETE, this);
-        lv_obj_set_size(wifi_bars_[index], 4, HEIGHTS[index]);
-        lv_obj_set_pos(wifi_bars_[index], index * 6, 15 - HEIGHTS[index]);
-        lv_obj_set_style_radius(wifi_bars_[index], 0, 0);
-        lv_obj_set_style_bg_color(wifi_bars_[index], lv_color_hex(0x333333), 0);
-        lv_obj_set_style_border_width(wifi_bars_[index], 0, 0);
+        lv_obj_remove_style_all(wifi_bars_[index]);
+        lv_obj_set_size(wifi_bars_[index], kBarW, HEIGHTS[index]);
+        lv_obj_set_pos(wifi_bars_[index], index * (kBarW + kBarGap), kPanelH - HEIGHTS[index]);
+        lv_obj_set_style_bg_opa(wifi_bars_[index], LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(wifi_bars_[index], lv_color_hex(cp0::theme::kDim), 0);
         lv_obj_clear_flag(wifi_bars_[index], LV_OBJ_FLAG_SCROLLABLE);
     }
     set_visible(false);
@@ -684,7 +706,7 @@ void AppTopBarNetworkComponent::refresh()
     for (int index = 0; index < 4; ++index) {
         bool active = (state & (1 << index)) != 0;
         lv_obj_set_style_bg_color(wifi_bars_[index],
-                                  lv_color_hex(active ? 0x3DDC84 : 0x333333), 0);
+                                  lv_color_hex(active ? cp0::theme::kAccent : cp0::theme::kDim), 0);
     }
     if (status.ethernet) lv_obj_remove_flag(ethernet_image_, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(ethernet_image_, LV_OBJ_FLAG_HIDDEN);
