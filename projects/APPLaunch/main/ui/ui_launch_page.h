@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "cp0_theme.hpp"
 #include "home_icon_buffer_pool.hpp"
 #include "launcher_ui_app_page.hpp"
 #include <array>
@@ -15,12 +16,13 @@
 
 class Launch;
 
-// Home screen: a static 4x2 grid of line icons with a shell-prompt footer.
-// Moving the selection only restyles the two affected tiles; nothing animates.
+// Home screen: a 3x2 grid of panel tiles (icon and name) with a
+// footer of key hints and page dots. Moving the selection only restyles the
+// two affected tiles; nothing animates.
 class UILaunchPage : public home_base
 {
 public:
-    static constexpr size_t kColumns = 4;
+    static constexpr size_t kColumns = 3;
     static constexpr size_t kRows = 2;
     static constexpr size_t kTilesPerPage = kColumns * kRows;
 
@@ -43,9 +45,11 @@ public:
 private:
     struct Tile
     {
-        lv_obj_t *box = nullptr;
+        cp0::ui::Panel panel;
         lv_obj_t *icon = nullptr;
+        lv_obj_t *name = nullptr;
     };
+    static constexpr size_t kMaxPageDots = 6;
 
     void create_grid(lv_obj_t *parent);
     void move_selection(int delta);
@@ -61,10 +65,8 @@ private:
     Launch *launch_ = nullptr;
     lv_obj_t *container_ = nullptr;
     std::array<Tile, kTilesPerPage> tiles_ = {};
-    std::array<lv_obj_t *, 4> corners_ = {};
-    lv_obj_t *selector_ = nullptr;
-    lv_obj_t *command_label_ = nullptr;
-    lv_obj_t *page_label_ = nullptr;
+    std::array<lv_obj_t *, kMaxPageDots> page_dots_ = {};
+    size_t focused_slot_ = SIZE_MAX;
     size_t shown_page_ = SIZE_MAX;
     std::vector<std::string> icon_paths_;
     HomeIconBufferPool home_icon_pool_;

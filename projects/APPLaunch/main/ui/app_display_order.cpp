@@ -71,7 +71,23 @@ std::string normalized_label(std::string_view label)
     return normalized;
 }
 
+// The first home page, in this order, ahead of the rest of the list.
+constexpr std::array<std::string_view, 6> kHomeFirstPage = {
+    "settings", "sdr", "spectrum", "rec", "cli", "files",
+};
+
 } // namespace
+
+int launcher_home_first_page_order(std::string_view label) noexcept
+{
+    try {
+        const std::string normalized = normalized_label(label);
+        for (std::size_t index = 0; index < kHomeFirstPage.size(); ++index)
+            if (normalized == kHomeFirstPage[index]) return static_cast<int>(index);
+    } catch (...) {
+    }
+    return -1;
+}
 
 int launcher_builtin_app_display_order(std::string_view label) noexcept
 {

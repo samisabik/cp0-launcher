@@ -85,8 +85,6 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_page_app<UISpectrumPage>},
     {{"Rec", "line/rec.png", "app_Rec", true, false},
      nullptr, false, true, false, append_page_app<UIRecPage>},
-    {{"Power", "line/power.png", "app_Power", true, false},
-     nullptr, false, true, false, append_page_app<UIPowerPage>},
     {{"SDR", "line/sdr.png", "app_SDR", true, false},
      nullptr, false, true, false, append_page_app<UISdrPage>},
     {{"Audio", "line/audio.png", "app_Audio", true, false},
@@ -177,13 +175,14 @@ void launcher_append_enabled_builtin_apps(std::list<app> &apps)
 void launcher_sort_app_display_order(std::list<app> &apps)
 {
     constexpr int installable_app_order = std::numeric_limits<int>::max();
-    apps.sort([](const app &left, const app &right) {
-        const int left_order = launcher_builtin_app_display_order(left.Name);
-        const int right_order = launcher_builtin_app_display_order(right.Name);
-        const int normalized_left = left_order >= 0 ? left_order : installable_app_order;
-        const int normalized_right = right_order >= 0 ? right_order : installable_app_order;
-        return normalized_left < normalized_right;
-    });
+    constexpr int pinned_offset = -1000;
+    const auto rank = [](const std::string &name) {
+        const int pinned = launcher_home_first_page_order(name);
+        if (pinned >= 0) return pinned_offset + pinned;
+        const int order = launcher_builtin_app_display_order(name);
+        return order >= 0 ? order : installable_app_order;
+    };
+    apps.sort([&rank](const app &left, const app &right) { return rank(left.Name) < rank(right.Name); });
 }
 
 bool launcher_builtin_app_owns_exec(const std::string &exec)

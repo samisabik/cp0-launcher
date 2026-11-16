@@ -27,6 +27,10 @@ int main()
     // Existing images may use the hardware-prefixed SubG desktop name.
     assert(launcher_builtin_app_display_order("Cap-CC1101-SubG-Chat") == 23);
     assert(launcher_builtin_app_display_order("Vim") == -1);
+    assert(launcher_home_first_page_order("Settings") == 0);
+    assert(launcher_home_first_page_order("SDR") == 1);
+    assert(launcher_home_first_page_order("Files") == 5);
+    assert(launcher_home_first_page_order("Python") == -1);
 
     assert(!launcher_builtin_desktop_app_is_managed("Settings"));
     assert(!launcher_builtin_desktop_app_is_managed("Store"));

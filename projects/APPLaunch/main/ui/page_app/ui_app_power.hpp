@@ -26,10 +26,7 @@ private:
     State state_ = State::Ask;
     lv_obj_t *title_ = nullptr;
     lv_obj_t *detail_ = nullptr;
-    lv_obj_t *key_ = nullptr;
-    lv_obj_t *word_ = nullptr;
-    lv_obj_t *key2_ = nullptr;
-    lv_obj_t *word2_ = nullptr;
+    lv_obj_t *footer_ = nullptr;
     lv_timer_t *timer_ = nullptr;
 
     void create_ui();

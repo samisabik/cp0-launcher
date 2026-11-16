@@ -5,6 +5,7 @@
  */
 
 #include "ui_screensaver.h"
+#include "cp0_theme.hpp"
 #include "ui_low_battery.h"
 
 #include "cp0_lvgl_app.h"
@@ -18,6 +19,7 @@
 #include "model/life_model.hpp"
 #include "model/lockscreen_status_model.hpp"
 #include "settings/settings_battery_info_model.hpp"
+#include "settings/settings_prefs.hpp"
 #include "model/lockscreen_state_model.hpp"
 #include "model/screensaver_model.hpp"
 #include "model/screensaver_runtime_contract.hpp"
@@ -57,8 +59,8 @@ lv_obj_t *s_date = nullptr;
 lv_obj_t *s_prompt_text = nullptr;
 constexpr uint32_t kColorAccent = 0x3DDC84;
 constexpr uint32_t kColorText = 0xE6E6E6;
-constexpr uint32_t kColorDim = 0x5F7A66;
-constexpr uint32_t kColorIdle = 0x8A8A8A;
+constexpr uint32_t kColorDim = cp0::theme::kDim;
+constexpr uint32_t kColorIdle = cp0::theme::kIdle;
 constexpr lv_coord_t kContentLeft = 16;
 constexpr lv_coord_t kClockTop = 16;
 constexpr lv_coord_t kDateLeft = 96;
@@ -161,9 +163,9 @@ void refresh_clock()
     const std::time_t now = std::time(nullptr);
     std::tm local{};
     if (!localtime_r(&now, &local)) return;
-    char clock_text[8];
+    const std::string clock = settings_prefs::format_clock(local);
+    const char *clock_text = clock.c_str();
     char date_text[24];
-    std::strftime(clock_text, sizeof(clock_text), "%H:%M", &local);
     std::strftime(date_text, sizeof(date_text), "%a %d %b", &local);
     for (char *c = date_text; *c; ++c)
         *c = static_cast<char>(std::tolower(static_cast<unsigned char>(*c)));
@@ -410,16 +412,15 @@ void create_content()
         lv_obj_set_pos(s_life_canvas, 0, kLifeCanvasTop);
     }
 
-    // A black terminal card keeps the clock readable over the simulation.
+    // A dark panel keeps the clock readable over the simulation.
     if (lv_obj_t *card = lv_obj_create(s_content)) {
         lv_obj_remove_style_all(card);
         lv_obj_set_pos(card, kContentLeft - 8, kClockTop - 6);
         lv_obj_set_size(card, kCardWidth, kCardHeight);
-        lv_obj_set_style_bg_color(card, lv_color_black(), 0);
+        lv_obj_set_style_bg_color(card, lv_color_hex(cp0::theme::kPanel), 0);
         lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_color(card, lv_color_hex(0x1E2B23), 0);
-        lv_obj_set_style_border_width(card, 1, 0);
         lv_obj_clear_flag(card, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
+        cp0::ui::brackets(card, cp0::theme::kAccent, 5);
     }
 
     s_clock = content_label(s_content, kCp0ChromeFontSize * 2, kColorText);
@@ -490,10 +491,10 @@ void hide_hold_hint()
  * request without racing the player's worker. */
 const char *s_last_sound_asset = "";
 
-// UI sounds are removed from this launcher build; lock-screen cues are silent.
 void play_lockscreen_sound(const char *asset) noexcept
 {
     if (asset) s_last_sound_asset = asset;
+    settings_prefs::play_system_sound(asset);
 }
 
 void update_timer_period()
@@ -882,6 +883,15 @@ extern "C" void ui_screensaver_deinit(void)
     s_hint = nullptr;
     s_model.reset(0);
     s_model.set_foreground(false, 0);
+}
+
+extern "C" void ui_screensaver_lock_now(void)
+{
+    try {
+        if (!s_model.active() && !s_exiting) enter_lockscreen();
+    } catch (...) {
+        stop_screensaver();
+    }
 }
 
 extern "C" int ui_screensaver_filter_key(const struct key_item *item)
