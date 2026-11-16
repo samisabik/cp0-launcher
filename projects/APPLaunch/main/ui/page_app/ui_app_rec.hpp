@@ -35,8 +35,7 @@ public:
 
 private:
     enum class View { List, Clip, Recording };
-    static constexpr int kRows = 9;
-    static constexpr int kChips = 5;
+    static constexpr int kRows = 7;
 
     struct Clip {
         std::string stem;
@@ -88,11 +87,9 @@ private:
     lv_obj_t *rec_time_ = nullptr;
     lv_obj_t *rec_meter_ = nullptr;
     lv_obj_t *rec_note_ = nullptr;
-    std::array<lv_obj_t *, kChips> chip_keys_{};
-    std::array<lv_obj_t *, kChips> chip_words_{};
+    lv_obj_t *footer_ = nullptr;
     lv_timer_t *timer_ = nullptr;
     std::shared_ptr<Stopped> stopped_ = std::make_shared<Stopped>();
-    std::string chips_key_;
 
     void create_ui();
     lv_obj_t *make_label(lv_obj_t *parent, int x, int y, uint32_t color);

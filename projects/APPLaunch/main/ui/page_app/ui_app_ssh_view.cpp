@@ -8,20 +8,20 @@
 #include "ui_app_ssh.hpp"
 #include "../model/ssh_view_build_contract.hpp"
 
+#include "cp0_theme.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <string>
 
 namespace {
 
-constexpr uint32_t kColorAccent = 0x3DDC84;
-constexpr uint32_t kColorText = 0xE6E6E6;
-constexpr uint32_t kColorIdle = 0x8A8A8A;
-constexpr uint32_t kColorDim = 0x5F7A66;
-constexpr uint32_t kColorSelect = 0x13261B;
-constexpr uint32_t kColorLine = 0x1E2B23;
-constexpr uint32_t kColorError = 0xFF5F56;
-constexpr int kFooterY = 135;
+constexpr uint32_t kColorAccent = cp0::theme::kAccent;
+constexpr uint32_t kColorText = cp0::theme::kText;
+constexpr uint32_t kColorIdle = cp0::theme::kIdle;
+constexpr uint32_t kColorDim = cp0::theme::kDim;
+constexpr uint32_t kColorError = cp0::theme::kDanger;
+constexpr int kScreenH = cp0::theme::kScreenH;
 constexpr int kValueX = 52;
 
 lv_obj_t *plain_box(lv_obj_t *parent, int x, int y, int w, int h, uint32_t color, bool filled)
@@ -55,19 +55,11 @@ int text_width(const std::string &value, int px)
     return size.x;
 }
 
-// Key in accent, action in dim, as in the other launcher pages.
-bool chips(lv_obj_t *parent, std::initializer_list<std::pair<const char *, const char *>> items, int y)
+bool chips(lv_obj_t *parent, const std::vector<cp0::ui::Chip> &items)
 {
-    int x = 4;
-    for (const auto &item : items) {
-        const std::string key = item.first;
-        const std::string word = std::string(" ") + item.second;
-        if (!text(parent, key, x, y, kColorAccent, 11)) return false;
-        x += text_width(key, 11);
-        if (!text(parent, word, x, y, kColorDim, 11)) return false;
-        x += text_width(word, 11) + 14;
-    }
-    return true;
+    lv_obj_t *footer = cp0::ui::footer(parent);
+    cp0::ui::set_footer(footer, items);
+    return footer != nullptr;
 }
 
 std::string lower(const char *value)
@@ -86,7 +78,7 @@ void UISSHPage::create_ui()
     if (!background_) return;
     lv_obj_add_event_cb(background_, static_owned_obj_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_remove_style_all(background_);
-    lv_obj_set_size(background_, 320, 150);
+    lv_obj_set_size(background_, 320, kScreenH);
     lv_obj_set_pos(background_, 0, 0);
     lv_obj_set_style_bg_color(background_, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(background_, LV_OPA_COVER, 0);
@@ -103,7 +95,7 @@ bool UISSHPage::build_help_view()
 {
     if (!background_ || help_container_) return help_container_ != nullptr;
 
-    lv_obj_t *candidate = plain_box(background_, 0, 0, 320, 150, 0x000000, true);
+    lv_obj_t *candidate = plain_box(background_, 0, 0, 320, kScreenH, 0x000000, true);
     if (!candidate) return false;
 
     struct Line {
@@ -117,15 +109,15 @@ bool UISSHPage::build_help_view()
         {"tab", "save these details for next time"},
         {"esc", "back"},
     };
-    bool ok = text(candidate, "$ man ssh", 4, 1, kColorDim, 11) &&
-              text(candidate, "connect to another machine over ssh", 4, 18, kColorText, 11);
-    int y = 42;
+    const cp0::ui::TitleRow title = cp0::ui::title_row(candidate, "ssh help");
+    bool ok = title.rule && text(candidate, "connect to another machine over ssh", 4, 22, kColorText, 11);
+    int y = 44;
     for (const Line &line : kLines) {
         ok = ok && text(candidate, line.key, 4, y, kColorAccent, 11) &&
              text(candidate, line.action, 60, y, kColorIdle, 11);
         y += 15;
     }
-    ok = ok && chips(candidate, {{"esc", "close"}}, kFooterY);
+    ok = ok && chips(candidate, {{"esc", "close"}});
     if (!ok) {
         lv_obj_delete(candidate);
         return false;
@@ -159,75 +151,64 @@ void UISSHPage::close_help()
 bool UISSHPage::build_input_fields()
 {
     if (!background_) return false;
-    lv_obj_t *candidate = plain_box(background_, 0, 0, 320, 150, 0x000000, false);
+    lv_obj_t *candidate = plain_box(background_, 0, 0, 320, kScreenH, 0x000000, false);
     if (!candidate) return false;
     try {
         bool ok = true;
         const std::string host = model_.value(0);
         const std::string port = model_.value(1);
         const std::string user = model_.value(2);
-        std::string command = "ssh ";
-        if (!user.empty()) command += user + "@";
-        command += host.empty() ? "host" : host;
-        if (!port.empty() && port != "22") command += " -p " + port;
-        ok = ok && text(candidate, "$", 4, 1, kColorDim, 11);
-        if (lv_obj_t *preview = text(candidate, command, 18, 1, host.empty() ? kColorDim : kColorAccent, 11)) {
-            lv_obj_set_width(preview, 298);
-            lv_label_set_long_mode(preview, LV_LABEL_LONG_CLIP);
-        } else {
-            ok = false;
-        }
-        ok = ok && plain_box(candidate, 0, 16, 320, 1, kColorLine, true) != nullptr;
+        std::string target;
+        if (!user.empty()) target += user + "@";
+        target += host.empty() ? "host" : host;
+        if (!port.empty() && port != "22") target += ":" + port;
+        const cp0::ui::TitleRow title = cp0::ui::title_row(candidate, "ssh");
+        cp0::ui::set_text(title.status, target.c_str(), host.empty() ? kColorDim : kColorIdle);
+        ok = ok && title.rule != nullptr;
 
         SshViewBuildContract build(SshConnectionModel::FIELD_COUNT);
-        int y = 24;
+        int y = 19;
         for (size_t index = 0; ok && index < SshConnectionModel::FIELD_COUNT; ++index) {
             const bool active = index == model_.active_index();
-            const int row_h = active ? 30 : 20;
-            if (active) {
-                lv_obj_t *bar = plain_box(candidate, 2, y, 316, row_h, kColorSelect, true);
-                if (!bar) {
-                    ok = false;
-                    break;
-                }
+            const int row_h = active ? 40 : 20;
+            const cp0::ui::Panel field = cp0::ui::panel(candidate, 4, y, 312, row_h);
+            if (!field.box) {
+                ok = false;
+                break;
             }
-            const int value_px = active ? 22 : 11;
-            const int value_h = active ? 24 : 13;
-            ok = ok && text(candidate, lower(model_.label(index)), 10, y + (row_h - 13) / 2,
-                            active ? kColorAccent : kColorDim, 11);
+            cp0::ui::set_panel_focus(field, active);
+            ok = ok && text(field.box, lower(model_.label(index)), 6, active ? 2 : 4,
+                            active ? kColorAccent : kColorIdle, 11);
             std::string value = model_.value(index);
             const bool empty = value.empty();
             if (index == 1 && empty) value = "22";
-            lv_obj_t *value_label = text(candidate, value, kValueX, y + (row_h - value_h) / 2,
-                                         active ? kColorText : (empty ? kColorDim : kColorIdle), value_px);
+            const int value_x = active ? 6 : kValueX - 4;
+            lv_obj_t *value_label = text(field.box, value, value_x, active ? 14 : 4,
+                                         active ? kColorText : (empty ? kColorDim : kColorText), active ? 22 : 11);
             if (!value_label) {
                 ok = false;
                 break;
             }
-            lv_obj_set_width(value_label, 320 - kValueX - 14);
+            lv_obj_set_width(value_label, 312 - value_x - 16);
             lv_label_set_long_mode(value_label, LV_LABEL_LONG_CLIP);
             if (active) {
-                const int cursor_x = kValueX + std::min(text_width(model_.value(index), 22), 320 - kValueX - 20);
-                lv_obj_t *cursor = plain_box(candidate, cursor_x + 1, y + 5, 10, 20, kColorAccent, true);
-                if (!cursor) {
+                const int cursor_x = value_x + std::min(text_width(model_.value(index), 22), 312 - value_x - 20);
+                if (!plain_box(field.box, cursor_x + 1, 14 + 6, 9, 16, kColorAccent, true)) {
                     ok = false;
                     break;
                 }
             }
             build.row_completed();
-            y += row_h + 2;
+            y += row_h + 4;
         }
 
         if (ok && !status_message_.empty()) {
-            lv_obj_t *status = text(candidate, lower(status_message_.c_str()), 4, kFooterY,
-                                    status_error_ ? kColorError : kColorAccent, 11);
-            if (status) {
-                lv_obj_set_width(status, 312);
-                lv_label_set_long_mode(status, LV_LABEL_LONG_CLIP);
-            }
+            lv_obj_t *status = cp0::ui::footer(candidate);
+            cp0::ui::set_footer_message(status, lower(status_message_.c_str()).c_str(),
+                                        status_error_ ? kColorError : kColorAccent);
             ok = status != nullptr;
         } else if (ok) {
-            ok = chips(candidate, {{"ent", "connect"}, {"tab", "save"}, {"f1", "help"}}, kFooterY);
+            ok = chips(candidate, {{"ent", "connect"}, {"tab", "save"}, {"f1", "help"}});
         }
         if (ok) build.hint_completed();
         if (!ok || !build.ready()) {

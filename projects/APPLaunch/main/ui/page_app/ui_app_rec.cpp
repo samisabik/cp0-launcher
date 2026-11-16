@@ -7,6 +7,7 @@
 
 #include "../model/rec_model.hpp"
 #include "cp0_lvgl_app.h"
+#include "cp0_theme.hpp"
 #include "input_keys.h"
 
 #include <algorithm>
@@ -24,13 +25,13 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = 0x3DDC84;
-constexpr uint32_t kColorText = 0xE6E6E6;
-constexpr uint32_t kColorIdle = 0x8A8A8A;
-constexpr uint32_t kColorDim = 0x5F7A66;
-constexpr uint32_t kColorTrack = 0x1E2B23;
-constexpr uint32_t kColorSelect = 0x13261B;
-constexpr uint32_t kColorRecord = 0xFF5F56;
+constexpr uint32_t kColorAccent = cp0::theme::kAccent;
+constexpr uint32_t kColorText = cp0::theme::kText;
+constexpr uint32_t kColorIdle = cp0::theme::kIdle;
+constexpr uint32_t kColorDim = cp0::theme::kDim;
+constexpr uint32_t kColorTrack = cp0::theme::kLine;
+constexpr uint32_t kColorSelect = cp0::theme::kSelect;
+constexpr uint32_t kColorRecord = cp0::theme::kDanger;
 
 constexpr const char *kArecord = "/usr/bin/arecord";
 constexpr const char *kFfmpeg = "/usr/bin/ffmpeg";
@@ -43,9 +44,9 @@ constexpr uint32_t kMinRecordMs = 700;
 constexpr uint32_t kRefreshMs = 100;
 constexpr uint32_t kMessageMs = 3000;
 constexpr uint32_t kDeleteArmMs = 3000;
-constexpr int kListTop = 16;
-constexpr int kRowH = 13;
-constexpr int kFooterY = 135;
+constexpr int kListTop = cp0::theme::kBodyTop + 5;
+constexpr int kRowH = 18;
+constexpr int kBodyBottom = cp0::theme::kFooterRuleY;
 constexpr int kTextX = 132;
 constexpr std::size_t kRowTextChars = 26;
 
@@ -251,30 +252,22 @@ lv_obj_t *UIRecPage::make_box(lv_obj_t *parent, int x, int y, int w, int h, uint
 void UIRecPage::create_ui()
 {
     if (!ui_APP_Container) return;
-    lv_obj_set_style_bg_color(ui_APP_Container, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(ui_APP_Container, LV_OPA_COVER, 0);
+    cp0::ui::paint_background(ui_APP_Container);
+    const cp0::ui::TitleRow title = cp0::ui::title_row(ui_APP_Container, "rec");
+    status_label_ = title.title;
+    side_label_ = title.status;
 
-    status_label_ = make_label(ui_APP_Container, 4, 1, kColorIdle);
-    if (status_label_) {
-        lv_obj_set_width(status_label_, 210);
-        lv_label_set_long_mode(status_label_, LV_LABEL_LONG_CLIP);
-    }
-    side_label_ = make_label(ui_APP_Container, 216, 1, kColorIdle);
-    if (side_label_) {
-        lv_obj_set_width(side_label_, 100);
-        lv_obj_set_style_text_align(side_label_, LV_TEXT_ALIGN_RIGHT, 0);
-    }
-
+    cp0::ui::panel(ui_APP_Container, 4, cp0::theme::kBodyTop + 2, 312, kBodyBottom - cp0::theme::kBodyTop - 3);
     for (int i = 0; i < kRows; ++i) {
-        lv_obj_t *row = make_box(ui_APP_Container, 2, kListTop + i * kRowH, 316, kRowH, kColorSelect);
+        lv_obj_t *row = make_box(ui_APP_Container, 5, kListTop + i * kRowH, 310, kRowH, kColorSelect);
         if (!row) continue;
         lv_obj_set_style_border_color(row, lv_color_hex(kColorAccent), 0);
         lv_obj_set_style_border_side(row, LV_BORDER_SIDE_LEFT, 0);
         rows_[i] = row;
-        row_meta_[i] = make_label(row, 4, 0, kColorIdle);
-        row_text_[i] = make_label(row, kTextX - 2, 0, kColorIdle);
+        row_meta_[i] = make_label(row, 6, 3, kColorIdle);
+        row_text_[i] = make_label(row, kTextX, 3, kColorIdle);
         if (row_text_[i]) {
-            lv_obj_set_width(row_text_[i], 316 - kTextX);
+            lv_obj_set_width(row_text_[i], 306 - kTextX);
             lv_label_set_long_mode(row_text_[i], LV_LABEL_LONG_CLIP);
         }
     }
@@ -282,47 +275,47 @@ void UIRecPage::create_ui()
     clip_panel_ = lv_obj_create(ui_APP_Container);
     if (clip_panel_) {
         lv_obj_remove_style_all(clip_panel_);
-        lv_obj_set_pos(clip_panel_, 0, kListTop);
-        lv_obj_set_size(clip_panel_, 320, kFooterY - kListTop - 2);
+        lv_obj_set_pos(clip_panel_, 6, kListTop);
+        lv_obj_set_size(clip_panel_, 308, kBodyBottom - kListTop - 4);
         lv_obj_set_scrollbar_mode(clip_panel_, LV_SCROLLBAR_MODE_OFF);
-        clip_text_ = make_label(clip_panel_, 6, 2, kColorText);
+        clip_text_ = make_label(clip_panel_, 4, 2, kColorText);
         if (clip_text_) {
-            lv_obj_set_width(clip_text_, 308);
+            lv_obj_set_width(clip_text_, 300);
             lv_label_set_long_mode(clip_text_, LV_LABEL_LONG_WRAP);
             lv_obj_set_style_text_line_space(clip_text_, 2, 0);
         }
-        lv_obj_t *track = make_box(clip_panel_, 6, 40, 308, 4, kColorTrack);
+        lv_obj_t *track = make_box(clip_panel_, 4, 40, 300, 4, kColorTrack);
         if (track) clip_progress_ = make_box(track, 0, 0, 0, 4, kColorAccent);
     }
 
-    rec_panel_ = make_box(ui_APP_Container, 0, kListTop - 2, 320, kFooterY - kListTop, 0x000000);
+    const cp0::ui::Panel recording =
+        cp0::ui::panel(ui_APP_Container, 4, cp0::theme::kBodyTop + 2, 312, kBodyBottom - cp0::theme::kBodyTop - 3);
+    cp0::ui::set_brackets(recording.corners, kColorRecord);
+    rec_panel_ = recording.box;
     if (rec_panel_) {
         lv_obj_t *badge = make_label(rec_panel_, 0, 14, kColorRecord);
         if (badge) {
-            lv_obj_set_width(badge, 320);
+            lv_obj_set_width(badge, 312);
             lv_obj_set_style_text_align(badge, LV_TEXT_ALIGN_CENTER, 0);
             lv_label_set_text(badge, "\xE2\x97\x8F recording");
         }
         rec_time_ = make_label(rec_panel_, 0, 32, kColorText);
         if (rec_time_) {
             lv_obj_set_style_text_font(rec_time_, launcher_fonts().get_chrome(22), 0);
-            lv_obj_set_width(rec_time_, 320);
+            lv_obj_set_width(rec_time_, 312);
             lv_obj_set_style_text_align(rec_time_, LV_TEXT_ALIGN_CENTER, 0);
         }
-        lv_obj_t *track = make_box(rec_panel_, 40, 66, 240, 6, kColorTrack);
+        lv_obj_t *track = make_box(rec_panel_, 36, 66, 240, 6, kColorTrack);
         if (track) rec_meter_ = make_box(track, 0, 0, 0, 6, kColorAccent);
         rec_note_ = make_label(rec_panel_, 0, 86, kColorDim);
         if (rec_note_) {
-            lv_obj_set_width(rec_note_, 320);
+            lv_obj_set_width(rec_note_, 312);
             lv_obj_set_style_text_align(rec_note_, LV_TEXT_ALIGN_CENTER, 0);
             lv_label_set_text(rec_note_, "transcribes when you stop");
         }
     }
 
-    for (int i = 0; i < kChips; ++i) {
-        chip_keys_[i] = make_label(ui_APP_Container, 0, kFooterY, kColorAccent);
-        chip_words_[i] = make_label(ui_APP_Container, 0, kFooterY, kColorDim);
-    }
+    footer_ = cp0::ui::footer(ui_APP_Container);
 }
 
 void UIRecPage::load_clips()
@@ -410,31 +403,12 @@ void UIRecPage::show_message(const std::string &text)
     message_until_ = lv_tick_get() + kMessageMs;
 }
 
-void UIRecPage::set_chips(const std::vector<std::pair<const char *, const char *>> &chips)
+void UIRecPage::set_chips(const std::vector<cp0::ui::Chip> &chips)
 {
-    std::string key_text;
-    for (const auto &chip : chips) key_text += std::string(chip.first) + '\x1f' + chip.second + '\x1e';
-    if (key_text == chips_key_) return;
-    chips_key_ = key_text;
-    const lv_font_t *font = launcher_fonts().get_chrome(11);
-    int x = 4;
-    for (int i = 0; i < kChips; ++i) {
-        const bool used = i < static_cast<int>(chips.size());
-        set_visible(chip_keys_[i], used);
-        set_visible(chip_words_[i], used);
-        if (!used || !chip_keys_[i] || !chip_words_[i]) continue;
-        const std::string key = chips[i].first;
-        const std::string word = std::string(" ") + chips[i].second;
-        set_text(chip_keys_[i], key);
-        set_text(chip_words_[i], word);
-        lv_point_t size{};
-        lv_text_get_size(&size, key.c_str(), font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        lv_obj_set_x(chip_keys_[i], x);
-        x += size.x;
-        lv_text_get_size(&size, word.c_str(), font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
-        lv_obj_set_x(chip_words_[i], x);
-        x += size.x + 14;
-    }
+    if (message_until_ != 0 && lv_tick_get() < message_until_)
+        cp0::ui::set_footer_message(footer_, message_.c_str(), kColorText);
+    else
+        cp0::ui::set_footer(footer_, chips);
 }
 
 void UIRecPage::render()
@@ -461,6 +435,8 @@ void UIRecPage::render_list()
         const bool has = index < count;
         const bool chosen = has && index == selection_;
         set_bg_opa(rows_[i], chosen ? LV_OPA_COVER : LV_OPA_TRANSP);
+        if (rows_[i] && lv_obj_get_style_border_width(rows_[i], LV_PART_MAIN) != (chosen ? 2 : 0))
+            lv_obj_set_style_border_width(rows_[i], chosen ? 2 : 0, LV_PART_MAIN);
         if (!has) {
             set_text(row_meta_[i], count == 0 && i == 0 ? "no recordings yet" : "");
             set_text(row_text_[i], "");
@@ -479,11 +455,8 @@ void UIRecPage::render_list()
     }
 
     std::string status = "recordings";
-    uint32_t color = kColorIdle;
-    if (message_until_ != 0 && now < message_until_) {
-        status = message_;
-        color = kColorText;
-    } else if (stt_pid_ > 0) {
+    uint32_t color = kColorText;
+    if (stt_pid_ > 0) {
         status = "stt " + rec::format_duration(now - stt_since_) + " / ~" +
                  rec::format_duration(stt_estimate_ms_);
         if (!stt_queue_.empty()) status += "  +" + std::to_string(stt_queue_.size()) + " queued";
@@ -497,7 +470,7 @@ void UIRecPage::render_list()
     if (count == 0)
         set_chips({{"spc", "record"}});
     else
-        set_chips({{"spc", "record"}, {"ent", "open"}, {"t", "transcribe"}, {"dd", "delete"}});
+        set_chips({{"spc", "record"}, {"ent", "open"}, {"t", "transcribe"}, {"dd", "del"}});
 }
 
 void UIRecPage::render_clip()
@@ -511,7 +484,6 @@ void UIRecPage::render_clip()
     const uint32_t now = lv_tick_get();
     std::string status = rec::stem_label(c->stem) + "  " + rec::format_duration(c->duration_ms);
     uint32_t color = kColorText;
-    if (message_until_ != 0 && now < message_until_) status = message_;
     set_text(status_label_, status);
     set_color(status_label_, color);
 

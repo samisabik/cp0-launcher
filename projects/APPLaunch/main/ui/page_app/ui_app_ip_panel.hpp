@@ -31,12 +31,12 @@ private:
     lv_obj_t *background_ = nullptr;
     lv_obj_t *list_container_ = nullptr;
     lv_obj_t *help_container_ = nullptr;
+    lv_obj_t *status_label_ = nullptr;
     ViewState view_state_ = ViewState::MAIN;
 
     // Layout constants (content area 320x150, title bar 22px, remaining 128px)
     static constexpr int ITEM_H       = 32;   // row height
     static constexpr int VISIBLE_ROWS = 4;    // visible row count (128/32 = 4)
-    static constexpr int TITLE_H      = 22;   // title bar height
     static constexpr int LIST_H       = 128;  // list area height
 
     // timer handle

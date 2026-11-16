@@ -168,6 +168,7 @@ void UIIpPanelPage::static_owned_obj_delete_cb(lv_event_t *event) noexcept
         lv_obj_t *deleted = static_cast<lv_obj_t *>(lv_event_get_target(event));
         if (deleted == self->background_) {
             self->background_ = nullptr;
+            self->status_label_ = nullptr;
             self->list_container_ = nullptr;
             self->help_container_ = nullptr;
             self->refresh_enabled_ = false;
@@ -197,5 +198,6 @@ void UIIpPanelPage::detach_delete_callbacks()
             background_, static_owned_obj_delete_cb, this);
     list_container_ = nullptr;
     help_container_ = nullptr;
+    status_label_ = nullptr;
     background_ = nullptr;
 }

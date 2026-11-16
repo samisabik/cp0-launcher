@@ -7,45 +7,22 @@
 #define APP_PAGE_IMPLEMENTATION_UNIT
 #include "ui_app_ip_panel.hpp"
 
+#include "cp0_theme.hpp"
+
+#include <cstdio>
+#include <string>
+
+namespace theme = cp0::theme;
+
 void UIIpPanelPage::create_ui()
 {
     if (!ui_APP_Container) return;
-    lv_obj_t *background = lv_obj_create(ui_APP_Container);
+    lv_obj_t *background = cp0::ui::box(ui_APP_Container, 0, 0, theme::kScreenW, theme::kScreenH, theme::kBg);
     if (!background) return;
-    lv_obj_set_size(background, 320, 150);
-    lv_obj_set_pos(background, 0, 0);
-    lv_obj_set_style_radius(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(background, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(background, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(background, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_clear_flag(background, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *title_bar = lv_obj_create(background);
-    if (!title_bar) { lv_obj_delete(background); return; }
-    lv_obj_set_size(title_bar, 320, TITLE_H);
-    lv_obj_set_pos(title_bar, 0, 0);
-    lv_obj_set_style_radius(title_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(title_bar, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(title_bar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(title_bar, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_left(title_bar, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_clear_flag(title_bar, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *title = lv_label_create(title_bar);
-    if (!title) { lv_obj_delete(background); return; }
-    lv_label_set_text(title, "ip panel");
-    lv_obj_set_align(title, LV_ALIGN_LEFT_MID);
-    lv_obj_set_style_text_color(title, lv_color_hex(0x3DDC84), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(title, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *hint = lv_label_create(title_bar);
-    if (!hint) { lv_obj_delete(background); return; }
-    lv_label_set_text(hint, "fn+h help");
-    lv_obj_set_align(hint, LV_ALIGN_RIGHT_MID);
-    lv_obj_set_x(hint, -4);
-    lv_obj_set_style_text_color(hint, lv_color_hex(0x5F7A66), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(hint, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
+    const cp0::ui::TitleRow title = cp0::ui::title_row(background, "ip panel");
+    status_label_ = title.status;
+    cp0::ui::set_footer(cp0::ui::footer(background), {{"up/dn", "move"}, {"fn+h", "help"}});
 
     lv_obj_t *list_container = lv_obj_create(background);
     if (!list_container) { lv_obj_delete(background); return; }
@@ -56,7 +33,7 @@ void UIIpPanelPage::create_ui()
     lv_obj_add_event_cb(
         background_, static_owned_obj_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_set_size(list_container_, 320, LIST_H);
-    lv_obj_set_pos(list_container_, 0, TITLE_H);
+    lv_obj_set_pos(list_container_, 0, theme::kBodyTop);
     lv_obj_set_style_radius(list_container_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(list_container_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(list_container_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -74,37 +51,18 @@ bool UIIpPanelPage::build_help_view()
 {
     if (!background_ || help_container_) return help_container_ != nullptr;
 
-    lv_obj_t *candidate = lv_obj_create(background_);
+    lv_obj_t *candidate = cp0::ui::box(background_, 0, 0, theme::kScreenW, theme::kScreenH, theme::kBg);
     if (!candidate) return false;
-    lv_obj_set_size(candidate, 320, 150);
-    lv_obj_set_pos(candidate, 0, 0);
-    lv_obj_set_style_radius(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(candidate, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(candidate, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(candidate, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_clear_flag(candidate, LV_OBJ_FLAG_SCROLLABLE);
-
-    auto add_label = [candidate](const char *text, int y, uint32_t color,
-                                 const lv_font_t *font, bool wrap = false) {
-        lv_obj_t *label = lv_label_create(candidate);
-        if (!label) return false;
-        lv_label_set_text(label, text);
-        lv_obj_set_pos(label, 8, y);
-        lv_obj_set_style_text_color(label, lv_color_hex(color),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_font(label, font, LV_PART_MAIN | LV_STATE_DEFAULT);
-        if (wrap) {
-            lv_obj_set_width(label, 304);
-            lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-        }
-        return true;
-    };
-
-    const lv_font_t *font = launcher_fonts().get_chrome(11);
-    if (!add_label("help", 6, 0x3DDC84, font) ||
-        !add_label("shows the wi-fi and ethernet ip addresses of this device.", 31, 0xE6E6E6, font, true) ||
-        !add_label("esc back", 135, 0x5F7A66, font)) {
+    cp0::ui::title_row(candidate, "ip panel help");
+    lv_obj_t *body = cp0::ui::label(candidate, theme::kPadX, 22, theme::kText);
+    if (body) {
+        lv_obj_set_width(body, theme::kScreenW - 2 * theme::kPadX);
+        lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
+        lv_label_set_text(body, "shows the wi-fi, ethernet and vpn addresses of this device.");
+    }
+    lv_obj_t *footer = cp0::ui::footer(candidate);
+    cp0::ui::set_footer(footer, {{"esc", "close"}});
+    if (!body || !footer) {
         lv_obj_delete(candidate);
         return false;
     }
@@ -133,13 +91,16 @@ void UIIpPanelPage::build_list_rows()
     if (!list_container_) return;
     lv_obj_clean(list_container_);
     const auto &interfaces = model_.interfaces();
+    std::size_t up = 0;
+    for (const IpInterfaceInfo &info : interfaces) up += info.up ? 1 : 0;
+    cp0::ui::set_text(status_label_, (std::to_string(up) + " up").c_str(), theme::kIdle);
     if (interfaces.empty()) {
         lv_obj_t *label = lv_label_create(list_container_);
         if (!label) return;
         lv_label_set_text(label, "no network interface found");
         lv_obj_set_pos(label, 10, 50);
-        lv_obj_set_style_text_color(label, lv_color_hex(0x5C5C5C), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_font(label, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(label, lv_color_hex(theme::kDim), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(label, cp0::ui::font(), LV_PART_MAIN | LV_STATE_DEFAULT);
         return;
     }
 
@@ -151,86 +112,47 @@ void UIIpPanelPage::build_list_rows()
     }
 }
 
+namespace {
+
+// "255.255.255.0" -> "/24"; empty when the mask is not a dotted quad.
+std::string cidr_suffix(const std::string &mask)
+{
+    unsigned a = 0, b = 0, c = 0, d = 0;
+    if (std::sscanf(mask.c_str(), "%u.%u.%u.%u", &a, &b, &c, &d) != 4) return "";
+    const uint32_t bits = (a << 24) | (b << 16) | (c << 8) | d;
+    int count = 0;
+    for (uint32_t v = bits; v & 0x80000000u; v <<= 1) ++count;
+    return "/" + std::to_string(count);
+}
+
+} // namespace
+
 void UIIpPanelPage::create_row(lv_obj_t *parent, int visual_row, size_t index, bool selected)
 {
     const auto &interfaces = model_.interfaces();
     if (!parent || index >= interfaces.size()) return;
     const IpInterfaceInfo &info = interfaces[index];
-    lv_obj_t *row = lv_obj_create(parent);
-    if (!row) return;
-    lv_obj_set_size(row, 318, ITEM_H - 2);
-    lv_obj_set_pos(row, 1, visual_row * ITEM_H + 1);
-    lv_obj_set_style_radius(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(row, lv_color_hex(selected ? 0x13261B : 0x000000),
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(row, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    const cp0::ui::Panel row = cp0::ui::panel(parent, 4, visual_row * ITEM_H + 2, 312, ITEM_H - 4);
+    if (!row.box) return;
+    cp0::ui::set_panel_focus(row, selected);
+    const int text_y = (ITEM_H - 4 - 13) / 2;
 
-    if (index + 1 < interfaces.size()) {
-        lv_obj_t *divider = lv_obj_create(parent);
-        if (divider) {
-        lv_obj_set_size(divider, 310, 1);
-        lv_obj_set_pos(divider, 5, (visual_row + 1) * ITEM_H);
-        lv_obj_set_style_radius(divider, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_color(divider, lv_color_hex(0x1E2B23), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(divider, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_width(divider, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_clear_flag(divider, LV_OBJ_FLAG_SCROLLABLE);
-        }
+    if (lv_obj_t *name = cp0::ui::label(row.box, 6, text_y, selected ? theme::kAccent : theme::kText)) {
+        lv_obj_set_width(name, 86);
+        lv_label_set_long_mode(name, LV_LABEL_LONG_CLIP);
+        lv_label_set_text(name, info.name.c_str());
     }
-
-    lv_obj_t *status_dot = lv_obj_create(row);
-    if (status_dot) {
-    lv_obj_set_size(status_dot, 6, 6);
-    lv_obj_set_pos(status_dot, 8, (ITEM_H - 8) / 2);
-    lv_obj_set_style_radius(status_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(status_dot, lv_color_hex(info.up ? 0x3DDC84 : 0x3C3C3C),
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(status_dot, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(status_dot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_clear_flag(status_dot, LV_OBJ_FLAG_SCROLLABLE);
+    const std::string cidr = cidr_suffix(info.netmask);
+    if (lv_obj_t *address = cp0::ui::label(row.box, 96, text_y, theme::kText)) {
+        lv_label_set_recolor(address, true);
+        char suffix[32] = "";
+        if (!cidr.empty()) std::snprintf(suffix, sizeof(suffix), "#%06X %s#", static_cast<unsigned>(theme::kIdle), cidr.c_str());
+        lv_label_set_text(address, (info.address + suffix).c_str());
     }
-
-    lv_obj_t *name = lv_label_create(row);
-    if (name) {
-    lv_label_set_text(name, info.name.c_str());
-    lv_obj_set_pos(name, 20, 2);
-    lv_obj_set_width(name, 72);
-    lv_label_set_long_mode(name, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(name, lv_color_hex(selected ? 0x3DDC84 : 0x8A8A8A),
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(name, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-
-    lv_obj_t *address = lv_label_create(row);
-    if (address) {
-    lv_label_set_text(address, info.address.c_str());
-    lv_obj_set_pos(address, 96, 2);
-    lv_obj_set_width(address, 130);
-    lv_label_set_long_mode(address, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(address, lv_color_hex(selected ? 0xE6E6E6 : 0x8A8A8A),
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(address, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-
-    lv_obj_t *netmask = lv_label_create(row);
-    if (netmask) {
-    lv_label_set_text(netmask, info.netmask.c_str());
-    lv_obj_set_pos(netmask, 96, 17);
-    lv_obj_set_width(netmask, 130);
-    lv_label_set_long_mode(netmask, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_color(netmask, lv_color_hex(0x5F7A66), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(netmask, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-
-    lv_obj_t *state = lv_label_create(row);
-    if (state) {
-    lv_label_set_text(state, info.up ? "up" : "down");
-    lv_obj_set_pos(state, 266, 2);
-    lv_obj_set_style_text_color(state, lv_color_hex(info.up ? 0x3DDC84 : 0x5C5C5C),
-                                LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(state, launcher_fonts().get_chrome(11), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *badge = cp0::ui::box(row.box, 312 - 6 - 24, text_y, 24, 13, info.up ? theme::kAccent : theme::kTrack);
+    if (lv_obj_t *state = badge ? cp0::ui::label(badge, 0, 0, info.up ? theme::kBg : theme::kIdle) : nullptr) {
+        lv_obj_set_width(state, 24);
+        lv_obj_set_style_text_align(state, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(state, info.up ? "up" : "dn");
     }
 }
