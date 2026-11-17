@@ -25,14 +25,12 @@ struct AppEntry
 inline bool is_protected_launcher_app(std::string_view config_key)
 {
     return config_key == "app_Setting" ||
-           config_key == "app_Store" ||
            config_key == "app_CLI";
 }
 
 inline bool is_launcher_settings_origin(LauncherAppOrigin origin)
 {
-    return origin == LauncherAppOrigin::Builtin ||
-           origin == LauncherAppOrigin::Preinstalled;
+    return origin == LauncherAppOrigin::Builtin;
 }
 
 template <typename Descriptor, typename EnabledPredicate>

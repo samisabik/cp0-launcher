@@ -89,7 +89,7 @@ std::string detect_cmd()
 
 std::string iq_cmd(uint32_t center_hz, int gain_db)
 {
-    std::string cmd = "rtl_sdr -f " + std::to_string(center_hz) + " -s " + std::to_string(kIqRate);
+    std::string cmd = "rtl_sdr -f " + std::to_string(center_hz + kTuneOffsetHz) + " -s " + std::to_string(kIqRate);
     if (gain_db >= 0) cmd += " -g " + std::to_string(gain_db);
     return cmd + " -";
 }
@@ -138,12 +138,13 @@ std::vector<float> iq_spectrum_db(const uint8_t *iq, std::size_t bytes)
     return out;
 }
 
-std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width)
+std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width, int offset_hz)
 {
     std::vector<float> out(std::max(0, width), -120.0f);
     if (bins.empty() || width <= 0) return out;
     const double used = std::clamp(static_cast<double>(span_hz) / kIqRate, 0.01, 1.0) * static_cast<double>(bins.size());
-    const double first = (static_cast<double>(bins.size()) - used) / 2.0;
+    const double shift = static_cast<double>(offset_hz) / kIqRate * static_cast<double>(bins.size());
+    const double first = (static_cast<double>(bins.size()) - used) / 2.0 - shift;
     for (int x = 0; x < width; ++x) {
         int lo = static_cast<int>(first + used * x / width);
         int hi = static_cast<int>(first + used * (x + 1) / width);
@@ -154,6 +155,66 @@ std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz
         out[x] = best;
     }
     return out;
+}
+
+void Demodulator::process(const uint8_t *iq, std::size_t bytes, std::vector<int16_t> &out)
+{
+    constexpr double kTwoPi = 6.283185307179586;
+    constexpr int kDecim1 = 10;
+    constexpr int kDecim2 = 5;
+    const double step = kTwoPi * kTuneOffsetHz / kIqRate;
+    const double step_re = std::cos(step), step_im = std::sin(step);
+    const float deemph_alpha = 1.0f - std::exp(-1.0f / (kAudioRate * 50e-6f));
+    auto push = [&out](float v) {
+        out.push_back(static_cast<int16_t>(std::clamp(v, -32767.0f, 32767.0f)));
+    };
+    for (std::size_t n = 0; n + 1 < bytes; n += 2) {
+        const float i0 = (static_cast<float>(iq[n]) - 127.5f) / 127.5f;
+        const float q0 = (static_cast<float>(iq[n + 1]) - 127.5f) / 127.5f;
+        acc1_re_ += static_cast<float>(i0 * phase_re_ - q0 * phase_im_);
+        acc1_im_ += static_cast<float>(i0 * phase_im_ + q0 * phase_re_);
+        const double re = phase_re_ * step_re - phase_im_ * step_im;
+        phase_im_ = phase_re_ * step_im + phase_im_ * step_re;
+        phase_re_ = re;
+        if (++count1_ < kDecim1) continue;
+        count1_ = 0;
+        const float x_re = acc1_re_ / kDecim1, x_im = acc1_im_ / kDecim1;
+        acc1_re_ = acc1_im_ = 0.0f;
+
+        if (demod_ == Demod::WFM) {
+            const float d = std::atan2(x_im * prev_re_ - x_re * prev_im_, x_re * prev_re_ + x_im * prev_im_);
+            prev_re_ = x_re;
+            prev_im_ = x_im;
+            acc2_ += d;
+            if (++count2_ < kDecim2) continue;
+            count2_ = 0;
+            const float y = acc2_ / kDecim2;
+            acc2_ = 0.0f;
+            deemph_ += deemph_alpha * (y - deemph_);
+            push(deemph_ * 12000.0f);
+            continue;
+        }
+        acc2_re_ += x_re;
+        acc2_im_ += x_im;
+        if (++count2_ < kDecim2) continue;
+        count2_ = 0;
+        const float z_re = acc2_re_ / kDecim2, z_im = acc2_im_ / kDecim2;
+        acc2_re_ = acc2_im_ = 0.0f;
+        if (demod_ == Demod::NFM) {
+            const float d = std::atan2(z_im * prev_re_ - z_re * prev_im_, z_re * prev_re_ + z_im * prev_im_);
+            prev_re_ = z_re;
+            prev_im_ = z_im;
+            deemph_ += 0.4f * (d - deemph_);
+            push(deemph_ * 30000.0f);
+        } else {
+            const float m = std::sqrt(z_re * z_re + z_im * z_im);
+            dc_ += 0.001f * (m - dc_);
+            push((m - dc_) / std::max(dc_, 1e-3f) * 12000.0f);
+        }
+    }
+    const double norm = std::sqrt(phase_re_ * phase_re_ + phase_im_ * phase_im_);
+    phase_re_ /= norm;
+    phase_im_ /= norm;
 }
 
 float median_db(std::vector<float> values)
@@ -175,19 +236,6 @@ std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const s
     if (gain_db >= 0) cmd += " -g " + std::to_string(gain_db);
     cmd += " '" + outpath + "'";
     return cmd;
-}
-
-std::string listen_cmd(uint32_t hz, Demod demod, int gain_db, bool audio_out)
-{
-    const char *mode = demod == Demod::WFM ? "wbfm" : demod == Demod::AM ? "am" : "fm";
-    const int rate = demod == Demod::WFM ? 48000 : 24000;
-    const int sample = demod == Demod::WFM ? 200000 : 24000;
-    std::string fm = std::string("rtl_fm -M ") + mode + " -f " + std::to_string(hz) + " -s " +
-                     std::to_string(sample) + " -r " + std::to_string(rate);
-    if (gain_db >= 0) fm += " -g " + std::to_string(gain_db);
-    fm += " -";
-    if (!audio_out) return fm + " > /dev/null";
-    return fm + " | aplay -q -r " + std::to_string(rate) + " -f S16_LE -t raw -c 1";
 }
 
 std::string decode_cmd(uint32_t hz, int gain_db, const std::string &outpath)

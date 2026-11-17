@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <vector>
 #include "../../main/ui/ui_low_battery.cpp"
 #include "../../main/ui/ui_screensaver.cpp"
 #include "../../../../ext_components/cp0_lvgl/src/cp0_keyboard_queue.h"
@@ -52,26 +51,6 @@ decltype(cp0_signal_config_api) cp0_signal_config_api;
 decltype(cp0_signal_audio_api) cp0_signal_audio_api;
 decltype(cp0_signal_filesystem_api) cp0_signal_filesystem_api;
 decltype(cp0_signal_settings_api) cp0_signal_settings_api;
-decltype(cp0_signal_system_play) cp0_signal_system_play;
-
-/* The sound worker runs off the LVGL thread; the last requested asset is
- * recorded synchronously so expectations do not race it. */
-static void assert_sound(const char *expected)
-{
-    assert(std::strcmp(s_last_sound_asset, expected) == 0);
-}
-
-/* Every asset handed to the platform player, in request order.  The lock-screen
- * tests keep using s_last_sound_asset; this records the low-battery cues. */
-static std::vector<std::string> played_sounds;
-
-static int sound_plays(const char *asset)
-{
-    int plays = 0;
-    for (const std::string &played : played_sounds)
-        if (played == asset) ++plays;
-    return plays;
-}
 
 extern "C" cp0_battery_info_t cp0_battery_read() { ++battery_reads; return battery; }
 extern "C" void cp0_system_shutdown() { ++shutdown_calls; }
@@ -223,7 +202,6 @@ static void test_hold_gesture_enters_lock()
     assert(hold_hint_hides == 1);
     assert(lv_obj_get_child_count(s_overlay) == 0);
     assert(s_hint && lv_obj_has_flag(s_hint, LV_OBJ_FLAG_HIDDEN));
-    assert_sound("lock.mp3");
 
     /* The held key cannot walk the machine: its repeats and its release are not
      * fresh presses, so letting go leaves the panel black. */
@@ -231,12 +209,10 @@ static void test_hold_gesture_enters_lock()
     key(KEY_TAB, KBD_KEY_RELEASED, true);
     assert(s_lock.state() == LockscreenState::Locked);
     assert(s_panel.black && backlight_raw == 0);
-    assert_sound("lock.mp3");
 
     // The next fresh press brings the visible screen up.
     key(KEY_ESC, KBD_KEY_PRESSED, true);
     assert(s_lock.state() == LockscreenState::PendingUnlock);
-    assert_sound("select.mp3");
     key(KEY_ESC, KBD_KEY_RELEASED, true);
     unlock_screensaver_from_pending_unlock();
 }
@@ -276,7 +252,6 @@ static void test_screensaver_panel()
     // No artwork is painted, and no frames are driven for a static panel.
     assert(lv_obj_get_child_count(s_overlay) == 0);
     assert(s_hint && lv_obj_has_flag(s_hint, LV_OBJ_FLAG_HIDDEN));
-    assert_sound("lock.mp3");
 
     /* (2) shows the wallpaper with the page's top bar in place and
      * the backlight back, and asks for the first unlock step. */
@@ -309,7 +284,6 @@ static void test_screensaver_panel()
     }
     lv_draw_buf_destroy(snapshot);
     assert(yellow_pixels > 100);
-    assert_sound("select.mp3");
     key(KEY_ESC, KBD_KEY_RELEASED, true);
 
     // (3) switches the hint to the confirmation step.
@@ -319,14 +293,12 @@ static void test_screensaver_panel()
     lv_text_get_size(&text_size, lv_label_get_text(s_hint), &lv_font_montserrat_14,
                      0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
     assert(lv_obj_get_width(s_hint) == text_size.x + 5);
-    assert_sound("select.mp3");
     key(KEY_TAB, KBD_KEY_RELEASED, true);
 
     // A key that is not the confirmation steps back to (2).
     key(KEY_TAB, KBD_KEY_PRESSED, true);
     assert(s_lock.state() == LockscreenState::PendingUnlock);
     assert(std::strcmp(lv_label_get_text(s_hint), "Press TAB to unlock") == 0);
-    assert_sound("blocked.mp3");
     key(KEY_TAB, KBD_KEY_RELEASED, true);
 
     /* The 10 s timeout drops the visible state back to the black screen and puts
@@ -343,7 +315,6 @@ static void test_screensaver_panel()
     assert(backlight_raw == 0);
     assert(lv_tick_get() > before_sleep);
     assert(s_hint && lv_obj_has_flag(s_hint, LV_OBJ_FLAG_HIDDEN));
-    assert_sound("lock.mp3");
 
     // ...and the countdown starts over from the next press.
     key(KEY_ESC, KBD_KEY_PRESSED, true);
@@ -366,7 +337,6 @@ static void test_screensaver_panel()
     key(KEY_TAB, KBD_KEY_PRESSED, true);
     key(KEY_TAB, KBD_KEY_RELEASED, true);
     key(KEY_ENTER, KBD_KEY_PRESSED, true);
-    assert_sound("unlock.mp3");
     assert(s_exiting && !s_panel.black);
     assert(s_hint && lv_obj_has_flag(s_hint, LV_OBJ_FLAG_HIDDEN));
     key(KEY_ENTER, KBD_KEY_RELEASED, true);
@@ -575,113 +545,6 @@ static void test_screensaver_battery_interaction()
     shutdown_warning();
 }
 
-/* The cues defer while the lock screen owns the panel: a warning that happens
- * behind the lock must stay silent and then sound exactly once when the overlay
- * is visible again. */
-static void test_low_battery_sounds_respect_lockscreen()
-{
-    using namespace launcher_battery_ui;
-    shutdown_warning();
-    set_battery(30);
-    init_warning();
-    assert(!visible());
-
-    const int reminder_before = sound_plays("applaunch-arcade-refund.mp3");
-    const int critical_before = sound_plays("applaunch-arcade-warning.mp3");
-
-    enter_lockscreen();
-    assert(ui_screensaver_is_active());
-    set_battery(20);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::Reminder && !visible());
-    advance(3000);
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before);
-
-    unlock_screensaver();
-    assert(visible());
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before + 1);
-    advance(3000);
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before + 1);
-
-    // Jumping straight into the shutdown countdown is still a single cue.
-    enter_lockscreen();
-    set_battery(2);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::ShutdownCountdown && !visible());
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before);
-    advance(1000);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before);
-
-    unlock_screensaver();
-    assert(visible());
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before + 1);
-    advance(3000);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before + 1);
-
-    stop_screensaver();
-    shutdown_warning();
-}
-
-/* Recovery while locked must re-arm the cue even though the render is postponed:
- * a new low-battery cycle that starts behind the lock still announces itself
- * once the overlay returns. */
-static void test_low_battery_sounds_rearm_while_locked()
-{
-    using namespace launcher_battery_ui;
-    shutdown_warning();
-    set_battery(15);
-    init_warning();
-    assert(visible());
-
-    const int reminder_before = sound_plays("applaunch-arcade-refund.mp3");
-
-    // Charge behind the lock, then unplug: the new Reminder is still deferred.
-    enter_lockscreen();
-    assert(ui_screensaver_is_active());
-    set_battery(15, true);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::None);
-    set_battery(15);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::Reminder && !visible());
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before);
-
-    unlock_screensaver();
-    assert(visible());
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before + 1);
-    advance(3000);
-    assert(sound_plays("applaunch-arcade-refund.mp3") == reminder_before + 1);
-
-    // The critical cue re-arms the same way after charging behind the lock.
-    set_battery(25);
-    advance(3000);
-    assert(!visible());
-    set_battery(4);
-    advance(3000);
-    assert(visible());
-    const int critical_before = sound_plays("applaunch-arcade-warning.mp3");
-
-    enter_lockscreen();
-    set_battery(4, true);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::None);
-    set_battery(4);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::Low && !visible());
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before);
-
-    unlock_screensaver();
-    assert(visible());
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before + 1);
-    set_battery(3);
-    advance(3000);
-    assert(flow.warning() == LowBatteryWarning::ShutdownCountdown);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == critical_before + 1);
-
-    stop_screensaver();
-    shutdown_warning();
-}
-
 int main()
 {
     using namespace launcher_battery_ui;
@@ -699,7 +562,6 @@ int main()
     cp0_signal_audio_api.append([](std::list<std::string>, std::function<void(int, std::string)> reply) {
         if (reply) reply(0, "");
     });
-    cp0_signal_system_play.append([](std::string asset) { played_sounds.push_back(asset); });
     cp0_signal_filesystem_api.append([](std::list<std::string> arguments, std::function<void(int, std::string)> reply) {
         if (reply) reply(0, arguments.back() == "lockscreen.png"
                                ? TEST_LOCKSCREEN_BACKGROUND : "/missing-screensaver-test-image.png");
@@ -734,17 +596,13 @@ int main()
     init_warning();
     assert(visible());
     assert(std::strstr(lv_label_get_text(message_label), "Press Enter to close"));
-    // One refund cue per low-battery cycle, even though the timer re-renders.
-    assert(sound_plays("applaunch-arcade-refund.mp3") == 1);
     snapshot_if_requested();
     advance(60000);
     assert(visible());
-    assert(sound_plays("applaunch-arcade-refund.mp3") == 1);
     set_battery(19);
     advance(3000);
     assert(std::strcmp(lv_label_get_text(countdown_label), "Battery: 19%") == 0);
     assert(lv_obj_has_flag(tint, LV_OBJ_FLAG_HIDDEN));
-    assert(sound_plays("applaunch-arcade-refund.mp3") == 1);
     key(KEY_ESC, KBD_KEY_PRESSED, true);
     key(KEY_ESC, KBD_KEY_RELEASED, true);
     assert(visible());
@@ -777,8 +635,6 @@ int main()
     set_battery(15);
     advance(3000);
     assert(visible());
-    // Recovery re-arms the reminder for the next low-battery cycle.
-    assert(sound_plays("applaunch-arcade-refund.mp3") == 2);
     key(KEY_KPENTER, KBD_KEY_PRESSED, true);
     assert(!visible());
     key(KEY_KPENTER, KBD_KEY_RELEASED, true);
@@ -803,27 +659,22 @@ int main()
     assert(visible());
     assert(!lv_obj_has_flag(tint, LV_OBJ_FLAG_HIDDEN) && frame_bright);
     assert(lv_obj_get_child_count(tint) == 4);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == 1);
     advance(500);
     assert(!frame_bright);
     key(KEY_ENTER, KBD_KEY_PRESSED, false);
     key(KEY_ENTER, KBD_KEY_RELEASED, false);
     assert(visible());
     advance(3000);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == 1);
 
     set_battery(3);
     advance(3000);
     assert(std::strcmp(lv_label_get_text(countdown_label), "power off in 15s") == 0);
-    // Low -> ShutdownCountdown promotes the same critical phase, not a new cue.
-    assert(sound_plays("applaunch-arcade-warning.mp3") == 1);
     advance(12000);
     set_battery(3, true);
     advance(3000);
     assert(shutdown_calls == 0 && !visible());
     set_battery(3);
     advance(3000);
-    assert(sound_plays("applaunch-arcade-warning.mp3") == 2);
     advance(15000);
     assert(shutdown_calls == 1);
     advance(3000);
@@ -842,8 +693,6 @@ int main()
     assert(!overlay && !warning_timer);
     assert(cp0_keyboard_get_key_filter() == previous_filter);
     test_screensaver_battery_interaction();
-    test_low_battery_sounds_respect_lockscreen();
-    test_low_battery_sounds_rearm_while_locked();
     ui_screensaver_deinit();
     cp0_keyboard_set_key_filter(nullptr);
     lv_display_delete(display);

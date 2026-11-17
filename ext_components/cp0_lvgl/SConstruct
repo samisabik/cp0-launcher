@@ -46,10 +46,8 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONEN
         'AUDIO': 'audio',
         'BATTERY': 'battery',
         'BQ27220': 'bq27220',
-        'CAMERA': 'camera',
         'CONFIG': 'config',
         'FILESYSTEM': 'filesystem',
-        'LORA': 'lara',
         'OSINFO': 'osinfo',
         'PROCESS': 'process',
         'PTY': 'pty',
@@ -71,8 +69,6 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONEN
 
     if service_enabled('AUDIO'):
         REQUIREMENTS += ['Miniaudio']
-    if service_enabled('LORA'):
-        REQUIREMENTS += ['RadioLib']
 
     SRCS += Glob('src/*.c*')
     if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
@@ -81,7 +77,6 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONEN
         REQUIREMENTS += pkg_config_ldflags('sdl2')
         platform_srcs = Glob('src/sdl/*.c*')
         platform_srcs += [
-            File('src/cp0/cp0_camera_viewport.cpp'),
             File('src/cp0/cp0_desktop_exec_policy.cpp'),
             File('src/cp0/cp0_process_commands.cpp'),
             File('src/cp0/cp0_process_lifecycle.cpp'),
@@ -93,8 +88,6 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONEN
         REQUIREMENTS += ['input', 'xkbcommon', 'udev', 'pthread']
         REQUIREMENTS += [':libdbus-1.so.3']
         configure_target_gio(REQUIREMENTS, DEFINITIONS, LDFLAGS)
-        if service_enabled('CAMERA'):
-            REQUIREMENTS += ['camera', 'camera-base', 'jpeg']
         PRIVATE_INCLUDE += [toolchain_path('usr', 'include', 'dbus-1.0'),
                             toolchain_path('usr', 'lib', env.get('GCC_DUMPMACHINE', ''), 'dbus-1.0', 'include')]
 
@@ -106,16 +99,12 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONEN
             if 'zmq' not in REQUIREMENTS:
                 REQUIREMENTS += ['zmq']
 
-    source_selected_services = {'AUDIO', 'CAMERA', 'LORA'}
+    source_selected_services = {'AUDIO'}
     for source in platform_srcs:
         source_name = str(source).lower()
         disabled = any(token in source_name and not service_enabled(name)
                        for name, token in optional_services.items()
                        if name in source_selected_services)
-        # The LoRa implementation historically used "lara" in one filename,
-        # while the bridge service uses the correct "lora" spelling.
-        if not service_enabled('LORA') and ('lora' in source_name or 'lara' in source_name):
-            disabled = True
         if not disabled:
             SRCS.append(source)
 

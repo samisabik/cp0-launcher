@@ -27,19 +27,12 @@ assert "PendingUnlock" in LOCK and "Armed" in LOCK
 assert "TimeoutMs = 10000" in LOCK
 assert "KEY_TAB" in LOCK
 assert "KEY_ENTER" in LOCK and "KEY_KPENTER" in LOCK
-# A key that neither advanced nor confirmed is reported so the caller can play
-# the blocked sound instead of the select sound.
-assert "bool blocked = false;" in LOCK
 
-# Sound feedback: lock on entering the black state, select when the lock advances,
-# blocked for a key that does not, and unlock on the confirmation.
-assert 'play_lockscreen_sound("lock.mp3")' in SOURCE
-assert 'play_lockscreen_sound("blocked.mp3")' in SOURCE
-assert 'play_lockscreen_sound("select.mp3")' in SOURCE
-assert 'play_lockscreen_sound("unlock.mp3")' in SOURCE
-assert "decision.blocked" in SOURCE
-
-# This build ships no UI sounds: the cue call sites stay, but play nothing.
+# The lock screen is silent: the launcher ships no UI sounds and the platform has
+# no system-sound player to route them through.
+assert "blocked" not in LOCK
+for silent in ("play_lockscreen_sound", "SystemSound", "system_play", "cp0_signal_audio_api", ".mp3"):
+    assert silent not in SOURCE, silent
 assert not (ROOT / "APPLaunch/share/audio").exists()
 
 # Both entry points (the idle timeout and the long-press gesture) share one path,
@@ -102,26 +95,12 @@ assert "ScreensaverImageCache" not in SOURCE
 assert '"screensaver.png"' not in SOURCE
 assert "kAnimationFrameMs" not in SOURCE
 
-assert "RegisterSystemSounds" not in SOURCE
-assert "cp0_signal_system_play" not in SOURCE
 assert "launcher_platform::path_c" not in SOURCE
 assert "std::thread" not in SOURCE
 
-# ...which relies on the platform half of the contract staying in place.
 PLATFORM = ROOT / "../../ext_components/cp0_lvgl/src"
-PLAYER = (PLATFORM / "cp0/cp0_audio_system_sound_player.cpp").read_text()
-PLAYER_HEADER = (PLATFORM / "cp0/cp0_audio_system_sound_player.hpp").read_text()
-CONTRACT = (PLATFORM / "cp0_audio_api_contract.cpp").read_text()
-AUDIO_DEVICE = (PLATFORM / "cp0/cp0_lvgl_audio.cpp").read_text()
-
-# Decoded PCM is cached and reused; the slots can grow so the launcher's sounds
-# get the same treatment as the platform's indexed ones.
-assert "struct CachedSound" in PLAYER
-assert "ma_audio_buffer_init" in PLAYER
-assert "ma_engine_init" in PLAYER
-assert "int add_named(const std::vector<std::string> &names)" in PLAYER_HEADER
-assert 'command == "RegisterSystemSounds"' in CONTRACT
-assert "void RegisterSystemSounds" in AUDIO_DEVICE
+assert not (PLATFORM / "cp0/cp0_audio_system_sound_player.cpp").exists()
+assert "SystemSound" not in (PLATFORM / "cp0_audio_api_contract.cpp").read_text()
 
 # The panel is driven dark on entry and restored on every exit path, including
 # teardown and the object-delete callbacks.

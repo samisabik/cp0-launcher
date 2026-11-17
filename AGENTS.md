@@ -10,7 +10,7 @@ Related files (all worth a quick scan):
 
 | File | Purpose |
 | --- | --- |
-| [`README_ZH.md`](README_ZH.md) / [`README.md`](README.md) / [`README_JA.md`](README_JA.md) | Dependency install, per-platform builds, running. **Start here for build problems** |
+| [`README.md`](README.md) | Apps, sysroot, build, test and deploy commands. **Start here for build problems** |
 | [`projects/APPLaunch/AGENTS.md`](projects/APPLaunch/AGENTS.md) | APPLaunch specifics: `compile_commands.json` prerequisite, `CP0_ENUM_CAST` macro conventions |
 | [`ext_components/cp0_lvgl/AGENTS.md`](ext_components/cp0_lvgl/AGENTS.md) | **Platform-layer contract**; required reading before touching `cp0_signal_*` |
 | [`projects/LaunchWizard/AGENTS.md`](projects/LaunchWizard/AGENTS.md) | LaunchWizard's single hard rule: UI font size ≥ 12px |
@@ -36,7 +36,7 @@ Related files (all worth a quick scan):
 
 1. **Run `scons` inside `projects/<project>/`, and run `scons distclean` before switching profiles** (§4.1).
 2. **`generated/page_app.h` is a build artifact — never edit it by hand, never commit it**; adding a page means touching only `page_app/` + `BUILTIN_APPS[]` (§6.2).
-3. **Run `git status --short` before you start; never `git add -A`, never commit submodule pointer drift or untracked leftover directories** (§10.3, §13).
+3. **Run `git status --short` before you start; never `git add -A`, never commit submodule pointer drift** (§10.3, §13).
 
 ---
 
@@ -49,24 +49,18 @@ launcher/
 ├── SDK/                       # [submodule] M5Stack_Linux_Libs: component libs + SCons toolchain + 3rd-party source cache
 ├── ext_components/            # vendored external components (cp0_lvgl is the core platform layer)
 │   ├── cp0_lvgl/              #   ★ platform adapter: LVGL runner, AppPage bases, cp0_signal_* service bus
-│   ├── Miniaudio/ RadioLib/ Sigslot/ SmoothUI/ Spdlog/ bluectl/ nmtui/
+│   ├── Miniaudio/ Sigslot/ SmoothUI/ Spdlog/ bluectl/ nmtui/
 │   └── THIRD_PARTY_NOTICES.md
 ├── projects/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
 │   │   ├── SConstruct         #   project entry: pick config → invoke SDK build
 │   │   ├── *_config_defaults.mk  # 7 build profiles (see §4.1)
 │   │   ├── main/              #   main/{src,ui,ui/{animation,model,page_app,settings},include}/ + main/SConstruct
-│   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): bin share lib applications adb
-│   │   ├── tests/             #   43 .cpp unit tests + 15 Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
+│   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share applications adb
+│   │   ├── tests/             #   42 .cpp unit tests + 12 Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
 │   │   └── dist/ build/       #   artifacts (git-ignored, wholly replaced on every build)
-│   ├── ZClaw/                 # ZeroClaw chat/config frontend (SCons, 37 tests)
 │   ├── LaunchWizard/          # OOBE first-boot wizard (SCons for the GUI + CMake for pure-logic tests)
 │   ├── CardputerZero-Emulator/ # desktop/web device emulator (**CMake**, reuses APPLaunch/main at source level)
-│   ├── HelloWorld/ UserDemo/  # minimal example / official demo
-│   ├── AppStore/              # [submodule] app store
-│   ├── Calculator/            # [submodule] calculator
-│   ├── CameraApp/             # body lives here; main_CameraApp/ is a [submodule]
-│   └── Keyboard-Guide/        # directory lives here; main_Keyboard-Guide/ is a [submodule] (currently uninitialized)
 ├── docs/                      # three parallel 13-part launcher guides (zh/en/ja) + topical docs (see §11)
 ├── scripts/                   # packaging / release / RPC / logging / hotplug scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
@@ -96,8 +90,8 @@ scons distclean && scons -j$(nproc)
 file dist/M5CardputerZero-APPLaunch            # expect ARM aarch64
 
 # 3. Run tests after changing code (run both; CI only runs the second)
-sh projects/APPLaunch/tests/run_tests.sh          # 42 C++ + 15 Python contracts
-sh ext_components/cp0_lvgl/tests/run_tests.sh     # 85 C++
+sh projects/APPLaunch/tests/run_tests.sh          # 41 C++ + 12 Python contracts
+sh ext_components/cp0_lvgl/tests/run_tests.sh     # 79 C++
 
 # 4. Build the .deb (**does not compile anything** — packages the existing dist/)
 python3 scripts/debian_packager.py
@@ -106,7 +100,7 @@ python3 scripts/debian_packager.py
 cd projects/APPLaunch && bear -- scons -j$(nproc)
 ```
 
-Dependency install is documented in the "编译程序" (Build) section of [`README_ZH.md`](README_ZH.md): `python3 python3-pip build-essential pkg-config libffi-dev libsdl2-dev libfreetype6-dev` plus `pip3 install parse scons requests tqdm setuptools-rust paramiko scp`.
+Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-dev libsdl2-dev libfreetype6-dev` plus `pip3 install parse scons requests tqdm setuptools-rust paramiko scp`.
 
 ---
 
@@ -118,15 +112,8 @@ Dependency install is documented in the "编译程序" (Build) section of [`READ
 | Project | Purpose | Build | Artifacts | Host SDL2 | Repo nature |
 | --- | --- | --- | --- | --- | --- |
 | **APPLaunch** | Launcher: grid home, built-in pages, `.desktop` app management | SCons | `M5CardputerZero-APPLaunch` + `APPLaunch/` resource tree | ✅ | plain directory |
-| ZClaw | Chat/config frontend (WS or webhook) | SCons | `ZClaw` + `dist/APPLaunch/` | ✅ | plain directory |
 | LaunchWizard | OOBE first-boot wizard | SCons (GUI) / CMake `ctest --preset dev` (tests) | `LaunchWizard` (CI copies it into `APPLaunch/bin/`) | ✅ | plain directory |
-| HelloWorld / UserDemo | Minimal example / official demo | SCons | `HelloWorld` / `M5CardputerZero-UserDemo` | ✅ | plain directory |
 | CardputerZero-Emulator | Desktop/web device emulator | **CMake** (not SCons) | `cardputer-zero-emu`; web `index.html/js/wasm/data` | ✅ | plain directory (`lib/lvgl` is a submodule) |
-| AppStore | App store (registry→md5→dpkg) | SCons | `M5CardputerZero-AppStore` | ✅ | **submodule** |
-| Calculator | Calculator | SCons | `Calculator` | ✅ | **submodule** |
-| CameraApp | Camera (libcamera ≥ 0.7.2) | CMake presets (the SCons path is unsuitable for x86) | `CameraApp` / `.deb` presets | ⚠️ | body lives here, `main_CameraApp/` is a **submodule** |
-| Keyboard-Guide | Keyboard tutorial | CMake `./bootstrap.sh` | `M5CardputerZero-Keyboard-Guide` | ✅ | **submodule** (uninitialized) |
-| FactoryTest | Historical factory test | **no working entry point** | none | ❌ | untracked leftover, see §10.3 |
 
 ---
 
@@ -160,7 +147,7 @@ projects/APPLaunch/
 ├── main/build/static/APPLaunch/         # staged resource tree (re-copied on every scons run)
 └── dist/
     ├── M5CardputerZero-APPLaunch        # executable
-    └── APPLaunch/{adb,applications,bin,lib,share}/ + preinstalled-desktop-apps.tsv
+    └── APPLaunch/{adb,applications,share}/
 ```
 
 - **`dist/` is wholly replaced on every build** (`rmtree` + `copytree`). Never place things there by hand.
@@ -179,7 +166,7 @@ cd projects/APPLaunch && bear -- scons -j$(nproc)   # writes ./compile_commands.
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| `.github/workflows/launcher-build.yml` | push to `master`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch/AppStore/Calculator/LaunchWizard/ZClaw → aggregates → `debian_packager.py` produces the `.deb`; a separate `unit-tests` job runs the `cp0_lvgl` tests |
+| `.github/workflows/launcher-build.yml` | push to `master`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch/LaunchWizard → aggregates → `debian_packager.py` produces the `.deb`; a separate `unit-tests` job runs the `cp0_lvgl` tests |
 | `.github/workflows/launcher-release.yml` | manual | Release publishing (whether prereleases are published automatically varies by branch, see §10.1) |
 | `.github/workflows/emulator-build.yml` | push/PR (paths such as `projects/CardputerZero-Emulator/**`) | 4 jobs: macos / linux / windows / web |
 
@@ -192,7 +179,7 @@ Release pipeline (local equivalent): `scripts/build_cardputerzero_release_local.
 
 - **Automation environments must `export CONFIG_REPO_AUTOMATION=y`**: otherwise, when third-party sources are missing, `SDK/tools/scons/SConstruct_tool.py` blocks on an `input()` prompt.
 - **Semantic version**: `APPLAUNCH_VERSION` must be `X.Y.Z[-tag]` (`main/SConstruct` validates it with a regex and raises otherwise); there are also `APPLAUNCH_CHANNEL` and `SOURCE_DATE_EPOCH`.
-- **Cross-compile sysroot**: `SDK/github_source/static_lib_<ver>`, with the version read from `ext_components/cp0_lvgl/sdk_version.txt` (currently `v0.0.7`; **the file must not end with a newline**). Downloaded automatically on first use (about 1.3G).
+- **Cross-compile sysroot**: `<repo>/sysroot` (git-ignored), made from the device by `scripts/make_sysroot.sh [ssh-host]` (default host `cp0`): the device's runtime libraries plus `-dev` packages at its own versions. Cross builds stop with a message when it is missing. CI builds it with `scripts/make_sysroot.sh --docker` from a Debian trixie arm64 container. Rebuild it after upgrading packages on the device.
 - **The third-party source cache does not validate versions**: after changing a pin you must delete `SDK/github_source/<repo>` to force a re-fetch.
 
 ---
@@ -203,7 +190,6 @@ Release pipeline (local equivalent): `scripts/build_cardputerzero_release_local.
 
 ```
 main/src/main.cpp  main()
-  ├─ system(bash_init)                    # unzip /var/template.zip → ~/Downloads
   ├─ options.after_resource_init          # backlight to 0 → restore previous brightness
   ├─ options.setup   → launcher_ui::init() [ui/ui.cpp:36] + ui_screensaver_init()
   └─ cp0_lvgl_run(options)                # ★ the real main loop
@@ -243,7 +229,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Home grid layout, icons and selection | `main/ui/ui_launch_page.cpp` | `create_grid`, `fill_page`, `apply_selection`, `move_selection` (4x2 tiles per page, no animation) |
 | Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white Pixelarticons, recoloured at runtime; slugs listed in `kKnown` |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
-| Boot logo / GIF / startup sound | `main/ui/ui_launch_page_startup.cpp` | — |
+| Boot logo / GIF | `main/ui/launcher_ui_runtime.cpp` + `ui_launch_page.cpp` | `start_startup_gif` |
 | Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `kIconSize`, `rebuild`, `find` |
 | Default placeholder icon | `main/ui/home_icon_fallback.c` | 50×50 ARGB8888; constrained by `tests/test_home_icon_fallback_contract.py` |
 | Add a built-in page | `main/ui/page_app/` + `builtin_app_registry.cpp` | see §6 |
@@ -257,7 +243,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Toast styling | `main/ui/launcher_toast.cpp` | `kShowDurationMs` |
 | Loading overlay | `main/ui/ui_loading.cpp` | `show` / `hide` |
 | Lock screen (timeout/unlock/Game of Life/status card) | `main/ui/ui_screensaver.cpp` + `model/lockscreen_state_model.hpp`, `model/screensaver_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
-| Low-battery policy / appearance / sound cues | `main/ui/low_battery_flow.hpp` / `ui_low_battery.cpp` | the policy is pure logic and unit-tested; cues register with `RegisterSystemSounds` and play via `cp0_signal_system_play` |
+| Low-battery policy / appearance | `main/ui/low_battery_flow.hpp` / `ui_low_battery.cpp` | the policy is pure logic and unit-tested |
 | Settings menu structure | `main/ui/settings/settings_page.cpp` | `create_page_detail` (node order = menu order), `UISettingTreePage` |
 | Settings entry policy/gating | `main/ui/settings/settings_tree_types.hpp` | `SettingEntry`, `SettingActivationPolicy`, `activation_gate` |
 | Add a settings sub-page | new `*_page.{hpp,cpp}` in `main/ui/settings/` + a factory and tree node in `settings_page.cpp` | three-level value pages derive from `LvSettingValuePage3Base` |
@@ -309,7 +295,7 @@ Only these keys are parsed: `Name` (≤128B, required), `Icon` (≤512B), `Exec`
 
 Silently skipped when: the filename does not end in `.desktop`; it contains `/ \` or control characters; `Name`/`Exec` is missing; `Exec` fails the backend `DesktopExecIsSafe` check; `Exec` duplicates a built-in or an already-loaded entry; `Icon` cannot be resolved. **Check the stderr log — do not delete those rejection messages.**
 
-To make it toggleable under Settings→Launcher: the filename must be listed in `kManagedDesktopFilenames` in `main/ui/app_display_order.cpp` and the label in `kBuiltInAppOrder`; otherwise its origin becomes `StoreInstalled` → `always_on` and it cannot be disabled. To be recognized as a product-preinstalled app it must also be listed in `projects/APPLaunch/APPLaunch/preinstalled-desktop-apps.tsv`.
+Desktop entries get origin `LauncherAppOrigin::External` and are always shown; only built-in pages can be switched off under Settings→Launcher.
 
 ---
 
@@ -345,7 +331,7 @@ To make it toggleable under Settings→Launcher: the filename must be listed in 
    * SPDX-License-Identifier: MIT
    */
   ```
-- **Logging uses `SLOG*`** (`SLOGI`/`SLOGE` from `sample_log.h`), **not spdlog** (spdlog is only used by side projects such as LaunchWizard/Keyboard-Guide).
+- **Logging uses `SLOG*`** (`SLOGI`/`SLOGE` from `sample_log.h`), **not spdlog** (spdlog is only used by side projects such as LaunchWizard).
 - **`enum class` conversions use `CP0_ENUM_CAST`**: `#include "cp0_enum_cast.h"`, then `CP0_ENUM_CAST(Target, value)` or `CP0_ENUM_CAST_INT/SIZE_T/UINT8/...`. Do not add a project-local helper that merely wraps one of these casts; do not use them for pointer casts or for converting unvalidated external integers into enums. See [`projects/APPLaunch/AGENTS.md`](projects/APPLaunch/AGENTS.md).
 - **Put new testable logic in `main/ui/model/`** (or `ui/settings/`): pure logic with no LVGL dependency is what makes unit tests possible outside the UI.
 - **Do not reflow whole files**: format only the lines you changed; a large formatting sweep makes the diff unreviewable.
@@ -358,17 +344,16 @@ To make it toggleable under Settings→Launcher: the filename must be listed in 
 
 | Scope | Command | Size (driven by that runner) | CI |
 | --- | --- | --- | --- |
-| APPLaunch | `sh projects/APPLaunch/tests/run_tests.sh` | 42 `.cpp` + 15 Python contract tests | ❌ not run |
+| APPLaunch | `sh projects/APPLaunch/tests/run_tests.sh` | 41 `.cpp` + 12 Python contract tests | ❌ not run |
 | APPLaunch (LVGL UI) | `sh projects/APPLaunch/tests/low_battery_ui/run_tests.sh` | 1 `.cpp` (needs an LVGL build) | ❌ |
-| cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | 85 `.cpp` | ✅ run |
+| cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | 79 `.cpp` | ✅ run |
 | cp0_lvgl (Bluetooth, on-device) | `run_bluetooth_reset_test.sh`, `build_bluetooth_backend_smoke.sh` | 2 `.cpp` (need real hardware) | ❌ |
-| ZClaw | `sh projects/ZClaw/tests/run_tests.sh` | 37 | ❌ |
 | LaunchWizard | `cmake --preset dev && ctest --preset dev` | 10 | ❌ |
 | Repo-root `tests/` | — | **empty directory, not an entry point** | — |
 
-On-disk file counts are 43 (APPLaunch) and 87 (cp0_lvgl); the difference is exactly the 1 + 2 hardware/LVGL-dependent tests that have their own dedicated runners above.
+On-disk file counts are 42 (APPLaunch) and 81 (cp0_lvgl); the difference is exactly the 1 + 2 hardware/LVGL-dependent tests that have their own dedicated runners above.
 
-**Key insight**: `projects/APPLaunch/tests/` contains **15 Python "source contract" tests** that `read_text()` the `.cpp`/`.h` sources directly and assert on **textual structure, call ordering, and specific strings**. Therefore:
+**Key insight**: `projects/APPLaunch/tests/` contains **12 Python "source contract" tests** that `read_text()` the `.cpp`/`.h` sources directly and assert on **textual structure, call ordering, and specific strings**. Therefore:
 
 - changing UI source code can break a test **without a single compile error**;
 - before refactoring, `grep projects/APPLaunch/tests/` for assertions covering the code you are about to touch;
@@ -386,17 +371,6 @@ On-disk file counts are 43 (APPLaunch) and 87 (cp0_lvgl); the difference is exac
 
 Known **branch-dependent points** (never treat these as fixed facts):
 
-- **LoRa / RadioLib is a three-layer switch** — and how tightly the layers are coupled **differs by branch**, so read the actual files:
-  1. `CONFIG_CP0_LVGL_INIT_LORA` — service sources + signal registration;
-  2. `CONFIG_RADIOLIB_COMPONENT_ENABLED` — component registration;
-  3. the `RadioLib` entry in `REQUIREMENTS` of `main/SConstruct` — linking.
-
-  Two known shapes of layer 3, both live in this repo's history:
-  - **Coupled** (`master`, `fix/radiolib-lora-disabled-by-default`): `REQUIREMENTS += ['RadioLib']` sits inside `if 'CONFIG_CP0_LVGL_INIT_LORA' in os.environ:`, so dropping layer 1 also drops the link flag — no link error, but LoRa silently disappears from the build.
-  - **Uncoupled** (`pr-231`): `RadioLib` is hard-coded in the base `REQUIREMENTS` list, so disabling layer 1 alone leaves a bare `-lRadioLib` → **link failure**.
-
-  Practical rule: after touching LoRa, run one build and grep the link line for `RadioLib`. Which defaults are `=y` versus commented out also varies per branch — **always go by the current branch's actual contents**, never by this document.
-
 - **Whether CI publishes prereleases automatically**, and which workflow files exist, vary by branch.
 - **Whether `.workbuddy/` is git-ignored** varies by branch (some branches lack that line).
 
@@ -407,16 +381,9 @@ Known **branch-dependent points** (never treat these as fixed facts):
 - **There is no `ui_app_page.hpp` in `main/ui/`**: the page base classes live in `ext_components/cp0_lvgl/include/`.
 - **`ui_app_setup.hpp` does not exist**: the settings page is `UISettingTreePage` in `main/ui/settings/settings_page.cpp`.
 
-### 10.3 Untracked leftover directories — do not `git add`
+### 10.3 Submodule pointer drift — do not `git add`
 
-`git status` will always show these two untracked directories:
-
-- `projects/FactoryTest/` (containing `main_FactoryTest/`, whose `.git` points into `.git/modules/...`)
-- `projects/LaunchWizard/main_Keyboard_Guide/`
-
-Both are **leftover clones of removed submodules** and are not part of the current build. If you need Keyboard-Guide, initialize the official path `projects/Keyboard-Guide/main_Keyboard-Guide` (currently an empty directory).
-
-Likewise, submodule pointers (`M SDK`, `M projects/AppStore`, etc.) are often left unstaged as "new commits" — **do not commit them casually**.
+Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are often left unstaged as "new commits" — **do not commit them casually**.
 
 ### 10.4 Build / environment
 
@@ -424,7 +391,7 @@ Likewise, submodule pointers (`M SDK`, `M projects/AppStore`, etc.) are often le
 - Switching profiles without `distclean` → compiled with the wrong config.
 - Changing resources without rebuilding → `dist/` still holds the old ones.
 - Missing `CONFIG_REPO_AUTOMATION=y` → CI/automation hangs on `input()`.
-- A trailing newline in `sdk_version.txt` → malformed sysroot path.
+- No `sysroot/` → cross builds stop; run `scripts/make_sysroot.sh`.
 - Changing a third-party pin without deleting `SDK/github_source/<repo>` → the old sources are still used.
 - `bbear` does not exist (use `bear`).
 - Cross-compiling without `aarch64-linux-gnu-g++`.
@@ -437,9 +404,9 @@ Likewise, submodule pointers (`M SDK`, `M projects/AppStore`, etc.) are often le
 | `docs/launcher工程详细说明/12-*` and the en/ja versions | The `BUILTIN_APPS[]` sample is outdated (actual: Settings/CLI/Python/SSH/IP Panel/Spectrum/Rec); the referenced `ui_app_setup.hpp`, `main/ui/ui_app_page.hpp`, and old `page_app.h` paths do not exist |
 | Several guides | Hardcoded absolute paths such as `/home/nihao/w2T/...` and `/home/pi/launcher` |
 | `docs/.../08-build-and-compilation-guide.md` | Still says `static_lib_v0.0.6` (actual: `v0.0.7`); some FLAGS descriptions do not match the real `config_tmp.mk` |
-| `docs/.../09-packaging-deployment-and-systemd.md` | Claims packaging prefers the source tree (it actually uses `dist/APPLaunch`); says nothing about the updater systemd unit / polkit / `/usr/libexec/applaunch-updater` |
+| `docs/.../09-packaging-deployment-and-systemd.md` | Claims packaging prefers the source tree (it actually uses `dist/APPLaunch`) |
 | `docs/launcher-project-guide-ja/` parts 02/04/05/12 | **Pre-refactor versions** (they reference `ui_init()`, `LauncherFonts`, `make_photo`, etc., which no longer exist) — do not use them as implementation references |
-| `docs/current-implementation-and-components.md` | Still treats FactoryTest as an existing submodule; the `source-audit/README.md` link is broken |
+| `docs/current-implementation-and-components.md` | The `source-audit/README.md` link is broken |
 | `docs/settings_ui_integration_task_assignment.md` | Outdated historical task sheet (references the deleted `docs/settings_ui_tasks/` and `projects/ui_test`) → **do not link to it** |
 | `projects/APPLaunch/AGENTS.md` | Its `bbear` command cannot run on this machine |
 
@@ -473,7 +440,7 @@ docs/launcher-project-guide-ja/  # Japanese — parts 02/04/05/12 are old; do no
 docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-project-guide-ja.md  # three index pages
 ```
 
-**All three guide sets were batch-snapshotted on 2026-09-23**; the code has kept refactoring since (settings pages migrated, the LoRa entry point removed, `launcher_platform::path()` replacing the old API). **Treat them as architecture tours, not API references.**
+**All three guide sets were batch-snapshotted on 2026-09-23**; the code has kept refactoring since (settings pages migrated, apps removed, `launcher_platform::path()` replacing the old API). **Treat them as architecture tours, not API references.**
 
 **Topical docs** (newer than the guides and mostly kept in sync with the code):
 
@@ -494,7 +461,7 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 
 | I want to… | Read first | Then work on |
 | --- | --- | --- |
-| Get it running on the host | `README_ZH.md` build section + §2 of this file | `projects/APPLaunch` with `linux_x86_sdl2_config_defaults.mk` |
+| Get it running on the host | `README.md` build section + §2 of this file | `projects/APPLaunch` with `linux_x86_sdl2_config_defaults.mk` |
 | Produce device/release artifacts | §4.4 of this file + `docs/.../09-*.md` (mind the outdated parts) | `scripts/build_cardputerzero_release_local.sh` → `scripts/debian_packager.py` |
 | Add a home-screen app (built-in page) | §6.2 of this file + `docs/.../10-extension-development-guide.md` | `main/ui/page_app/` + `builtin_app_registry.cpp` |
 | Add an external app (`.desktop`) | §6.3 of this file | `projects/APPLaunch/APPLaunch/applications/` |
@@ -502,7 +469,6 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 | Change the settings page | §5.3 of this file, "Settings menu structure" | `main/ui/settings/` |
 | Change keys/input | `docs/.../07-input-system-and-key-mapping.md` | `main/ui/ui_launch_page_input.cpp`, `model/global_hint_policy.cpp` |
 | Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.md` | `ext_components/cp0_lvgl/`, syncing the trilingual docs + contracts + tests |
-| Change the camera | `docs/current-implementation-and-components.md` | `projects/CameraApp/` (note `main_CameraApp/` is a submodule) |
 | Change the emulator | `projects/CardputerZero-Emulator/` | CMake, not SCons |
 | Debug a blank screen / boot failure | `docs/.../11-debugging-and-troubleshooting.md` | `journalctl --user -u APPLaunch.service -f` |
 | Debug an external app that never returns | §6.1 of this file + `tests/test_external_framebuffer_ownership.py` | `main/ui/launch.cpp` |
@@ -511,12 +477,12 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 
 ## 13. Collaboration and Commits
 
-- **Commit messages**: Conventional Commits — `type(scope): one-line summary`, with type ∈ `feat|fix|chore|refactor|docs|ci|test|perf|style`; details go in the body as `-` bullets. Examples (from `git log`): `fix(audio): stop the saved-volume restore when audio tears down`, `chore(config): disable RadioLib/LoRa by default and pin RadioLib commit`.
+- **Commit messages**: Conventional Commits — `type(scope): one-line summary`, with type ∈ `feat|fix|chore|refactor|docs|ci|test|perf|style`; details go in the body as `-` bullets. Example (from `git log`): `fix(audio): stop the saved-volume restore when audio tears down`.
 - **Branches**: prefixes `fix/`, `feat/`, `feature/`, `refactor/`, `ci/`, `codex/`; PRs land on `master` via merge commits; release tags are `launcher-vX.Y.Z`.
 - **There is no CONTRIBUTING file, no PR template, and no issue template.**
 - **Licensing**: the root [`LICENSE`](LICENSE) is MIT (M5Stack code). [`LICENSES/`](LICENSES/) holds verbatim third-party texts plus provenance and **does not relicense this repo**.
   New third-party components must be registered following [`docs/OPEN_SOURCE_COMPONENTS.md`](docs/OPEN_SOURCE_COMPONENTS.md): the verbatim text in `LICENSES/` + a provenance row in `LICENSES/README.md` + a row in `OPEN_SOURCE_COMPONENTS.md` (plus `ext_components/THIRD_PARTY_NOTICES.md` if the component lives under `ext_components/`).
-- **Never commit**: `build/`, `dist/`, `compile_commands.json`, `.workbuddy/`, or the leftover directories from §10.3.
+- **Never commit**: `build/`, `dist/`, `compile_commands.json`, or `.workbuddy/`.
 - **Multi-agent / shared working tree**:
   1. run `git status --short` before touching anything;
   2. **never `git add -A`** — stage only the files you changed;
@@ -525,16 +491,15 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 
 ### Commit boundaries (submodules)
 
-`SDK`, `projects/AppStore`, `projects/Calculator`, `projects/CameraApp/main_CameraApp`, `projects/Keyboard-Guide/main_Keyboard-Guide`, and `projects/CardputerZero-Emulator/lib/lvgl` are **git submodules**:
+`SDK` and `projects/CardputerZero-Emulator/lib/lvgl` are **git submodules**:
 
 - changes inside them must be committed to **their own upstream repositories**; `git add` in the parent repo only records a gitlink;
 - an `M <submodule>` entry here usually just means "pointer drift" and does not indicate a substantive change;
-- `projects/Keyboard-Guide/main_Keyboard-Guide` may be empty in the current checkout (uninitialized); run `git submodule update --init` if you need it.
 
 ### How `ext_components` is consumed
 
 - Among `ext_components`, APPLaunch **depends directly only on `cp0_lvgl`**. The base `REQUIREMENTS` list in `main/SConstruct` is `cp0_lvgl`, `eventpp`, `utilities`, `lvgl_component`, `freetype`, `pthread` — the latter five are SDK or system libraries, not `ext_components`. `Miniaudio` is pulled in transitively by `cp0_lvgl` via `CONFIG_CP0_LVGL_INIT_AUDIO`.
-- `SmoothUI` / `Spdlog` are used only by Keyboard-Guide; `bluectl` / `nmtui` are currently **enabled by no project** (do not treat them as default dependencies); `Sigslot` is never `#include`d and serves only as an OR-gate in cp0_lvgl; `eventpp` is an SDK component and a global dependency.
+- `SmoothUI` / `Spdlog` are used only by LaunchWizard; `bluectl` / `nmtui` are currently **enabled by no project** (do not treat them as default dependencies); `Sigslot` is never `#include`d and serves only as an OR-gate in cp0_lvgl; `eventpp` is an SDK component and a global dependency.
 - The cache of upstream-fetched components **does not validate versions**; after changing a pin you must delete `SDK/github_source/<repo>`.
 
 ---
@@ -543,7 +508,7 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 
 Before handing off, confirm each of the following:
 
-- [ ] `git status --short` lists only files I intended to change (no `build/`, `dist/`, leftover directories, or submodule drift)
+- [ ] `git status --short` lists only files I intended to change (no `build/`, `dist/`, or submodule drift)
 - [ ] `sh projects/APPLaunch/tests/run_tests.sh` passes (if APPLaunch was touched)
 - [ ] `sh ext_components/cp0_lvgl/tests/run_tests.sh` passes (if the platform layer was touched)
 - [ ] The SDL2 build passes: `cd projects/APPLaunch && CONFIG_DEFAULT_FILE=linux_x86_sdl2_config_defaults.mk scons -j$(nproc)`

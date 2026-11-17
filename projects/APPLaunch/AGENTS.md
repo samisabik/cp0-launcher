@@ -4,7 +4,7 @@
 
 Before analyzing the code, check whether `compile_commands.json` exists in this
 directory (`projects/APPLaunch/compile_commands.json`). If it does not, follow
-the cross-compilation instructions in `../../README_ZH.md` (repo root): load
+the cross-compilation instructions in `../../README.md` (repo root): load
 the config matching your current platform, then run one cross-compilation:
 
 ```bash
@@ -14,7 +14,7 @@ bbear -- scons -j22
 
 `linux_x86_cross_cp0_config_defaults.mk` corresponds to the current platform
 (Linux x86_64 host, CP0 cross toolchain). Pick the matching
-`*_config_defaults.mk` for your platform from `../../README_ZH.md` — for
+`*_config_defaults.mk` for your platform from `../../README.md` — for
 example `linux_x86_sdl2_config_defaults.mk` for the SDL2 simulator on Linux.
 
 This command generates `compile_commands.json` in this directory. Then use the
@@ -241,9 +241,5 @@ network, Tailscale address, recordings) and the unlock prompt. The simulation
 runs only while the panel is visible and pauses in the black state. Animate exit
 using the stored panel rectangle, not potentially stale LVGL layout geometry.
 
-`play_lockscreen_sound` records the requested asset name and passes it to
-`settings_prefs::play_system_sound` (`main/ui/settings/settings_prefs.hpp`),
-which plays it only while Settings -> sound -> system sounds is on. No sound
-assets ship in this build, so the cues are silent until assets are added. Lock
-entry still suspends the system sound player, and exit prepares it
-asynchronously and completes cleanup before exposing the working screen.
+The lock screen is silent. The launcher has no UI sound effects, and
+`cp0_lvgl` has no system-sound API.

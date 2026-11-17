@@ -13,13 +13,3 @@
 int launcher_builtin_app_display_order(std::string_view label) noexcept;
 // Position on the first home page, or -1 when the app is not pinned there.
 int launcher_home_first_page_order(std::string_view label) noexcept;
-
-// Returns true for product-owned desktop applications that belong in the
-// Settings -> Launcher control list. Settings, Store, and CLI are protected
-// launcher surfaces and are intentionally excluded.
-bool launcher_builtin_desktop_app_is_managed(std::string_view label) noexcept;
-
-// Returns true for desktop filenames shipped by the CardputerZero product
-// packages.  This is used together with the desktop entry identity so a
-// user-installed app with a matching display name is not treated as built-in.
-bool launcher_builtin_desktop_filename_is_managed(std::string_view filename) noexcept;

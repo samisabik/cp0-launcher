@@ -6,11 +6,9 @@
 
 #pragma once
 
-#include <cstddef>
 #include <list>
 #include <functional>
 #include <string>
-#include <vector>
 
 namespace cp0::audio {
 
@@ -33,27 +31,13 @@ enum class ApiCommand {
     DefaultSink,
     MuteRead,
     MuteToggle,
-    SetSystemSoundNames,
-    /* Append named sounds for application use without touching the platform's
-     * three indexed slots. */
-    RegisterSystemSounds,
-    SystemSoundPlay,
-    SystemSoundSuspend,
-    SystemSoundPrepare,
-    SystemSoundEnable,
 };
-
-/* Applications may register this many extra named sounds on top of the
- * platform's indexed slots. */
-constexpr std::size_t kMaxRegisteredSystemSounds = 32;
 
 struct ApiRequest
 {
     ApiCommand command = ApiCommand::Play;
     std::string path;
     int value = 0;
-    bool enabled = false;
-    std::vector<std::string> names;
 };
 
 enum class SetupCommand { SetCallback, SetWaveform, StopPlay };

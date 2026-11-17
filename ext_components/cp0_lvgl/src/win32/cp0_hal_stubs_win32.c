@@ -70,8 +70,6 @@ int cp0_sudo_run_argv_async_ex(const char *const *argv,
 int cp0_sudo_cancel(uint64_t request_id)
 { (void)request_id; return -ENOTSUP; }
 
-void cp0_lora_request_stop(void) {}
-void cp0_lora_clear_stop(void) {}
 
 void hal_audio_init(void) {}
 void hal_audio_play(const char *path) { (void)path; }
@@ -93,8 +91,6 @@ const char *hal_path_data_dir(void) { return "/"; }
 const char *hal_path_applications_dir(void) { return "/applications"; }
 const char *hal_path_lock_file(void) { return "/tmp/lock"; }
 const char *hal_path_font_dir(void) { return "/font"; }
-const char *hal_path_font_regular(void) { return "/font/regular.ttf"; }
-const char *hal_path_font_mono(void) { return "/font/mono.ttf"; }
 const char *hal_path_keyboard_device(void) { return 0; }
 const char *hal_path_keyboard_map(void) { return 0; }
 const char *hal_path_images_dir(void) { return "/images"; }

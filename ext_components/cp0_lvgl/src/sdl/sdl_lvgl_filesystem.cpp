@@ -37,8 +37,6 @@ static char s_data_dir[512] = ".";
 static char s_applications_dir[512] = "./applications";
 static char s_lock_file[512] = "/tmp/M5CardputerZero-APPLaunch_fcntl.lock";
 static char s_font_dir[512] = "./APPLaunch/share/font";
-static char s_font_regular[512] = "./APPLaunch/share/font/AlibabaPuHuiTi-3-55-Regular.ttf";
-static char s_font_mono[512] = "./APPLaunch/share/font/LiberationMono-Regular.ttf";
 static char s_images_dir[512] = "./APPLaunch/share/images";
 static char s_audio_dir[512] = "./APPLaunch/share/audio";
 
@@ -51,17 +49,12 @@ extern "C" void hal_paths_init(const char *exe_dir)
     std::snprintf(s_images_dir, sizeof(s_images_dir), "%s/APPLaunch/share/images", exe_dir);
     std::snprintf(s_font_dir, sizeof(s_font_dir), "%s/APPLaunch/share/font", exe_dir);
     std::snprintf(s_audio_dir, sizeof(s_audio_dir), "%s/APPLaunch/share/audio", exe_dir);
-    std::snprintf(s_font_regular, sizeof(s_font_regular),
-                  "%s/APPLaunch/share/font/AlibabaPuHuiTi-3-55-Regular.ttf", exe_dir);
-    std::snprintf(s_font_mono, sizeof(s_font_mono), "%s/APPLaunch/share/font/LiberationMono-Regular.ttf", exe_dir);
 }
 
 extern "C" const char *hal_path_data_dir(void) { return s_data_dir; }
 extern "C" const char *hal_path_applications_dir(void) { return s_applications_dir; }
 extern "C" const char *hal_path_lock_file(void) { return s_lock_file; }
 extern "C" const char *hal_path_font_dir(void) { return s_font_dir; }
-extern "C" const char *hal_path_font_regular(void) { return s_font_regular; }
-extern "C" const char *hal_path_font_mono(void) { return s_font_mono; }
 extern "C" const char *hal_path_keyboard_device(void) { return nullptr; }
 extern "C" const char *hal_path_keyboard_map(void) { return nullptr; }
 extern "C" const char *hal_path_images_dir(void) { return s_images_dir; }
@@ -163,10 +156,6 @@ private:
             return "";
         if (file == "applications")
             return hal_path_applications_dir();
-        if (file == "appstore_exec")
-            return join_path(hal_path_data_dir(), "bin/M5CardputerZero-AppStore");
-        if (file == "calculator_exec")
-            return join_path(hal_path_data_dir(), "bin/M5CardputerZero-Calculator");
         if (file == "adb_helper")
             return join_path(hal_path_data_dir(), "adb/cardputer-adb");
         if (file == "launcher_settings")

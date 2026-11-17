@@ -18,10 +18,9 @@ scons -j8
 cross_package_enabled = False
 local_path = Path(os.getcwd())
 sdk_path = local_path.parent.parent / "SDK"
-version_file = local_path.parent.parent / "ext_components" / "cp0_lvgl" / "sdk_version.txt"
-
-version = version_file.read_text(encoding="utf-8")
-static_lib_path = sdk_path / "github_source" / f"static_lib_{version}"
+# Cross builds compile against a sysroot made from the device by
+# scripts/make_sysroot.sh.
+sysroot_path = local_path.parent.parent / "sysroot"
 
 if os.environ.get("CardputerZero", "") == "y":
     os.environ["CONFIG_DEFAULT_FILE"] = "linux_x86_cross_cp0_config_defaults.mk"
@@ -46,8 +45,10 @@ if previous_config != selected_config:
 
 if "cross" in os.environ.get("CONFIG_DEFAULT_FILE", ""):
     cross_package_enabled = True
+    if not (sysroot_path / "usr" / "include").is_dir():
+        sys.exit(f"missing sysroot {sysroot_path}: run scripts/make_sysroot.sh with the device reachable over SSH")
     config_tmp_path = Path("build") / "config" / "config_tmp.mk"
-    sysroot_path_str = static_lib_path.as_posix().replace('"', r'\"')
+    sysroot_path_str = sysroot_path.as_posix().replace('"', r'\"')
     config_tmp_content = f'CONFIG_TOOLCHAIN_SYSROOT="{sysroot_path_str}"\n'
     if not config_tmp_path.exists() or config_tmp_path.read_text() != config_tmp_content:
         config_tmp_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,13 +79,3 @@ for src in list(lvgl_component["SRCS"]):
     if "lv_sdl_keyboard.c" in str(src):
         lvgl_component["SRCS"].remove(src)
 
-
-# static_lib is only needed for cross-compilation, skip in SDL mode.
-if cross_package_enabled:
-    tools = {}
-    exec(Path(env["PROJECT_TOOL_S"]).read_text(), tools)
-    tools["ensure_static_lib_version"](
-        f"https://github.com/CardputerZero/launcher/releases/download/{version}/sdk_bsp.tar.gz",
-        version,
-        static_lib_path / "version"
-    )

@@ -93,10 +93,10 @@ Type=Application
 
 ```ini
 [Desktop Entry]
-Name=Calculator
-Exec=/home/pi/M5CardputerZero-Calculator-linux-aarch64
+Name=MyApp
+Exec=/usr/share/APPLaunch/bin/my_app
 Terminal=false
-Icon=share/images/math.png
+Icon=share/images/my_app_100.png
 Type=Application
 ```
 

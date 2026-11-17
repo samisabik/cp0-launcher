@@ -14,7 +14,7 @@ namespace lockscreen_status {
 // means discharge, as the BQ27220 reports it.
 std::string battery_line(int soc, int remain_mah, int avg_current_ma);
 
-// "3 clips", "3 clips, 1 to transcribe", or "none".
-std::string recordings_line(int total, int untranscribed);
+// Time since boot: "12m", "1h 40m", "3d 4h".
+std::string uptime_line(long seconds);
 
 } // namespace lockscreen_status

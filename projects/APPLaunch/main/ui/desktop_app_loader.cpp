@@ -13,7 +13,6 @@
 #include "desktop_entry.h"
 #include "launch.h"
 #include "launcher_platform.hpp"
-#include "model/preinstalled_app_manifest.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -87,25 +86,6 @@ std::string desktop_config_key(const std::string &filename)
     return key;
 }
 
-std::vector<PreinstalledDesktopApp> load_preinstalled_app_manifest(
-    const std::string &applications_dir)
-{
-    const std::filesystem::path path =
-        std::filesystem::path(applications_dir).parent_path() /
-        "preinstalled-desktop-apps.tsv";
-    if (applications_dir.empty() || path.empty()) return {};
-
-    int read_code = -1;
-    std::string contents;
-    cp0_signal_filesystem_api({"ReadFile", path.string(), "65536"},
-                              [&](int code, std::string data) {
-                                  read_code = code;
-                                  contents = std::move(data);
-                              });
-    if (read_code != 0) return {};
-    return parse_preinstalled_app_manifest(contents);
-}
-
 } // namespace
 
 void launcher_append_desktop_apps(std::list<app> &apps)
@@ -125,7 +105,6 @@ void launcher_append_desktop_apps(std::list<app> &apps)
 
         launcher_app_registry_begin_dynamic_refresh();
         refresh_started = true;
-        const auto preinstalled_apps = load_preinstalled_app_manifest(app_dir);
 
         std::istringstream lines(listing);
         std::string line;
@@ -187,8 +166,8 @@ void launcher_append_desktop_apps(std::list<app> &apps)
             candidate.filename = std::move(name);
             candidate.entry = std::move(*entry);
             candidate.icon_path = icon_path;
-            // AppStore rewrites the desktop file after installation, so its
-            // last-write time is the install/update order for custom apps.
+            // Package installs rewrite the desktop file, so its last-write
+            // time is the install/update order for custom apps.
             candidate.has_modified_time = read_modified_time(path, candidate.modified_time);
             candidate.directory_sequence = directory_sequence++;
             candidates.push_back(std::move(candidate));
@@ -209,31 +188,14 @@ void launcher_append_desktop_apps(std::list<app> &apps)
                 continue;
             }
 
-            // Release-owned desktop apps may come from projects outside the
-            // APPLaunch repository. Require both the stable package filename
-            // and product label; the manifest permits explicitly listed
-            // release entries whose label is not in the shared order table.
-            const int display_order = launcher_builtin_app_display_order(candidate.entry.name);
-            const bool protected_builtin = display_order >= 0 &&
-                                           !launcher_builtin_desktop_app_is_managed(
-                                               candidate.entry.name);
-            const bool product_builtin =
-                launcher_builtin_desktop_filename_is_managed(candidate.filename) &&
-                launcher_builtin_desktop_app_is_managed(candidate.entry.name);
-            const bool manifest_builtin = preinstalled_app_manifest_contains(
-                preinstalled_apps, candidate.filename, candidate.entry);
-            const LauncherAppOrigin origin = (!protected_builtin &&
-                                              (product_builtin || manifest_builtin))
-                ? LauncherAppOrigin::Preinstalled
-                : LauncherAppOrigin::StoreInstalled;
+            const LauncherAppOrigin origin = LauncherAppOrigin::External;
             const std::string config_key = desktop_config_key(candidate.filename);
             if (!launcher_app_registry_register_dynamic(
                     candidate.entry.name, candidate.icon_path, config_key, origin))
                 continue;
-            const bool settings_managed = origin == LauncherAppOrigin::Preinstalled;
             const AppDescriptor descriptor{
                 candidate.entry.name.c_str(), candidate.icon_path.c_str(),
-                config_key.c_str(), settings_managed, !settings_managed, origin};
+                config_key.c_str(), false, true, origin};
             bool enabled = true;
             try {
                 enabled = launcher_app_registry_is_enabled(descriptor);

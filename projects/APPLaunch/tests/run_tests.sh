@@ -11,7 +11,6 @@ python3 "$test_root/test_settings_menu_order.py"
 python3 "$test_root/test_settings_wifi_enable_copy_contract.py"
 python3 "$test_root/test_settings_rtc_layout_contract.py"
 python3 "$test_root/test_settings_volume_initial_selection.py"
-python3 "$test_root/test_preinstalled_app_packaging.py"
 python3 "$test_root/test_settings_storage_build_contract.py"
 python3 "$test_root/test_static_resource_staging.py"
 python3 "$test_root/test_lockscreen_contract.py"
@@ -34,7 +33,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     -o "$build_dir/test_page_timer_lifecycle"
 "$build_dir/test_page_timer_lifecycle"
 python3 "$test_root/test_updater_packaging.py"
-python3 "$test_root/test_appstore_packaging.py"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../main/include" \
     -I"$test_root/../../../ext_components/cp0_lvgl/include" \
@@ -48,13 +46,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/desktop_entry.cpp" \
     -o "$build_dir/test_desktop_entry"
 "$build_dir/test_desktop_entry"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    -I"$test_root/../main/ui" \
-    "$test_root/test_preinstalled_app_manifest.cpp" \
-    "$test_root/../main/ui/model/preinstalled_app_manifest.cpp" \
-    "$test_root/../main/ui/desktop_entry.cpp" \
-    -o "$build_dir/test_preinstalled_app_manifest"
-"$build_dir/test_preinstalled_app_manifest"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../main/ui" \
     "$test_root/test_app_display_order.cpp" \
@@ -94,16 +85,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/keyboard_text_input.cpp" \
     -o "$build_dir/test_keyboard_text_input"
 "$build_dir/test_keyboard_text_input"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_mesh_page_model.cpp" \
-    "$test_root/../main/ui/model/mesh_page_model.cpp" \
-    -o "$build_dir/test_mesh_page_model"
-"$build_dir/test_mesh_page_model"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    "$test_root/test_lora_page_model.cpp" \
-    "$test_root/../main/ui/model/lora_page_model.cpp" \
-    -o "$build_dir/test_lora_page_model"
-"$build_dir/test_lora_page_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_setup_value_policy.cpp" \
     "$test_root/../main/ui/model/setup_value_policy.cpp" \
@@ -179,6 +160,11 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -o "$build_dir/test_audio_model"
 "$build_dir/test_audio_model"
 "$build_dir/test_sdr_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_files_model.cpp" \
+    "$test_root/../main/ui/model/files_model.cpp" \
+    -o "$build_dir/test_files_model"
+"$build_dir/test_files_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_rec_model.cpp" \
     "$test_root/../main/ui/model/rec_model.cpp" \

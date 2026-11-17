@@ -20,7 +20,6 @@ public:
         MinVolume = setup_values::volume_metric(setup_values::VolumeMetric::MinPercent),
         MaxVolume = setup_values::volume_metric(setup_values::VolumeMetric::MaxPercent),
         VolumeOptionCount = setup_values::volume_metric(setup_values::VolumeMetric::OptionCount),
-        SystemSoundSwitchIndex = 1,
     };
 
     static constexpr int metric(LayoutMetric value)
@@ -69,8 +68,6 @@ private:
         PreviewWrite,
         CommitWrite,
         RestoreWrite,
-        PreviewSound,
-        CommitSound,
     };
 
     struct ActiveRequest {
@@ -88,7 +85,6 @@ private:
     bool request_is_current(const ActiveRequest &request) const;
     void start_read_request();
     void start_volume_request(RequestKind kind, int value);
-    void start_command_request(RequestKind kind);
     void handle_volume_failure(const ActiveRequest &request, int code, std::string message);
     void handle_volume_result(const ActiveRequest &request,
                               const VolumeResponse &result);
@@ -96,15 +92,7 @@ private:
     void handle_write_failure();
     void start_restore_if_needed(bool force_write = false);
     void accept_commit_without_write();
-    void start_commit_sound();
-    void schedule_preview_sound();
-    void start_preview_sound();
-    static void preview_timer_cb(lv_timer_t *timer) noexcept;
-    void cancel_preview_timer();
-    void handle_command_result(const ActiveRequest &request,
-                               const Response &result);
-    void pump_preview();
-    void pump_commit();
+    void finish_commit();
 
     std::function<void()> back_callback_;
     std::optional<ActiveRequest> active_request_;
@@ -117,12 +105,10 @@ private:
     bool commit_leave_requested_ = false;
     bool back_requested_ = false;
     bool rollback_pending_ = false;
-    bool preview_sound_pending_ = false;
     int original_volume_ = metric(LayoutMetric::MaxVolume);
     int backend_volume_ = metric(LayoutMetric::MaxVolume);
     int locked_selection_ = 0;
     int last_preview_requested_ = metric(LayoutMetric::MaxVolume);
     int last_preview_actual_ = metric(LayoutMetric::MaxVolume);
     std::string last_error_;
-    lv_timer_t *preview_timer_ = nullptr;
 };

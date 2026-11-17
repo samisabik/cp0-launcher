@@ -51,7 +51,8 @@ that manage the service lifecycle explicitly. `cp0_lvgl` calls the compatible
 - Build: `libnm` headers and library, plus GLib/GIO headers.
 - Runtime: the `NetworkManager` daemon and its system D-Bus service.
 - Cross builds: the component uses `CONFIG_TOOLCHAIN_SYSROOT` and links
-  `usr/lib/<triplet>/libnm.so.0` from the selected `static_lib_*` SDK.
+  `usr/lib/<triplet>/libnm.so.0` from `sysroot/`; add `libnm-dev` to the
+  package list in `scripts/make_sysroot.sh` before enabling it.
 
 The adapter uses synchronous `libnm` queries and a small local GLib main-context
 pump around asynchronous activation calls. Wi-Fi operations should still be

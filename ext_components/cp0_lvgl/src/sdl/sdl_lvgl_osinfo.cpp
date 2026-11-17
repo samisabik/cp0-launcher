@@ -90,22 +90,12 @@ public:
         operations_.random_u32 = random_u32;
         operations_.get_ntp = [] { return 0; };
         operations_.set_ntp = [](bool) { return 0; };
-        operations_.apt_update_background = apt_update_background;
-        operations_.update_launcher_background = update_launcher_background;
     }
 
     void api_call(arg_t arg, callback_t callback)
     {
         const std::string command = arg.empty() ? std::string() : arg.front();
-        if (command == "UpdateLauncherCheckStart") {
-            const std::string id = jobs_.start([] {
-                return cp0::update::Result{0,
-                    "up-to-date|version=0.0.0-dev|commit=0000000"};
-            });
-            cp0::callback::invoke(callback, 0, id);
-            return;
-        }
-        if (command == "AptUpdateStart" || command == "UpdateLauncherStart") {
+        if (command == "SystemUpgradeStart") {
             const std::string id = jobs_.start([] {
                 return cp0::update::Result{-ENOTSUP, "unsupported"};
             });
@@ -121,10 +111,6 @@ public:
         if (command == "UpdateJobCancel") {
             const auto id = arg.size() > 1 ? *std::next(arg.begin()) : std::string();
             cp0::callback::invoke(callback, jobs_.cancel(id) ? 0 : -1, {});
-            return;
-        }
-        if (command == "UpdateLauncherState") {
-            cp0::callback::invoke(callback, -ENOTSUP, {});
             return;
         }
         const cp0::osinfo::Result result = cp0::osinfo::dispatch(arg, operations_);
@@ -280,16 +266,6 @@ private:
         return 0;
     }
 
-    static int apt_update_background()
-    {
-        return 0;
-    }
-
-    static int update_launcher_background()
-    {
-        return 0;
-    }
-
 public:
     static int api_eth_info(const char *command, cp0_eth_info_t *info)
     {
@@ -362,14 +338,4 @@ extern "C" int cp0_time_ntp_get(void)
 extern "C" int cp0_time_ntp_set(int enable)
 {
     return SdlOsInfoSystem::api_simple({"NtpSet", enable ? "1" : "0"});
-}
-
-extern "C" int cp0_system_apt_update_background(void)
-{
-    return SdlOsInfoSystem::api_simple({"AptUpdateBackground"});
-}
-
-extern "C" int cp0_system_update_launcher_background(void)
-{
-    return SdlOsInfoSystem::api_simple({"UpdateLauncherBackground"});
 }

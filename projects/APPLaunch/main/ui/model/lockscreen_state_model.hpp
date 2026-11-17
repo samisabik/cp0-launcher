@@ -39,9 +39,6 @@ struct LockscreenDecision
     bool sleep = false;
     /* Leave the lock screen entirely. */
     bool unlock = false;
-    /* A fresh press that neither advanced nor confirmed the unlock, so the sound
-     * feedback is "blocked" rather than "select". */
-    bool blocked = false;
 };
 
 class LockscreenStateModel
@@ -85,8 +82,6 @@ public:
             } else if (key_code == KEY_TAB) {
                 state_ = LockscreenState::Armed;
                 decision.show_panel = true;
-            } else {
-                decision.blocked = true;
             }
             break;
         case LockscreenState::Armed:
@@ -99,7 +94,6 @@ public:
                 /* Any other key steps back to (2) rather than unlocking. */
                 state_ = LockscreenState::PendingUnlock;
                 decision.show_panel = true;
-                decision.blocked = true;
             }
             break;
         }

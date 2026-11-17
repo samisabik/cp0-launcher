@@ -184,7 +184,7 @@ int run_key_sound_worker()
         ma_context_uninit(&context);
         return 1;
     }
-    ma_engine_set_volume(&engine, 1.5f); // Match Keyboard-Guide's master and per-cue gains.
+    ma_engine_set_volume(&engine, 1.5f);
     std::array<ma_sound, kCues.size()> sounds{};
     std::array<bool, kCues.size()> loaded{};
     bool loaded_any = false;

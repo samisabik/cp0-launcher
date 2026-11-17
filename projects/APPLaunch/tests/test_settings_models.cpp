@@ -28,28 +28,25 @@ int main()
 {
     const Descriptor descriptors[] = {
         {"Hidden", "hidden", false, true, LauncherAppOrigin::Builtin},
-        {"Calculator", "calculator", true, false, LauncherAppOrigin::Builtin},
+        {"Spectrum", "spectrum", true, false, LauncherAppOrigin::Builtin},
         {"Python", "app_Python", true, false, LauncherAppOrigin::Builtin},
-        {"Snake", "app_Game", true, false, LauncherAppOrigin::Builtin},
+        {"SDR", "app_SDR", true, false, LauncherAppOrigin::Builtin},
         {"Settings", "app_Setting", true, false, LauncherAppOrigin::Builtin},
-        {"Store", "app_Store", true, false, LauncherAppOrigin::Builtin},
         {"CLI", "app_CLI", true, false, LauncherAppOrigin::Builtin},
-        {"ZClaw", "app_desktop_zclaw", true, false, LauncherAppOrigin::Preinstalled},
-        {"Downloaded", "app_desktop_downloaded", true, false, LauncherAppOrigin::StoreInstalled},
+        {"Downloaded", "app_desktop_downloaded", true, false, LauncherAppOrigin::External},
         {nullptr, "missing-label", true, false, LauncherAppOrigin::Builtin},
         {"Missing key", nullptr, true, false, LauncherAppOrigin::Builtin},
     };
     const auto entries = settings_t12b::launcher::configurable_entries(
         descriptors,
-        11,
+        9,
         [](const Descriptor &descriptor) { return descriptor.always_on; });
-    assert(entries.size() == 4);
-    assert(entries[0].label == "Calculator");
-    assert(entries[0].config_key == "calculator");
+    assert(entries.size() == 3);
+    assert(entries[0].label == "Spectrum");
+    assert(entries[0].config_key == "spectrum");
     assert(!entries[0].enabled);
     assert(entries[1].label == "Python" && entries[1].config_key == "app_Python");
-    assert(entries[2].label == "Snake" && entries[2].config_key == "app_Game");
-    assert(entries[3].label == "ZClaw" && entries[3].config_key == "app_desktop_zclaw");
+    assert(entries[2].label == "SDR" && entries[2].config_key == "app_SDR");
     using settings_t12b::boot_actions::Action;
     using settings_t12b::boot_actions::Operation;
     assert(settings_t12b::boot_actions::presentation(Action::Reboot).confirmation_title == "reboot?");

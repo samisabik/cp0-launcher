@@ -8,7 +8,6 @@
 #include "ui_screensaver.h"
 
 #include "low_battery_flow.hpp"
-#include "settings/settings_prefs.hpp"
 #include "cp0_font_service.hpp"
 #include "keyboard_input.h"
 #include "input_keys.h"
@@ -48,23 +47,6 @@ cp0_keyboard_key_filter_t previous_key_filter = nullptr;
 std::set<uint32_t> swallowed_keys;
 
 void render(uint32_t now, bool force = false);
-
-/* ---- low-battery sounds ------------------------------------------------
- * The assets are appended to the platform's system-sound list on first play so
- * the device decodes them once and keeps a warm engine; the by-name request
- * then reuses that player.  Registration appends after the platform's indexed
- * sounds, so the launcher's startup/switch/enter slots are untouched. */
-constexpr const char *kReminderSound = "applaunch-arcade-refund.mp3";
-constexpr const char *kCriticalSound = "applaunch-arcade-warning.mp3";
-/* One latch per cue.  Low and ShutdownCountdown share the critical latch so the
- * 4% -> 3% promotion does not repeat the warning. */
-bool reminder_sound_played = false;
-bool critical_sound_played = false;
-
-void play_low_battery_sound(const char *asset) noexcept
-{
-    settings_prefs::play_system_sound(asset);
-}
 
 int reminder_key_filter(const struct key_item *item) noexcept
 {
@@ -269,13 +251,6 @@ void render(uint32_t now, bool force)
 {
     const LowBatteryWarning warning = flow.warning();
     if (ui_screensaver_is_active()) {
-        /* Recovery has no deferred cue to protect, so re-arm right away even
-         * though the render is postponed; a phase entered while locked keeps its
-         * latch instead and is played once when the overlay is visible again. */
-        if (warning == LowBatteryWarning::None || warning == LowBatteryWarning::Undefined) {
-            reminder_sound_played = false;
-            critical_sound_played = false;
-        }
         if (overlay)
             lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
         rendered_warning = LowBatteryWarning::None;
@@ -283,9 +258,6 @@ void render(uint32_t now, bool force)
         return;
     }
     if (warning == LowBatteryWarning::None || warning == LowBatteryWarning::Undefined) {
-        /* Recovery re-arms both cues for the next low-battery cycle. */
-        reminder_sound_played = false;
-        critical_sound_played = false;
         if (overlay)
             lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
         rendered_warning = warning;
@@ -298,19 +270,6 @@ void render(uint32_t now, bool force)
         return;
     lv_obj_move_foreground(overlay);
     lv_obj_clear_flag(overlay, LV_OBJ_FLAG_HIDDEN);
-
-    /* Trigger from the phase, not warning_changed: the render bookkeeping is
-     * reset when the overlay is rebuilt, and a replay there would be audible.
-     * The latches keep the cues one-shot for as long as the phase lasts. */
-    if (warning == LowBatteryWarning::Reminder) {
-        if (!reminder_sound_played) {
-            reminder_sound_played = true;
-            play_low_battery_sound(kReminderSound);
-        }
-    } else if (!critical_sound_played) {
-        critical_sound_played = true;
-        play_low_battery_sound(kCriticalSound);
-    }
 
     const bool warning_changed = warning != rendered_warning;
     if (warning_changed) {
@@ -384,8 +343,6 @@ void init_warning()
     try {
     if (warning_timer)
         return;
-    reminder_sound_played = false;
-    critical_sound_played = false;
     flow.reset();
     battery_refresh_tick = lv_tick_get();
     warning_timer = lv_timer_create(timer_cb, kActivePeriodMs, nullptr);
@@ -443,8 +400,6 @@ void shutdown_warning()
     countdown_label = nullptr;
     message_label = nullptr;
     flow.reset();
-    reminder_sound_played = false;
-    critical_sound_played = false;
     rendered_warning = LowBatteryWarning::None;
     rendered_seconds = 0;
     battery_refresh_tick = 0;

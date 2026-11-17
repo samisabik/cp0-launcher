@@ -6,7 +6,6 @@ on:
     paths:
       - 'projects/CardputerZero-Emulator/**'
       - 'projects/APPLaunch/**'
-      - 'projects/UserDemo/**'
       - 'SDK/**'
       - '.github/workflows/emulator-build.yml'
   pull_request:

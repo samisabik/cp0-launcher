@@ -18,9 +18,8 @@
 // ============================================================
 //  Rec  UIRecPage
 //  Voice recorder with on-device speech to text. Recordings live in
-//  ~/Recordings/<stamp>.wav (the folder the old recorder package used);
-//  transcripts sit next to them as <stamp>.txt. Transcription runs
-//  ffmpeg (16 kHz mono, loudness normalised) then whisper-cli tiny.en,
+//  ~/Recordings/<stamp>.wav; transcripts sit next to them as <stamp>.txt.
+//  Transcription runs ffmpeg (16 kHz mono, loudness normalised) then whisper-cli tiny.en,
 //  one clip at a time; new recordings are queued automatically.
 //
 //  List:   SPACE record   ENTER/RIGHT open   T transcribe   D twice delete

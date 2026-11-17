@@ -42,17 +42,12 @@ void test_path_and_no_argument_commands()
     assert(request.command == ApiCommand::CapEnd);
     assert(cp0::audio::parse_api_request({"MuteToggle"}, request));
     assert(request.command == ApiCommand::MuteToggle);
-    assert(cp0::audio::parse_api_request({"SystemSoundSuspend"}, request));
-    assert(request.command == ApiCommand::SystemSoundSuspend);
-    assert(cp0::audio::parse_api_request({"SystemSoundPrepare"}, request));
-    assert(request.command == ApiCommand::SystemSoundPrepare);
     assert(cp0::audio::parse_api_request({"DefaultSink"}, request));
     assert(request.command == ApiCommand::DefaultSink);
     assert(!cp0::audio::parse_api_request({"DefaultSink", "extra"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundPrepare", "junk"}, request));
 }
 
-void test_numeric_and_boolean_commands()
+void test_numeric_commands()
 {
     ApiRequest request;
     assert(cp0::audio::parse_api_request({"VolumeWrite", "0"}, request));
@@ -66,47 +61,21 @@ void test_numeric_and_boolean_commands()
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "101"}, request));
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "99999999999999999999"}, request));
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "50", "junk"}, request));
-
-    assert(cp0::audio::parse_api_request({"SystemSoundPlay", "0"}, request));
-    assert(request.command == ApiCommand::SystemSoundPlay && request.value == 0);
-    assert(cp0::audio::parse_api_request({"SystemSoundPlay", "2"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundPlay", "3"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundPlay", "junk"}, request));
-
-    assert(cp0::audio::parse_api_request({"SystemSoundEnable"}, request));
-    assert(request.enabled);
-    assert(cp0::audio::parse_api_request({"SystemSoundEnable", "disabled"}, request));
-    assert(!request.enabled);
-    assert(cp0::audio::parse_api_request({"SystemSoundEnable", "true"}, request));
-    assert(request.enabled);
-    assert(!cp0::audio::parse_api_request({"SystemSoundEnable", "yes"}, request));
 }
 
-void test_names_and_setup_commands()
+void test_removed_system_sound_commands()
 {
     ApiRequest request;
-    assert(cp0::audio::parse_api_request({"SetSystemSoundNames"}, request));
-    assert(request.names.empty());
-    assert(cp0::audio::parse_api_request(
-        {"SetSystemSoundNames", "ding.wav", "switch.wav", "enter.wav"}, request));
-    assert(request.names.size() == 3 && request.names[2] == "enter.wav");
-    assert(!cp0::audio::parse_api_request(
-        {"SetSystemSoundNames", "1", "2", "3", "4"}, request));
+    assert(!cp0::audio::parse_api_request({"SystemSoundPlay", "0"}, request));
+    assert(!cp0::audio::parse_api_request({"SystemSoundEnable"}, request));
+    assert(!cp0::audio::parse_api_request({"SystemSoundSuspend"}, request));
+    assert(!cp0::audio::parse_api_request({"SystemSoundPrepare"}, request));
+    assert(!cp0::audio::parse_api_request({"SetSystemSoundNames"}, request));
+    assert(!cp0::audio::parse_api_request({"RegisterSystemSounds", "lock.wav"}, request));
+}
 
-    // Applications append their own named sounds instead of taking over the
-    // platform slots.
-    assert(!cp0::audio::parse_api_request({"RegisterSystemSounds"}, request));
-    assert(cp0::audio::parse_api_request(
-        {"RegisterSystemSounds", "lock.mp3", "unlock.mp3"}, request));
-    assert(request.command == cp0::audio::ApiCommand::RegisterSystemSounds);
-    assert(request.names.size() == 2 && request.names[0] == "lock.mp3");
-    {
-        std::list<std::string> too_many{"RegisterSystemSounds"};
-        for (std::size_t i = 0; i <= cp0::audio::kMaxRegisteredSystemSounds; ++i)
-            too_many.push_back("s" + std::to_string(i) + ".mp3");
-        assert(!cp0::audio::parse_api_request(too_many, request));
-    }
-
+void test_setup_commands()
+{
     SetupRequest setup;
     assert(!cp0::audio::parse_setup_request({}, setup));
     assert(!cp0::audio::parse_setup_request({"unknown"}, setup));
@@ -144,7 +113,8 @@ void test_callback_exception_boundary()
 int main()
 {
     test_path_and_no_argument_commands();
-    test_numeric_and_boolean_commands();
-    test_names_and_setup_commands();
+    test_numeric_commands();
+    test_removed_system_sound_commands();
+    test_setup_commands();
     test_callback_exception_boundary();
 }

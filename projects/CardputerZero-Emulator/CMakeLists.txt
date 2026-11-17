@@ -12,7 +12,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Paths — same repo, sibling projects
 set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 set(APPLAUNCH  ${REPO_ROOT}/projects/APPLaunch/main)
-set(USERDEMO   ${REPO_ROOT}/projects/UserDemo/main)
 set(CP0_LVGL   ${REPO_ROOT}/ext_components/cp0_lvgl)
 set(APPLAUNCH_LVGL_OVERRIDE ${APPLAUNCH}/lvgl)
 set(APPLAUNCH_EMU_ENTRY ${CMAKE_CURRENT_SOURCE_DIR}/src/app_launch_entry.cpp)
@@ -179,7 +178,6 @@ file(GLOB CP0_LVGL_COMMON_SRCS CONFIGURE_DEPENDS
 )
 file(GLOB CP0_LVGL_SDL_SRCS CONFIGURE_DEPENDS
     ${CP0_LVGL_COMMON_SRCS}
-    ${CP0_LVGL}/src/cp0/cp0_camera_viewport.cpp
     ${CP0_LVGL}/src/cp0/cp0_desktop_exec_policy.cpp
     ${CP0_LVGL}/src/cp0/cp0_process_commands.cpp
     ${CP0_LVGL}/src/cp0/cp0_process_lifecycle.cpp
@@ -250,28 +248,6 @@ endif()
 endif() # NOT EMU_SKIP_APPLAUNCH
 
 # ---------------------------------------------------------------------------
-# APP: UserDemo shared lib
-# ---------------------------------------------------------------------------
-file(GLOB_RECURSE USERDEMO_UI_C ${USERDEMO}/ui/*.c)
-
-add_library(UserDemo SHARED ${USERDEMO_UI_C})
-target_include_directories(UserDemo PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib
-    ${USERDEMO}/ui
-    ${USERDEMO}/include
-    ${USERDEMO}
-)
-target_compile_options(UserDemo PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat.h)
-if(APPLE)
-    target_link_options(UserDemo PRIVATE -undefined dynamic_lookup)
-elseif(WIN32)
-    target_link_libraries(UserDemo PRIVATE lvgl)
-else()
-    target_link_options(UserDemo PRIVATE -Wl,--unresolved-symbols=ignore-all)
-endif()
-
-# ---------------------------------------------------------------------------
 # Emulator executable
 # ---------------------------------------------------------------------------
 if(WIN32 AND NOT EMU_SKIP_APPLAUNCH)
@@ -296,15 +272,11 @@ if(WIN32 AND NOT EMU_SKIP_APPLAUNCH)
     target_compile_definitions(cardputer-zero-emu PRIVATE EMU_STATIC_APP=1 HAL_PLATFORM_SDL=1)
     target_link_options(cardputer-zero-emu PRIVATE -Wl,--allow-multiple-definition)
 elseif(WIN32)
-    add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp ${USERDEMO_UI_C})
-    target_include_directories(cardputer-zero-emu PRIVATE
-        ${USERDEMO}/ui ${USERDEMO}/include ${USERDEMO})
-    target_compile_definitions(cardputer-zero-emu PRIVATE EMU_STATIC_APP=1)
+    message(FATAL_ERROR "Windows builds link APPLaunch statically; EMU_SKIP_APPLAUNCH leaves no app to run")
 else()
     add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp)
 endif()
 add_dependencies(cardputer-zero-emu lvgl lvgl_thorvg)
-add_dependencies(cardputer-zero-emu UserDemo)
 if(TARGET APPLaunch)
     add_dependencies(cardputer-zero-emu APPLaunch)
 endif()
@@ -421,7 +393,6 @@ endif()
 # ---------------------------------------------------------------------------
 add_custom_command(TARGET cardputer-zero-emu POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cardputer-zero-emu>/apps
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:UserDemo> $<TARGET_FILE_DIR:cardputer-zero-emu>/apps/
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cardputer-zero-emu>/applications
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cardputer-zero-emu>/images
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${REPO_ROOT}/projects/APPLaunch/APPLaunch/share/images $<TARGET_FILE_DIR:cardputer-zero-emu>/images
@@ -429,7 +400,6 @@ add_custom_command(TARGET cardputer-zero-emu POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${REPO_ROOT}/projects/APPLaunch/APPLaunch/share $<TARGET_FILE_DIR:cardputer-zero-emu>/APPLaunch/share
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cardputer-zero-emu>/assets
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/assets/device_skin.png $<TARGET_FILE_DIR:cardputer-zero-emu>/assets/device_skin.png
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/assets/startup.mp3 $<TARGET_FILE_DIR:cardputer-zero-emu>/assets/startup.mp3
     COMMENT "Copying apps and resources"
 )
 if(TARGET APPLaunch)

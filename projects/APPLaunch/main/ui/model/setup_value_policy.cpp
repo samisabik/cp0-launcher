@@ -15,7 +15,6 @@ namespace {
 
 constexpr int kBrightnessPercentages[] = {100, 75, 50, 25};
 constexpr int kDarkTimes[] = {0, 10, 30, 60, 300};
-constexpr CameraResolution kCameraResolutions[] = {{1280, 720}, {640, 480}};
 
 template <typename T, int N>
 constexpr int array_size(const T (&)[N])
@@ -148,29 +147,6 @@ bool volume_value_valid(int percent)
 {
     return percent >= volume_metric(VolumeMetric::MinPercent) &&
            percent <= volume_metric(VolumeMetric::MaxPercent);
-}
-
-int camera_resolution_index(int width, int height)
-{
-    return width == 640 && height == 480 ? 1 : 0;
-}
-
-CameraResolution camera_resolution(int index)
-{
-    return kCameraResolutions[clamp_index(index, array_size(kCameraResolutions))];
-}
-
-bool camera_resolution_supported(int width, int height)
-{
-    for (const auto &resolution : kCameraResolutions) {
-        if (resolution.width == width && resolution.height == height) return true;
-    }
-    return false;
-}
-
-bool camera_available_from_status(bool callback_received, int status_code)
-{
-    return callback_received && status_code >= 0;
 }
 
 } // namespace setup_values

@@ -12,12 +12,11 @@
 #include <ctime>
 #include <string>
 
-// Launcher preferences stored through cp0_signal_config_api, shared by Settings,
-// the lock screen and the low-battery cues.
+// Launcher preferences stored through cp0_signal_config_api, shared by Settings
+// and the lock screen.
 namespace settings_prefs {
 
 inline constexpr const char *kClock12h = "clock_12h";
-inline constexpr const char *kSystemSounds = "system_sounds";
 
 inline int get_int(const char *key, int fallback)
 {
@@ -89,21 +88,6 @@ inline std::string format_now(bool seconds = false)
     std::tm local{};
     if (!localtime_r(&now, &local)) return "--:--";
     return format_clock(local, seconds);
-}
-
-inline bool system_sounds_enabled()
-{
-    return get_int(kSystemSounds, 1) != 0;
-}
-
-// The one gate for launcher UI cues.
-inline void play_system_sound(const char *asset)
-{
-    if (!asset || !asset[0] || !system_sounds_enabled()) return;
-    try {
-        cp0_signal_system_play(asset);
-    } catch (...) {
-    }
 }
 
 } // namespace settings_prefs

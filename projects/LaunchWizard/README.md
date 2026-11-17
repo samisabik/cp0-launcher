@@ -54,8 +54,7 @@ Install `dist/LaunchWizard` at that exact path and merge `dist/APPLaunch/` into
 `/usr/share/APPLaunch/` to deploy the audio resources as well. The local release
 script and CI bundle both into the APPLaunch package.
 
-Both build paths follow the same `main/src` and `main/ui` layout as the
-HelloWorld reference project.
+Both build paths use the `main/src` and `main/ui` layout.
 
 The SDL acceptance pages can be opened directly with:
 
@@ -90,7 +89,7 @@ temporary files and never change the host's timezone.
 
 ## Key sound
 
-The wizard uses the same six active cues and per-cue volumes as Keyboard-Guide:
+The wizard uses six active cues:
 
 | Feedback | Local WAV | Trigger |
 | --- | --- | --- |
@@ -104,10 +103,9 @@ The wizard uses the same six active cues and per-cue volumes as Keyboard-Guide:
 Each initial key press selects one cue after processing the action; releases
 and auto-repeat do not trigger another sound. Asynchronous results have their
 own feedback. The CC0 files live in `APPLaunch/share/audio/`, alongside their
-license notice. The tutorial's two currently unused assets (`mechanical-complete`
-and `mechanical-progress-step`) are not included.
-Like ZClaw, the project uses SCons `STATIC_FILES` to copy the resource tree to
-`dist/APPLaunch/`. It has no build-time dependency on Keyboard-Guide's assets.
+license notice.
+The project uses SCons `STATIC_FILES` to copy the resource tree to
+`dist/APPLaunch/`.
 Playback resolves resources relative to the executable in both the `dist/`
 layout and the installed `/usr/share/APPLaunch/` layout, regardless of the
 working directory.

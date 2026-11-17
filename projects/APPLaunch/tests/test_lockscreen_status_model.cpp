@@ -15,8 +15,10 @@ int main()
     assert(battery_line(130, 0, 0) == "100%");
     assert(battery_line(-4, 100, -300) == "0%  20m left");
 
-    assert(recordings_line(0, 0) == "none");
-    assert(recordings_line(1, 0) == "1 clip");
-    assert(recordings_line(3, 1) == "3 clips, 1 to transcribe");
+    assert(uptime_line(59) == "0m");
+    assert(uptime_line(12 * 60) == "12m");
+    assert(uptime_line(100 * 60) == "1h 40m");
+    assert(uptime_line((3 * 24 + 4) * 3600 + 59) == "3d 4h");
+    assert(uptime_line(-5) == "0m");
     return 0;
 }

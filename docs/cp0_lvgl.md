@@ -73,7 +73,7 @@ void cp0_dir_watch_stop(cp0_watcher_t watcher);
 int cp0_file_read_first_line(const char *path, char *out, int out_size);
 ```
 
-`cp0_file_path_c` 将逻辑资源名解析为平台路径；常用键包括 `applications`、`appstore_exec`、`calculator_exec`、`adb_helper`、`launcher_settings`、`oobe_marker`、`home_dir`、`lock_file`、`keyboard_device`、`keyboard_map`，以及 `share/images/`、`share/audio/`、字体资源。C++ 可用 `std::string cp0_file_path(std::string)`。
+`cp0_file_path_c` 将逻辑资源名解析为平台路径；常用键包括 `applications`、`adb_helper`、`launcher_settings`、`oobe_marker`、`home_dir`、`lock_file`、`keyboard_device`、`keyboard_map`，以及 `share/images/`、`share/audio/`、字体资源。C++ 可用 `std::string cp0_file_path(std::string)`。
 
 返回的 C 字符串属于当前线程的缓存，不要释放；需要长期保存时立即复制到自己的缓冲区或 `std::string`。
 
@@ -151,9 +151,7 @@ int cp0_time_ntp_set(int enable);
 
 - `cp0_network_default_info_read` / `cp0_eth_info_read`：读取 IPv4、gateway、MAC。
 - `cp0_account_info_read`：读取当前 user 和 hostname。
-- `cp0_system_apt_update_background`、`cp0_system_update_launcher_background`：启动后台更新。
 - `cp0_desktop_exec_is_safe`：返回安全检查结果并写入原因。
-- `cp0_lora_request_stop`、`cp0_lora_clear_stop`：取消/清除 LoRa 初始化停止请求。
 
 ## 4. `cp0_signal_*` 完整用法
 
@@ -163,7 +161,7 @@ int cp0_time_ntp_set(int enable);
 
 #### `cp0_signal_audio_play(std::string path)`
 
-单向播放文件路径，不回调结果。`cp0_signal_system_play(std::string name)` 播放系统音效名；名称可以是平台的三个索引音效，也可以先通过 `RegisterSystemSounds` 注册的名称。
+单向播放文件路径，不回调结果。
 
 #### `cp0_signal_audio_cap(bool enable)`
 
@@ -190,12 +188,6 @@ int cp0_time_ntp_set(int enable);
 | `VolumeWrite` | 0..100 | data 为实际值 |
 | `MuteRead` | 无 | data 为 0/1 |
 | `MuteToggle` | 无 | data 为切换后的 0/1 |
-| `SetSystemSoundNames` | 最多 3 个名称 | 重置平台索引音效名 |
-| `RegisterSystemSounds` | 1..32 个名称 | 追加应用音效名 |
-| `SystemSoundPlay` | 索引 0..2 | 播放索引音效 |
-| `SystemSoundSuspend` | 无 | 暂停系统音效队列 |
-| `SystemSoundPrepare` | 无 | 预热系统音效播放器 |
-| `SystemSoundEnable` | 可省略，或 0/1、on/off 等 | data 为当前 0/1 |
 
 `Play` 的无分隔文件名按资源路径解析；`PlayFile` 按原始路径处理。无 callback 时通常使用 `set_callback` 设置的状态回调。播放/录音错误会返回负 code 和说明文本。
 
@@ -232,10 +224,6 @@ int cp0_time_ntp_set(int enable);
 
 命令：`Path logical_name`（解析路径）、`DirList path`、`DirListDetail path`、`Exists path`、`ReadFile path [max_bytes]`、`EnsureDirForUser path`、`Touch path`、`Remove path`、`WatchStart path`、`WatchPoll handle`、`WatchStop handle`。成功的 `Exists` data 为 `1/0`；`WatchStart` data 为句柄；`WatchPoll` data 为轮询结果；目录列表为编码后的逐行记录。路径不能为空且不能包含 NUL；未知命令 code=-2。
 
-### LoRa：`cp0_signal_lora_api(args, cb)`
-
-命令：`Init`、`Poll`、`Info`、`SendText text`、`StartReceive`、`SetTxMode 0|1`、`Shutdown`。`SendText` 非空且最多 127 字节。`Poll`/`Info` 成功 data 是原始 `cp0_lora_info_t` 二进制（必须按同一 ABI 解码），字段见 `cp0_lvgl_app.h`。`Poll` 会先执行硬件轮询，`Info` 只读当前状态。
-
 ### Wi-Fi：`cp0_signal_wifi_api(args, cb)`
 
 命令：`Status`、`Scan [limit]`（0..32）、`Connect ssid [password]`、`ConnectHidden ssid [password]`、`Disconnect`、`ProfileForget ssid`、`ProfileExists ssid`、`ProfileDisconnectActive`、`RadioEnabled`、`RadioSetEnabled on|off|1|0|true|false`。`Status` data 为 `connected:ssid:ip:signal:ethernet`；`Scan` 每行是 `ssid:signal:security:in_use:saved`，字段中的 `\\`、`\:`、`\n`、`\r` 已转义。推荐使用 C 包装函数解码。
@@ -260,17 +248,13 @@ int cp0_time_ntp_set(int enable);
 
 ### OS 信息和时间：`cp0_signal_osinfo_api` / `cp0_signal_timedate_api`
 
-两者由同一个 OS info 服务处理。命令：`NetworkDefaultInfoRead`、`EthInfoRead`（data 三行 IPv4/gateway/MAC）、`NetworkList`（每行 iface、IPv4、netmask、is_up，以 tab 分隔）、`AccountInfoRead`（user 和 hostname 两行）、`TimeSet timestamp`、`LocalTime`（`year,month,day,hour,minute,second`）、`RandomU32`、`NtpGet`、`NtpSet 0|1`、`AptUpdateBackground`、`UpdateLauncherBackground`。
+两者由同一个 OS info 服务处理。命令：`NetworkDefaultInfoRead`、`EthInfoRead`（data 三行 IPv4/gateway/MAC）、`NetworkList`（每行 iface、IPv4、netmask、is_up，以 tab 分隔）、`AccountInfoRead`（user 和 hostname 两行）、`TimeSet timestamp`、`LocalTime`（`year,month,day,hour,minute,second`）、`RandomU32`、`NtpGet`、`NtpSet 0|1`。
 
 ### 电池和截图
 
 - `cp0_signal_bq27220_api(args, cb)`：`Read` 返回编码后的 `cp0_battery_info_t`；`Calibrate index` 执行校准命令，当前有效索引为 0..3。推荐 `cp0_battery_read` / `cp0_bq27220_calibrate`。
 - `cp0_signal_screenshot_api(args, cb)`：`Save directory` 将当前 framebuffer 保存为 BMP，成功 data 为完整文件路径。设备端支持 16/32 bpp；SDL 端可能采用模拟实现。
 - `cp0_signal_battery_pub(std::function<void()> callback)`：触发一次电池发布。当前后端会读取缓存并向活动 LVGL screen 发送电池事件，传入的 callback 参数仅为信号签名兼容而保留，不要把它当作订阅注册接口；调用应发生在 LVGL 线程，避免阻塞。
-
-### 摄像头：`cp0_signal_camera_api(args, cb)`
-
-命令：`Open [width] [height]`、`Start [width] [height]`、`Close`、`Stop`、`Capture [path] [width] [height]`、`Photo [path] [width] [height]`、`Status`、`SetCallback`、`SetFrameCallback`、`ZoomIn`、`ZoomOut`、`Pan dx dy`。默认尺寸 320x150。`Status` code=0 表示 streaming，code=1 表示 stopped；不支持 libcamera 时返回 -10。帧回调属于后端线程语境，UI 使用前必须转发到 LVGL 线程；关闭摄像头会清除两个 callback。
 
 ### 声卡：`cp0_signal_soundcard_api(args, cb)`
 
@@ -313,4 +297,4 @@ int cp0_time_ntp_set(int enable);
 1. 先看本文件和 `include/signal_register_plan.h`，确认调用签名、命令名、返回编码。
 2. 修改接口时同步更新设备端与 SDL 后端、C 包装函数、调用方和测试；新增外部信号必须在 `signal_register_plan.h` 使用 `def_hal_fun` 声明。
 3. 修 bug 时必须检查对应实现文件和 contract 文件，不能只根据本文推断行为；重点检查回调线程、服务是否初始化、反初始化是否仍有后台线程、wire 数据是否需要转义。
-4. 运行模块测试：`ext_components/cp0_lvgl/tests/run_tests.sh`。涉及平台命令、BlueZ、libcamera、framebuffer 或 sudo 的改动，还要在目标平台做对应集成验证。
+4. 运行模块测试：`ext_components/cp0_lvgl/tests/run_tests.sh`。涉及平台命令、BlueZ、framebuffer 或 sudo 的改动，还要在目标平台做对应集成验证。

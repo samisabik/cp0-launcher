@@ -76,6 +76,8 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_cli_app},
     {{"Python", "python_100.png", "app_Python", true, false},
      "python3", true, false, false, nullptr, create_python_help},
+    {{"Files", "line/files.png", "app_Files", true, false},
+     nullptr, false, true, false, append_page_app<UIFilesPage>},
 #if defined(__linux__) && !defined(HAL_PLATFORM_SDL)
     {{"SSH", "ssh_100.png", "app_SSH", true, false},
      nullptr, false, true, false, append_page_app<UISSHPage>},

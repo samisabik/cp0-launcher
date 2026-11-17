@@ -18,7 +18,6 @@ LockscreenDecision press(LockscreenStateModel &model, uint32_t key_code, uint32_
     const LockscreenDecision release = model.handle_key(key_code, false, true, now + 1);
     assert(release.consumed);
     assert(!release.show_panel && !release.sleep && !release.unlock);
-    assert(!release.blocked);
     return decision;
 }
 
@@ -36,14 +35,13 @@ int main()
     LockscreenDecision decision = press(model, KEY_ESC, 2000);
     assert(decision.consumed && decision.show_panel);
     assert(!decision.sleep && !decision.unlock);
-    assert(!decision.blocked);
     assert(model.state() == LockscreenState::PendingUnlock);
     assert(model.visible());
 
     // (2) ESC returns to the black screen immediately.
     decision = press(model, KEY_ESC, 3000);
     assert(decision.consumed && decision.sleep);
-    assert(!decision.show_panel && !decision.unlock && !decision.blocked);
+    assert(!decision.show_panel && !decision.unlock);
     assert(model.state() == LockscreenState::Locked);
 
     // Wake again. Other keys only count as activity while the panel is visible.
@@ -51,18 +49,18 @@ int main()
     assert(decision.consumed && decision.show_panel);
     assert(model.state() == LockscreenState::PendingUnlock);
     decision = press(model, KEY_SPACE, 4000);
-    assert(decision.consumed && decision.blocked);
+    assert(decision.consumed);
     assert(!decision.show_panel && !decision.sleep && !decision.unlock);
     assert(model.state() == LockscreenState::PendingUnlock);
 
     // (2) -> (3) on TAB, and the panel is refreshed for the new hint.
     decision = press(model, KEY_TAB, 5000);
-    assert(decision.consumed && decision.show_panel && !decision.blocked);
+    assert(decision.consumed && decision.show_panel);
     assert(model.state() == LockscreenState::Armed);
 
     // (3) -> (2) on any key that is not a confirmation.
     decision = press(model, KEY_TAB, 6000);
-    assert(decision.consumed && decision.show_panel && decision.blocked);
+    assert(decision.consumed && decision.show_panel);
     assert(!decision.unlock);
     assert(model.state() == LockscreenState::PendingUnlock);
 
@@ -72,7 +70,7 @@ int main()
     // (3) + ENTER leaves the lock screen; the caller resets for the next entry.
     decision = press(model, KEY_ENTER, 8000);
     assert(decision.consumed && decision.unlock);
-    assert(!decision.show_panel && !decision.sleep && !decision.blocked);
+    assert(!decision.show_panel && !decision.sleep);
     model.reset(7001);
     assert(model.state() == LockscreenState::Locked);
 
@@ -101,7 +99,6 @@ int main()
         const LockscreenDecision repeat = model.handle_key(KEY_TAB, false, false, 20100 + step * 50);
         assert(repeat.consumed);
         assert(!repeat.show_panel && !repeat.sleep && !repeat.unlock);
-        assert(!repeat.blocked);
     }
     assert(model.state() == LockscreenState::PendingUnlock);
     // The held key's release must not advance the machine either.
@@ -123,7 +120,7 @@ int main()
     assert(!model.poll(109999).sleep);
     // A non-navigation press resets the countdown, even one that does not change state.
     const LockscreenDecision activity = model.handle_key(KEY_SPACE, true, false, 105000);
-    assert(activity.consumed && !activity.show_panel && activity.blocked);
+    assert(activity.consumed && !activity.show_panel);
     assert(!model.poll(114999).sleep);
     assert(model.poll(115000).sleep);
 

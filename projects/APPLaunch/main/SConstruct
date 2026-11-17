@@ -22,8 +22,6 @@ SRCS = []
 INCLUDE = []
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['cp0_lvgl', 'eventpp', 'utilities', 'lvgl_component', 'freetype', 'pthread']
-if 'CONFIG_CP0_LVGL_INIT_LORA' in os.environ:
-    REQUIREMENTS += ['RadioLib']
 # REQUIREMENTS = []
 STATIC_LIB = []
 DYNAMIC_LIB = []
@@ -32,9 +30,6 @@ DEFINITIONS_PRIVATE = []
 LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
-
-REQUIREMENTS += [':libcurl.so.4']
-DEFINITIONS += ['-DAPPLAUNCH_USE_LIBCURL=1']
 
 # Generate page_app includes into build output so builds do not rewrite source files.
 def run_python_script(script_rel_path, args=None):
@@ -140,7 +135,6 @@ if 'CONFIG_APPLAUNCH_CROSS' in os.environ:
     lvgl_component['DEFINITIONS'] += ['-D_REENTRANT']
     lvgl_component['INCLUDE'] += [rootfs_path/"usr"/"include"/"freetype2",
                                   rootfs_path/"usr"/"include"/"libpng16",
-                                  rootfs_path/"usr"/"include"/"libcamera",
                                   ]
     LDFLAGS += [rootfs_path/"usr"/"lib"/"aarch64-linux-gnu"/"libstdc++.so.6"]
 
@@ -165,7 +159,6 @@ if 'CONFIG_APPLAUNCH_MAC_CROSS_CP0' in os.environ:
 
     REQUIREMENTS += ['cp0_lvgl']
     REQUIREMENTS += ['input', 'xkbcommon', 'udev', 'freetype']
-    # The camera service is not enabled for the launcher, so libcamera is not linked.
     LDFLAGS += [f'{os.environ.get("CONFIG_TOOLCHAIN_SYSROOT", "")}/usr/lib/aarch64-linux-gnu/libstdc++.so.6',f'-Wl,-rpath-link,{os.environ.get("CONFIG_TOOLCHAIN_SYSROOT", "")}/usr/lib/aarch64-linux-gnu',f'-B{os.environ.get("CONFIG_TOOLCHAIN_SYSROOT", "")}/usr/lib/aarch64-linux-gnu']
     DEFINITIONS += ['-Wno-format-truncation']
 # macOS

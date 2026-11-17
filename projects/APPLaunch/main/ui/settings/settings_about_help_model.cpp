@@ -90,8 +90,6 @@ D-Bus, AFL-2.1 or GPL-2.0-or-later
 https://gitlab.freedesktop.org/dbus/dbus
 GLib, LGPL-2.1-or-later
 https://gitlab.gnome.org/GNOME/glib
-curl, curl license
-https://github.com/curl/curl
 miniaudio, Unlicense or MIT-0
 https://github.com/mackron/miniaudio
 eventpp, Apache-2.0
@@ -133,14 +131,6 @@ Departure Mono, SIL OFL-1.1
 https://departuremono.com
 DejaVu, Bitstream Vera and Arev licenses
 https://github.com/dejavu-fonts/dejavu-fonts
-Alibaba PuHuiTi 3.0, Alibaba PuHuiTi Font License
-https://www.alibabafonts.com
-JetBrains Mono, SIL OFL-1.1
-https://github.com/JetBrains/JetBrainsMono
-Noto Sans CJK, SIL OFL-1.1
-https://github.com/notofonts
-Liberation Mono, SIL OFL-1.1
-https://github.com/liberationfonts/liberation-fonts
 Montserrat, SIL OFL-1.1
 https://github.com/JulietaUla/Montserrat)CP0_LICENSES"),
     };

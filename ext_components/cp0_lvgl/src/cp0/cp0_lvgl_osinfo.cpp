@@ -13,14 +13,13 @@
 #include "../cp0_signal_registration.hpp"
 #include "../cp0_sync_signal.hpp"
 #include "../cp0_update_job.hpp"
-#include "../cp0_launcher_updater.hpp"
+#include "../cp0_system_upgrade.hpp"
 #include "cp0_process_commands.hpp"
 #include "cp0_timedate_client.hpp"
 
-#include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <chrono>
-#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -28,6 +27,7 @@
 #include <list>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <random>
 #include <pwd.h>
 #include <sstream>
@@ -55,35 +55,28 @@ public:
         operations_.random_u32 = random_u32;
         operations_.get_ntp = ntp_get;
         operations_.set_ntp = ntp_set;
-        operations_.apt_update_background = apt_update_background;
-        operations_.update_launcher_background = update_launcher_background;
     }
 
     void api_call(arg_t arg, callback_t callback)
     {
         const std::string command = arg.empty() ? std::string() : arg.front();
-        if (command == "UpdateLauncherCheckStart") {
-            auto progress = std::make_shared<std::atomic<int>>(0);
-            const std::string id = jobs_.start(
-                [progress](const std::atomic<bool> &cancel) {
-                    return check_launcher(cancel, *progress);
-                },
-                [progress] { return "checking:" + std::to_string(progress->load()); });
-            cp0::callback::invoke(callback, 0, id);
-            return;
-        }
-        if (command == "AptUpdateStart" || command == "UpdateLauncherStart") {
-            const bool launcher = command == "UpdateLauncherStart";
-            std::string id;
-            if (launcher) {
-                id = jobs_.start(
-                    [](const std::atomic<bool> &cancel) { return update_launcher(cancel); },
-                    [] { return launcher_progress(); });
-            } else {
-                id = jobs_.start(
-                    [](const std::atomic<bool> &cancel) { return apt_update(cancel); });
+        if (command == "SystemUpgradeStart") {
+            // One upgrade at a time: a second start returns the running job so
+            // a reopened settings page can follow it again.
+            std::lock_guard<std::mutex> lock(upgrade_mutex_);
+            if (!upgrade_running_->load()) {
+                upgrade_running_->store(true);
+                const std::string log = system_upgrade_log_path();
+                auto running = upgrade_running_;
+                upgrade_id_ = jobs_.start(
+                    [log, running](const std::atomic<bool> &) {
+                        const cp0::update::Result result = system_upgrade(log);
+                        running->store(false);
+                        return result;
+                    },
+                    [log] { return cp0::system_upgrade::progress(read_file(log)); });
             }
-            cp0::callback::invoke(callback, 0, id);
+            cp0::callback::invoke(callback, 0, upgrade_id_);
             return;
         }
         if (command == "UpdateJobStatus") {
@@ -95,13 +88,6 @@ public:
         if (command == "UpdateJobCancel") {
             const auto id = arg.size() > 1 ? *std::next(arg.begin()) : std::string();
             cp0::callback::invoke(callback, jobs_.cancel(id) ? 0 : -1, {});
-            return;
-        }
-        if (command == "UpdateLauncherState") {
-            std::ifstream input(update_state_root() + "/status");
-            std::string status;
-            std::getline(input, status);
-            cp0::callback::invoke(callback, input.bad() || status.empty() ? -1 : 0, status);
             return;
         }
         const cp0::osinfo::Result result = cp0::osinfo::dispatch(arg, operations_);
@@ -123,110 +109,47 @@ public:
 private:
     cp0::osinfo::Operations operations_;
     cp0::update::Jobs jobs_;
+    std::mutex upgrade_mutex_;
+    std::shared_ptr<std::atomic<bool>> upgrade_running_ = std::make_shared<std::atomic<bool>>(false);
+    std::string upgrade_id_;
 
-    static std::string update_state_root()
+    static std::string system_upgrade_log_path()
     {
-        const char *configured_root = std::getenv("APPLAUNCH_UPDATE_STATE_DIR");
-        return configured_root && configured_root[0]
-            ? configured_root : "/var/lib/applaunch-updater";
+        const char *runtime = std::getenv("XDG_RUNTIME_DIR");
+        return std::string(runtime && runtime[0] ? runtime : "/tmp") + "/cp0-system-upgrade.log";
     }
 
-    static std::string update_release_url()
+    static std::string read_file(const std::string &path)
     {
-        const char *configured_url = std::getenv("APPLAUNCH_UPDATE_RELEASE_URL");
-        return configured_url && configured_url[0]
-            ? configured_url
-            : "https://github.com/CardputerZero/launcher/releases/download/launcher-latest";
+        std::ifstream input(path);
+        std::ostringstream text;
+        text << input.rdbuf();
+        return text.str();
     }
 
-    static std::string launcher_progress()
+    // apt-get update, then a non-interactive apt-get upgrade that keeps local
+    // config files. Held packages (the launcher itself) stay as they are.
+    // Neither step is cancellable: interrupting dpkg leaves it half-configured.
+    static cp0::update::Result system_upgrade(const std::string &log)
     {
-        std::ifstream input(update_state_root() + "/status");
-        std::string state;
-        if (!std::getline(input, state)) return {};
-        if (state == "downloading" || state == "repairing" ||
-            state == "installing" || state == "restarting" ||
-            state.rfind("recovering:", 0) == 0)
-            return state;
-        for (const char *stage : {"downloading", "repairing", "installing", "restarting"}) {
-            const std::string prefix = std::string(stage) + ":";
-            if (state.rfind(prefix, 0) != 0) continue;
-            const std::string value = state.substr(prefix.size());
-            if (value.empty() || value.size() > 3 ||
-                !std::all_of(value.begin(), value.end(), [](unsigned char c) { return std::isdigit(c); }))
-                return {};
-            const int percent = std::atoi(value.c_str());
-            return percent <= 100 ? state : std::string();
-        }
-        return {};
-    }
-
-    static cp0::update::Result check_launcher(const std::atomic<bool> &cancel,
-                                               std::atomic<int> &progress)
-    {
-        auto capture = [&cancel](const std::vector<std::string> &arguments,
-                                 std::string &output) {
-            return cp0_process_commands::capture_argv_with_timeout(
-                arguments, output, 120000, &cancel);
-        };
-        return cp0::update::check_launcher(
-            capture, update_release_url(),
-            [&progress](int value) { progress.store(value); });
-    }
-
-    static cp0::update::Result apt_update(const std::atomic<bool> &cancel)
-    {
+        const std::string apt =
+            "sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -q -o APT::Status-Fd=1 ";
+        const std::string quoted_log = "'" + log + "'";
         std::string output;
-        const int code = cp0_process_commands::capture_argv_with_timeout(
-            {"systemctl", "start", "applaunch-apt-update.service"},
-            output, 300000, &cancel);
-        if (code == -ECANCELED) {
-            std::string ignored;
-            cp0_process_commands::capture_argv_with_timeout(
-                {"systemctl", "stop", "applaunch-apt-update.service"},
-                ignored, 30000, nullptr);
-        }
-        return {code, code == 0 ? "completed" : (code == -ECANCELED ? "cancelled" : "apt-update")};
+        int code = cp0_process_commands::capture_argv_with_timeout(
+            {"sh", "-c", std::string("echo ") + cp0::system_upgrade::kPhaseUpdate + " > " + quoted_log + "; " +
+                             apt + "update >> " + quoted_log},
+            output, 600000, nullptr);
+        if (code != 0) return {code, cp0::system_upgrade::failure(output, "apt-update")};
+        code = cp0_process_commands::capture_argv_with_timeout(
+            {"sh", "-c", std::string("echo ") + cp0::system_upgrade::kPhaseUpgrade + " >> " + quoted_log + "; " +
+                             apt + "-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "
+                                   "upgrade >> " + quoted_log},
+            output, 7200000, nullptr);
+        if (code != 0) return {code, cp0::system_upgrade::failure(output, "apt-upgrade")};
+        return {0, cp0::system_upgrade::summary(read_file(log))};
     }
 
-    static cp0::update::Result update_launcher(const std::atomic<bool> &cancel)
-    {
-        auto timeout_for = [](const std::vector<std::string> &arguments) {
-            if (!arguments.empty() && arguments.front() == "systemctl") return 1200000;
-            return 30000;
-        };
-        auto argv = [timeout_for, &cancel](const std::vector<std::string> &arguments) {
-            std::string ignored;
-            return cp0_process_commands::capture_argv_with_timeout(
-                arguments, ignored, timeout_for(arguments), &cancel);
-        };
-        auto capture = [timeout_for, &cancel](const std::vector<std::string> &arguments,
-                                     std::string &output) {
-            return cp0_process_commands::capture_argv_with_timeout(
-                arguments, output, timeout_for(arguments), &cancel);
-        };
-        const cp0::update::Result apt_result = apt_update(cancel);
-        if (apt_result.code != 0) return apt_result;
-        cp0::update::Result result = cp0::update::launcher(argv, capture);
-        if (result.code != -ECANCELED) return result;
-
-        std::string ignored;
-        const int stop_code = cp0_process_commands::capture_argv_with_timeout(
-            {"systemctl", "stop", "applaunch-updater.service"},
-            ignored, 330000, nullptr);
-        if (stop_code != 0) return {stop_code, "cancel-stop"};
-
-        std::string state;
-        const int state_code = cp0_process_commands::capture_argv_with_timeout(
-            {"cat", update_state_root() + "/status"}, state, 30000, nullptr);
-        state = cp0::update::trim(std::move(state));
-        if (state_code == 0 && state == "cancelled") return {-ECANCELED, "cancelled"};
-        if (state_code == 0 && state.rfind("succeeded:", 0) == 0)
-            return {0, state.substr(10)};
-        if (state_code == 0 && state.rfind("failed:", 0) == 0)
-            return {-1, state.substr(7)};
-        return {-EIO, "cancel-state"};
-    }
 
     static uint32_t random_u32() noexcept
     {
@@ -334,16 +257,6 @@ private:
         return cp0_timedate_set_ntp(enable ? 1 : 0);
     }
 
-    static int apt_update_background()
-    {
-        return -ENOTSUP;
-    }
-
-    static int update_launcher_background()
-    {
-        return -ENOTSUP;
-    }
-
 public:
     static int api_eth_info(const char *command, cp0_eth_info_t *info)
     {
@@ -409,14 +322,4 @@ extern "C" int cp0_time_ntp_get(void)
 extern "C" int cp0_time_ntp_set(int enable)
 {
     return OsInfoSystem::api_simple({"NtpSet", enable ? "1" : "0"});
-}
-
-extern "C" int cp0_system_apt_update_background(void)
-{
-    return OsInfoSystem::api_simple({"AptUpdateBackground"});
-}
-
-extern "C" int cp0_system_update_launcher_background(void)
-{
-    return OsInfoSystem::api_simple({"UpdateLauncherBackground"});
 }

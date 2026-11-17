@@ -48,7 +48,7 @@ public:
     lv_font_t *get_mono(const char *font_name, uint16_t size,
                         lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL);
     // UI font: kCp0ChromeFont at the nearest crisp size (11 or 22 px), falling
-    // back to DejaVu Sans and then the CJK font for glyphs it does not cover.
+    // back to DejaVu Sans for glyphs it does not cover.
     lv_font_t *get_chrome(uint16_t size);
 
     lv_font_t *fallback(uint16_t size) const;

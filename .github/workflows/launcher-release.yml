@@ -3,22 +3,17 @@ name: Publish APPLauncher release
 run-name: Publish APPLauncher ${{ inputs.version }}
 
 # Reviewed release gate. Merges only build artifacts (launcher-build.yml); this
-# workflow is the single path that publishes a GitHub Release and refreshes the
-# launcher-latest update channel, and it can only be started by hand, on master,
-# after the change has been reviewed and merged.
+# workflow is the single path that publishes a GitHub Release, and it can only be
+# started by hand, on master, after the change has been reviewed and merged.
 #
 # The publish job in launcher-build.yml runs in the `release` environment. Add
 # required reviewers to that environment in the repository settings to make it
 # a real approval gate.
-#
-# Recovery: if the channel update fails after the versioned release was created,
-# use "Re-run failed jobs" on that run. It re-runs only the publish job and
-# overwrites the channel assets; re-running all jobs would bump the version.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (X.Y.Z). Must be greater than every version installed on devices; check the launcher-latest update channel first."
+        description: "Release version (X.Y.Z). Must be greater than every version installed on devices; check the existing releases first."
         required: true
         type: string
       confirm:

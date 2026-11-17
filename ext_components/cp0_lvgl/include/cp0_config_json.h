@@ -9,9 +9,9 @@
 // Minimal JSON <-> flat "dotted key" store used by the unified device config
 // (~/.config/cardputerzero/config.json). The launcher's config system keeps a
 // flat key=value model internally; nested JSON objects map to dotted keys, e.g.
-//   camera.resolution.width -> { "camera": { "resolution": { "width": .. }}}
-// This keeps the shared contract with other apps (the camera app reads
-// camera.resolution.{width,height}) while the launcher still uses simple keys.
+//   limits.maximum -> { "limits": { "maximum": .. }}
+// This keeps a nested JSON file that other apps can read while the launcher
+// still uses simple keys.
 //
 // Only objects, strings and numbers are emitted; arrays/true/false/null are
 // tolerated on read but never written (the launcher is the sole writer).

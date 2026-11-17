@@ -22,8 +22,8 @@ public:
     // reach the speaker have to tell the two apart. While no sink exists at
     // all, pipewire-pulse reports the special name "@DEFAULT_SINK@" instead.
     // Defined inline because shared callers such as commount.cpp are also built
-    // by the emulator and AppStore targets, which do not compile the
-    // libpulse-backed implementation in cp0_audio_mixer_control.cpp.
+    // by the emulator target, which does not compile the libpulse-backed
+    // implementation in cp0_audio_mixer_control.cpp.
     static bool is_hardware_sink_name(const char *name)
     {
         if (!name || !name[0] || name[0] == '@')
@@ -45,8 +45,8 @@ public:
 // the launcher, but the transitions are the part that usually breaks, so they
 // stay pure: no clock, no audio server, no signals.
 // Defined inline for the same reason as is_hardware_sink_name: commount.cpp is
-// built by the emulator and AppStore targets, which do not compile the
-// libpulse-backed implementation in cp0_audio_mixer_control.cpp.
+// built by the emulator target, which does not compile the libpulse-backed
+// implementation in cp0_audio_mixer_control.cpp.
 struct Cp0VolumeRestoreStep
 {
     enum class Action

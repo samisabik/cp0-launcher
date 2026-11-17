@@ -53,9 +53,9 @@ void test_feature_order()
     assert(position(plan, CP0_INIT_STEP_DISPLAY) < position(plan, CP0_INIT_STEP_INPUT));
     assert(position(plan, CP0_INIT_STEP_INPUT) < position(plan, CP0_INIT_STEP_RPC));
     assert(position(plan, CP0_INIT_STEP_RPC) < position(plan, CP0_INIT_STEP_AUDIO));
-    assert(position(plan, CP0_INIT_STEP_SCREENSHOT) < position(plan, CP0_INIT_STEP_LORA));
+    assert(position(plan, CP0_INIT_STEP_SCREENSHOT) < position(plan, CP0_INIT_STEP_WIFI));
     assert(position(plan, CP0_INIT_STEP_BQ27220) < position(plan, CP0_INIT_STEP_SAVED_SETTINGS));
-    assert(position(plan, CP0_INIT_STEP_BATTERY) < position(plan, CP0_INIT_STEP_CAMERA));
+    assert(position(plan, CP0_INIT_STEP_BATTERY) < position(plan, CP0_INIT_STEP_SOUNDCARD));
 }
 
 void test_selected_features_and_capacity()

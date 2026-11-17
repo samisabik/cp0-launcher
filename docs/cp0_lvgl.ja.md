@@ -61,7 +61,7 @@ void cp0_dir_watch_stop(cp0_watcher_t watcher);
 int cp0_file_read_first_line(const char *path, char *out, int out_size);
 ```
 
-`cp0_file_path_c` は `applications`、`appstore_exec`、`calculator_exec`、`adb_helper`、`launcher_settings`、`oobe_marker`、`home_dir`、`lock_file`、`keyboard_device`、`keyboard_map`、`share/images/`、`share/audio/`、フォントなどの論理名を解決します。返される C 文字列はスレッドローカルキャッシュに属するため、長く保持する場合はコピーしてください。watcher handle はモジュール所有の非ゼロ値で、対応する start/poll/stop の組だけで使用します。
+`cp0_file_path_c` は `applications`、`adb_helper`、`launcher_settings`、`oobe_marker`、`home_dir`、`lock_file`、`keyboard_device`、`keyboard_map`、`share/images/`、`share/audio/`、フォントなどの論理名を解決します。返される C 文字列はスレッドローカルキャッシュに属するため、長く保持する場合はコピーしてください。watcher handle はモジュール所有の非ゼロ値で、対応する start/poll/stop の組だけで使用します。
 
 ### ネットワークと Wi-Fi
 
@@ -75,7 +75,7 @@ int cp0_file_read_first_line(const char *path, char *out, int out_size);
 
 ### バッテリー、バックライト、時刻
 
-`cp0_battery_read` は最新のバックグラウンド snapshot のみを読み、ハードウェア I/O は行いません。`valid == 1` の場合だけ利用します。`cp0_bq27220_calibrate` の index は 0..3、バックライト書き込みは 0..max に clamp されます。`cp0_time_set` の形式は `YYYY-MM-DD HH:MM:SS` で、RTC を永続化するには NTP を無効にします。Ethernet/account 情報、時刻文字列、背景更新、LoRa 初期化停止 API も提供します。
+`cp0_battery_read` は最新のバックグラウンド snapshot のみを読み、ハードウェア I/O は行いません。`valid == 1` の場合だけ利用します。`cp0_bq27220_calibrate` の index は 0..3、バックライト書き込みは 0..max に clamp されます。`cp0_time_set` の形式は `YYYY-MM-DD HH:MM:SS` で、RTC を永続化するには NTP を無効にします。Ethernet/account 情報と時刻文字列の API も提供します。
 
 ## `cp0_signal_*` 完全な使い方
 
@@ -85,9 +85,8 @@ int cp0_file_read_first_line(const char *path, char *out, int out_size);
 
 - `cp0_signal_audio_play(std::string path)`: パスを再生する一方向信号。
 - `cp0_signal_audio_cap(bool enable)`: 録音の開始/停止。
-- `cp0_signal_system_play(std::string name)`: システム音を名前で再生。追加名は `RegisterSystemSounds` で登録します。
 - `cp0_signal_audio_setup`: `{"set_callback"}`、`{"set_waveform"}` または `{"set_waveform","0"}`、`{"stop_play"}`。
-- `cp0_signal_audio_api`: `PlayFile path`、`Play asset`、`PlayPause`、`PlayContinue`、`PlayEnd`、`Cap`、`CapPause`、`CapContinue`、`CapEnd`、`CapFileSave path`、`SetCallback`、`Preload`、`VolumeRead`、`VolumeWrite 0..100`、`DefaultSink`（sink 名。実 sink がない backend は code -1 と空 data）、`MuteRead`、`MuteToggle`、`SetSystemSoundNames [最大3名]`、`RegisterSystemSounds [1..32名]`、`SystemSoundPlay 0..2`、`SystemSoundSuspend`、`SystemSoundPrepare`、`SystemSoundEnable [0/1 または on/off]`。`Preload` は最初の音量操作より前にミキサークライアントを読み込みます。`Play` は区切り文字のない名前を resource として解決し、`PlayFile` は指定パスを使います。
+- `cp0_signal_audio_api`: `PlayFile path`、`Play asset`、`PlayPause`、`PlayContinue`、`PlayEnd`、`Cap`、`CapPause`、`CapContinue`、`CapEnd`、`CapFileSave path`、`SetCallback`、`Preload`、`VolumeRead`、`VolumeWrite 0..100`、`DefaultSink`（sink 名。実 sink がない backend は code -1 と空 data）、`MuteRead`、`MuteToggle`。`Preload` は最初の音量操作より前にミキサークライアントを読み込みます。`Play` は区切り文字のない名前を resource として解決し、`PlayFile` は指定パスを使います。
 
 ### PTY
 
@@ -99,9 +98,7 @@ int cp0_file_read_first_line(const char *path, char *out, int out_size);
 
 `cp0_signal_filesystem_api` は `Path logical_name`、`DirList path`、`DirListDetail path`、`Exists path`、`ReadFile path [max_bytes]`、`EnsureDirForUser path`、`Touch path`、`Remove path`、`WatchStart path`、`WatchPoll handle`、`WatchStop handle` を提供します。`Exists` は `1/0`、空または NUL を含むパスは無効、未知コマンドは code -2 です。
 
-### LoRa: `cp0_signal_lora_api(args, cb)` と Wi-Fi: `cp0_signal_wifi_api(args, cb)`
-
-LoRa のコマンドは `Init`、`Poll`、`Info`、`SendText text`、`StartReceive`、`SetTxMode 0|1`、`Shutdown`。text は空でなく最大 127 byte、`Poll`/`Info` の data は raw `cp0_lora_info_t` です。`Poll` は hardware poll を実行し、`Info` は状態だけを読みます。
+### Wi-Fi: `cp0_signal_wifi_api(args, cb)`
 
 Wi-Fi のコマンドは `Status`、`Scan [0..32]`、`Connect ssid [password]`、`ConnectHidden ssid [password]`、`Disconnect`、`ProfileForget ssid`、`ProfileExists ssid`、`ProfileDisconnectActive`、`RadioEnabled`、`RadioSetEnabled on|off|1|0|true|false`。Status は `connected:ssid:ip:signal:ethernet`、Scan は 1 行ごとに `ssid:signal:security:in_use:saved` です。backslash、colon、LF、CR は escape されます。
 
@@ -117,12 +114,11 @@ Settings のコマンドは `BacklightRead`、`BacklightMax`、`BacklightWrite v
 
 Process のコマンドは `ExecBlocking executable keep_root`、`Spawn executable keep_root`、`Stop pid`、`CheckLock path`、`Kill pid grace_ms`、`RunArgv background argv...`、legacy の `RunSudo`、`CaptureArgv argv...`、`AdbStatus`、`DesktopExecIsSafe executable`、`Shutdown`、`Reboot`、`DelayMs milliseconds`。`Shutdown` と `Reboot` は `systemctl poweroff|reboot --check-inhibitors=yes` を実行するため、block inhibitor（パッケージのインストールや更新）があると拒否されます。拒否時の code は systemctl の終了コード、data はその出力の 1 行目です。OS 情報と timedate は同じ service で、network/account 情報、`TimeSet`、`LocalTime`、`RandomU32`、`NtpGet`、`NtpSet`、背景更新を処理します。
 
-### Battery、screenshot、camera、soundcard
+### Battery、screenshot、soundcard
 
 - `cp0_signal_bq27220_api`: `Read` は encoded `cp0_battery_info_t`、`Calibrate index` は 0..3。
 - `cp0_signal_screenshot_api`: `Save directory` は BMP を保存し、完全パスを返します。
 - `cp0_signal_battery_pub(std::function<void()>)`: active LVGL screen に一度 battery event を発行します。引数は互換性のためで、subscription 登録ではありません。LVGL スレッドで呼びます。
-- `cp0_signal_camera_api`: `Open [width] [height]`、`Start`、`Close`、`Stop`、`Capture`、`Photo`、`Status`、`SetCallback`、`SetFrameCallback`、`ZoomIn`、`ZoomOut`、`Pan dx dy`。既定は 320x150、libcamera がない場合は -10。frame callback は別スレッドの場合があるため LVGL へ marshal します。
 - `cp0_signal_soundcard_api`: `ListCards`、`ListControls card_index`、`GetControlDetail card_index control`、`SetControl card_index control value`。値は raw `amixer` テキストです。
 
 ### Sudo signal
@@ -138,4 +134,4 @@ Process のコマンドは `ExecBlocking executable keep_root`、`Spawn executab
 1. call site を変更する前に本書と `include/signal_register_plan.h` を読みます。
 2. インターフェースを変更したら、英語・中国語・日本語の 3 文書、対応 contract、C wrapper、call site、テストを更新します。
 3. バグ修正では実装と contract を確認し、callback thread、初期化、teardown、worker、wire escape を検証します。
-4. `ext_components/cp0_lvgl/tests/run_tests.sh` を実行します。Linux command、BlueZ、libcamera、framebuffer、sudo に関わる変更は対象デバイスでも検証します。
+4. `ext_components/cp0_lvgl/tests/run_tests.sh` を実行します。Linux command、BlueZ、framebuffer、sudo に関わる変更は対象デバイスでも検証します。

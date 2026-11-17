@@ -54,8 +54,6 @@ bool is_no_argument_command(const std::string &command, ApiCommand &parsed)
     else if (command == "DefaultSink") parsed = ApiCommand::DefaultSink;
     else if (command == "MuteRead") parsed = ApiCommand::MuteRead;
     else if (command == "MuteToggle") parsed = ApiCommand::MuteToggle;
-    else if (command == "SystemSoundSuspend") parsed = ApiCommand::SystemSoundSuspend;
-    else if (command == "SystemSoundPrepare") parsed = ApiCommand::SystemSoundPrepare;
     else return false;
     return true;
 }
@@ -83,33 +81,6 @@ bool parse_api_request(const std::list<std::string> &args, ApiRequest &request)
     if (command == "VolumeWrite") {
         request.command = ApiCommand::VolumeWrite;
         return args.size() == 2 && parse_integer(*argument, 0, 100, request.value);
-    }
-    if (command == "SystemSoundPlay") {
-        request.command = ApiCommand::SystemSoundPlay;
-        return args.size() == 2 && parse_integer(*argument, 0, 2, request.value);
-    }
-    if (command == "SystemSoundEnable") {
-        request.command = ApiCommand::SystemSoundEnable;
-        if (args.size() == 1) {
-            request.enabled = true;
-            return true;
-        }
-        return args.size() == 2 && parse_boolean(*argument, request.enabled);
-    }
-    if (command == "SetSystemSoundNames") {
-        request.command = ApiCommand::SetSystemSoundNames;
-        if (args.size() > 4)
-            return false;
-        request.names.assign(argument, args.end());
-        return true;
-    }
-    if (command == "RegisterSystemSounds") {
-        request.command = ApiCommand::RegisterSystemSounds;
-        if (args.size() < 2 ||
-            args.size() > kMaxRegisteredSystemSounds + 1)
-            return false;
-        request.names.assign(argument, args.end());
-        return true;
     }
     return false;
 }

@@ -37,7 +37,6 @@ void deinit_rpc(void) noexcept;
 #else
 void deinit_rpc(void);
 #endif
-void init_lora(void);
 void init_wifi();
 void init_bluetooth(void);
 void init_settings(void);
@@ -45,12 +44,6 @@ void init_osinfo(void);
 void init_bq27220(void);
 void deinit_bq27220(void);
 void init_battery();
-void init_camera(void);
-#ifdef __cplusplus
-void deinit_camera(void) noexcept;
-#else
-void deinit_camera(void);
-#endif
 void init_soundcard(void);
 #ifdef __cplusplus
 }

@@ -36,4 +36,8 @@ int main()
         "/usr/bin/sudo", "-S", "--",
         "/bin/bash", "-c", "fixed command",
     }));
+
+    assert((cp0_sudo::passwordless_probe_command() == std::vector<std::string>{"/usr/bin/sudo", "-n", "true"}));
+    assert((cp0_sudo::passwordless_command({"tailscale", "down"}) ==
+            std::vector<std::string>{"/usr/bin/sudo", "-n", "--", "tailscale", "down"}));
 }

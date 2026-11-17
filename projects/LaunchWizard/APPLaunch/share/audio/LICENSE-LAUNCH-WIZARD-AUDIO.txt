@@ -1,7 +1,7 @@
 The launch-wizard-*.wav files are the mechanical typing, lock, unlock, error,
 notification, and achievement cues from uisfx 0.4.0:
 https://github.com/romainsimon/uisfx
-They are the same 48 kHz mono PCM WAV files used by Keyboard-Guide.
+They are 48 kHz mono PCM WAV files.
 
 UI SFX audio assets are dedicated to the public domain under the Creative
 Commons CC0 1.0 Universal Public Domain Dedication.

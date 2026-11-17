@@ -259,7 +259,6 @@ void init_pty(void);
 void init_process(void);
 void init_sudo_signals(void);
 void init_screenshot(void);
-void init_lora(void);
 void init_wifi(void);
 void init_settings(void);
 void init_osinfo(void);
@@ -267,7 +266,6 @@ void init_bq27220(void);
 void init_battery(void);
 void init_lvgl_saved_settings(void);
 void cp0_saved_volume_restore_stop(void) noexcept;
-void init_camera(void);
 void init_input(void);
 void lv_sdl_keyboard_handler(SDL_Event *event);
 }
@@ -287,12 +285,10 @@ static void emu_init_cp0_runtime()
     init_sudo_signals();
     init_osinfo();
     init_screenshot();
-    init_lora();
     init_wifi();
     init_settings();
     init_bq27220();
     init_battery();
-    init_camera();
     init_lvgl_saved_settings();
     init_input();
 
@@ -359,7 +355,7 @@ int main(int argc, char *argv[])
 
 #ifdef EMU_STATIC_APP
     // Windows: app statically linked, no dlopen
-    const char *app_path = "(static-linked UserDemo)";
+    const char *app_path = "(static-linked APPLaunch)";
 #elif defined(__APPLE__)
     const char *app_path = "apps/libAPPLaunch.dylib";
 #else

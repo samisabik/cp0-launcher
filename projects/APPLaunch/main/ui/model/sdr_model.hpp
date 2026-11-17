@@ -55,8 +55,6 @@ std::string gain_label(int gain_db);
 // output the page tails; it is quoted by the caller's directory, assumed safe.
 std::string detect_cmd();
 std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const std::string &outpath);
-// Without audio_out the demodulator still runs but its audio is discarded.
-std::string listen_cmd(uint32_t hz, Demod demod, int gain_db, bool audio_out = true);
 std::string decode_cmd(uint32_t hz, int gain_db, const std::string &outpath);
 
 // rtl_test output -> is a device present, and its name if any.
@@ -81,8 +79,12 @@ std::vector<int> power_columns(const PowerRow &row, int width);
 
 // Live scope: rtl_sdr streams 8-bit unsigned IQ at kIqRate into a FIFO and the
 // page takes a kIqFft-point FFT of the newest block.
-constexpr uint32_t kIqRate = 2048000u;
+// The dongle tunes kTuneOffsetHz above the listening frequency so the
+// RTL2832U's DC spike stays off the signal; the page shifts it back.
+constexpr uint32_t kIqRate = 2400000u;
 constexpr int kIqFft = 1024;
+constexpr int kTuneOffsetHz = 150000;
+constexpr int kAudioRate = 48000;
 std::string iq_cmd(uint32_t center_hz, int gain_db);
 
 // Power per FFT bin in dB relative to full scale, ordered low to high
@@ -90,9 +92,31 @@ std::string iq_cmd(uint32_t center_hz, int gain_db);
 // its neighbours. `iq` must hold 2 * kIqFft bytes.
 std::vector<float> iq_spectrum_db(const uint8_t *iq, std::size_t bytes);
 
-// Max of the bins covering each of `width` columns across the central
-// `span_hz` of the kIqRate-wide spectrum.
-std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width);
+// Max of the bins covering each of `width` columns across `span_hz` centred
+// `offset_hz` below the tuner frequency (the listening frequency).
+std::vector<float> span_columns(const std::vector<float> &bins, uint32_t span_hz, int width,
+                                int offset_hz = kTuneOffsetHz);
+
+// Streaming demodulator for 8-bit IQ at kIqRate from a tuner sitting
+// kTuneOffsetHz above the wanted signal. Produces mono s16 audio at
+// kAudioRate: shift to baseband, decimate by 10 to 240 kHz, then
+// WFM (discriminator, 50 us de-emphasis), NFM or AM at 48 kHz.
+class Demodulator {
+public:
+    explicit Demodulator(Demod demod) : demod_(demod) {}
+    void process(const uint8_t *iq, std::size_t bytes, std::vector<int16_t> &out);
+
+private:
+    Demod demod_;
+    double phase_re_ = 1.0, phase_im_ = 0.0;
+    float acc1_re_ = 0.0f, acc1_im_ = 0.0f;
+    int count1_ = 0;
+    float acc2_re_ = 0.0f, acc2_im_ = 0.0f, acc2_ = 0.0f;
+    int count2_ = 0;
+    float prev_re_ = 1.0f, prev_im_ = 0.0f;
+    float deemph_ = 0.0f;
+    float dc_ = 0.0f;
+};
 
 // Median of the values: a robust noise-floor estimate for auto scaling.
 float median_db(std::vector<float> values);

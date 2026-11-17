@@ -275,19 +275,6 @@ void ssh_server_api(int cmd, void *data)
     }).detach();
 }
 
-void system_sounds_api(int cmd, void *data)
-{
-    if (cmd == SettingApiReadFlag || cmd == SettingApiReadFlagTimeStart) {
-        const bool enabled = settings_prefs::system_sounds_enabled();
-        if (cmd == SettingApiReadFlag && data) *static_cast<bool *>(data) = enabled;
-        if (cmd == SettingApiReadFlagTimeStart && data)
-            std::get<0>(*static_cast<SettingApiReadFlagTimeStartData *>(data)) = enabled;
-        return;
-    }
-    if (cmd != SettingApiActivate) return;
-    settings_prefs::set_int(settings_prefs::kSystemSounds, settings_prefs::system_sounds_enabled() ? 0 : 1);
-}
-
 void append_clock_format_options(Tree &tree, const NodeIter &parent)
 {
     tree.append_child(parent, SettingEntry{"24h"});

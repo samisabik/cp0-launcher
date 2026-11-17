@@ -74,19 +74,4 @@ int main()
     assert(setup_values::volume_value_valid(100));
     assert(!setup_values::volume_value_valid(-1));
     assert(!setup_values::volume_value_valid(101));
-
-    assert(setup_values::camera_resolution_index(640, 480) == 1);
-    assert(setup_values::camera_resolution_index(1280, 720) == 0);
-    assert(setup_values::camera_resolution_index(640, 720) == 0);
-    assert(setup_values::camera_resolution_supported(1280, 720));
-    assert(setup_values::camera_resolution_supported(640, 480));
-    assert(!setup_values::camera_resolution_supported(640, 720));
-    assert(setup_values::camera_available_from_status(true, 0));
-    assert(setup_values::camera_available_from_status(true, 1));
-    assert(!setup_values::camera_available_from_status(true, -10));
-    assert(!setup_values::camera_available_from_status(false, 0));
-    const auto hd = setup_values::camera_resolution(-1);
-    assert(hd.width == 1280 && hd.height == 720);
-    const auto vga = setup_values::camera_resolution(99);
-    assert(vga.width == 640 && vga.height == 480);
 }

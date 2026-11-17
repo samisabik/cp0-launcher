@@ -2,11 +2,8 @@
 # SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
 # SPDX-License-Identifier: MIT
 
-import hashlib
 import importlib.util
 import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -19,20 +16,6 @@ packager = importlib.util.module_from_spec(spec)
 assert spec.loader
 sys.modules[spec.name] = packager
 spec.loader.exec_module(packager)
-
-
-def executable(path: Path, text: str) -> None:
-    path.write_text("#!/bin/sh\nset -eu\n" + text, encoding="utf-8")
-    path.chmod(0o755)
-
-
-def fake_gnu_tools(fake_bin: Path) -> None:
-    # util-linux flock and coreutils timeout are missing on macOS hosts; the
-    # lock and the time limits are not under test.
-    if not shutil.which("flock"):
-        executable(fake_bin / "flock", "exit 0\n")
-    if not shutil.which("timeout"):
-        executable(fake_bin / "timeout", 'shift\nexec "$@"\n')
 
 
 def ar_members(data: bytes) -> dict[str, bytes]:
@@ -50,209 +33,11 @@ def ar_members(data: bytes) -> dict[str, bytes]:
     return members
 
 
-def run_update(fail_install: bool = False,
-               provide_rollback: bool = True,
-               fail_rollback: bool = False,
-               fail_configure: bool = False,
-               keep_audit_dirty: bool = False,
-               unhealthy_process: bool = False,
-               audit_required: bool = False,
-               interrupted_candidate: bool = False,
-               compatible: bool = True,
-               cancel_during_download: bool = False,
-               cancel_during_install: bool = False) -> tuple[subprocess.CompletedProcess[str], str, str]:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        root = Path(temp_dir)
-        fake_bin = root / "bin"
-        release = root / "release"
-        release_root = root / "releases"
-        old_release = release_root / "launcher-v1.0"
-        state = root / "state"
-        cache = root / "cache"
-        proc = root / "proc"
-        fake_bin.mkdir()
-        fake_gnu_tools(fake_bin)
-        release.mkdir()
-        old_release.mkdir(parents=True)
-        (proc / "4242").mkdir(parents=True)
-        app_executable = root / "M5CardputerZero-APPLaunch"
-        app_executable.write_text("current executable", encoding="ascii")
-        running_executable = root / "old-deleted-executable" if unhealthy_process else app_executable
-        (proc / "4242" / "exe").symlink_to(running_executable)
-        if interrupted_candidate:
-            state.mkdir()
-            (state / "status").write_text("installing:85\n", encoding="ascii")
-        package = release / "applaunch_arm64.deb"
-        package.write_bytes(b"trusted test package")
-        digest = hashlib.sha256(package.read_bytes()).hexdigest()
-        (release / "applaunch_arm64.deb.sha256").write_text(
-            f"{digest}  applaunch_arm64.deb\n", encoding="ascii"
-        )
-        (release / "applaunch_arm64.deb.update-abi").write_text(
-            "1\n" if compatible else "0\n", encoding="ascii"
-        )
-        if provide_rollback:
-            old_package = old_release / "applaunch_1.0_arm64.deb"
-            old_package.write_bytes(b"trusted previous package")
-            old_digest = hashlib.sha256(old_package.read_bytes()).hexdigest()
-            (old_release / "applaunch_arm64.deb.sha256").write_text(
-                f"{old_digest}  applaunch_arm64.deb\n", encoding="ascii"
-            )
-        log = root / "commands.log"
-
-        executable(
-            fake_bin / "wget",
-            'src=$5\ndst=$7\n'
-            'case "$src" in */applaunch_arm64.deb) '
-            '[ "${TEST_CANCEL_DOWNLOAD:-0}" != 1 ] || { kill -TERM "$PPID"; exit 143; };; esac\n'
-            'cp "${src#file://}" "$dst"\n',
-        )
-        executable(
-            fake_bin / "dpkg-deb",
-            'case "$3" in Package) echo applaunch;; Architecture) echo arm64;; '
-            'X-CardputerZero-Update-ABI) echo "${TEST_UPDATE_ABI:-1}";; '
-            'Version) case "$2" in *installed.deb|*rollback.deb) echo 1.0;; *) echo 2.0;; esac;; esac\n',
-        )
-        executable(
-            fake_bin / "dpkg-query",
-            'case "$2" in *Status*) echo installed;; *) '
-            'if [ -f "$TEST_MARKER" ]; then echo 2.0; else echo 1.0; fi;; esac\n',
-        )
-        executable(
-            fake_bin / "dpkg",
-            'echo "dpkg $*" >>"$TEST_LOG"\n'
-            'case "$1" in --compare-versions) exit 0;; --audit) '
-            '[ ! -f "$TEST_AUDIT_MARKER" ] || echo "package needs configuration";; --configure) '
-            '[ "${TEST_FAIL_CONFIGURE:-0}" != 1 ] || exit 44; '
-            '[ "${TEST_KEEP_AUDIT_DIRTY:-0}" = 1 ] || rm -f "$TEST_AUDIT_MARKER";; -i) '
-            'case "$2" in *rollback.deb) [ "${TEST_FAIL_ROLLBACK:-0}" != 1 ] || exit 43; '
-            'rm -f "$TEST_MARKER";; *) [ "${TEST_FAIL_INSTALL:-0}" != 1 ] || exit 42; '
-            '[ "${TEST_CANCEL_INSTALL:-0}" != 1 ] || { kill -TERM "$PPID"; exit 143; }; '
-            'touch "$TEST_MARKER";; esac;; esac\n',
-        )
-        executable(fake_bin / "systemctl", 'echo "systemctl $*" >>"$TEST_LOG"\n')
-        executable(
-            fake_bin / "runuser",
-            'echo "runuser $*" >>"$TEST_LOG"\ncase "$*" in *is-active*) exit 0;; '
-            '*property=MainPID*) echo 4242;; esac\n',
-        )
-        executable(fake_bin / "getent", 'echo "tester:x:1000:1000::/tmp:/bin/sh"\n')
-
-        env = os.environ.copy()
-        env.update(
-            {
-                "PATH": f"{fake_bin}:{env['PATH']}",
-                "APPLAUNCH_UPDATE_RELEASE_URL": f"file://{release}",
-                "APPLAUNCH_UPDATE_RELEASE_ROOT": f"file://{release_root}",
-                "APPLAUNCH_UPDATE_STATE_DIR": str(state),
-                "APPLAUNCH_UPDATE_CACHE_DIR": str(cache),
-                "TEST_LOG": str(log),
-                "TEST_MARKER": str(root / "installed.marker"),
-                "TEST_FAIL_INSTALL": "1" if fail_install else "0",
-                "TEST_FAIL_ROLLBACK": "1" if fail_rollback else "0",
-                "TEST_FAIL_CONFIGURE": "1" if fail_configure else "0",
-                "TEST_KEEP_AUDIT_DIRTY": "1" if keep_audit_dirty else "0",
-                "TEST_AUDIT_MARKER": str(root / "audit.marker"),
-                "APPLAUNCH_UPDATER_REEXEC": "1",
-                "APPLAUNCH_UPDATE_EXECUTABLE": str(app_executable),
-                "APPLAUNCH_UPDATE_PROC_ROOT": str(proc),
-                "APPLAUNCH_UPDATE_HEALTH_CHECKS": "1",
-                "TEST_UPDATE_ABI": "1" if compatible else "0",
-                "TEST_CANCEL_DOWNLOAD": "1" if cancel_during_download else "0",
-                "TEST_CANCEL_INSTALL": "1" if cancel_during_install else "0",
-            }
-        )
-        if interrupted_candidate:
-            Path(env["TEST_MARKER"]).touch()
-        if audit_required:
-            Path(env["TEST_AUDIT_MARKER"]).touch()
-        result = subprocess.run(
-            ["sh"], input=packager._updater_script_text(), text=True,
-            env=env, capture_output=True, check=False,
-        )
-        status = (state / "status").read_text(encoding="utf-8").strip()
-        commands = log.read_text(encoding="utf-8") if log.exists() else ""
-        return result, status, commands
-
-
-success, status, commands = run_update()
-assert success.returncode == 0, (success.stderr, success.stdout, status, commands)
-assert status == "succeeded:2.0"
-assert "dpkg -i" in commands
-assert "is-active --quiet APPLaunch.service" in commands
-assert "property=MainPID" in commands
-
-failure, status, commands = run_update(fail_install=True)
-assert failure.returncode != 0
-assert status == "failed:install"
-assert "dpkg --configure -a" in commands
-
-interrupted, status, commands = run_update(
-    audit_required=True, interrupted_candidate=True
-)
-assert interrupted.returncode == 0
-assert status == "succeeded:2.0"
-assert "dpkg -i" not in commands
-assert "restart APPLaunch.service" in commands
-assert "restart APPLaunch.service" in commands
-
-rollback_failure, status, commands = run_update(fail_install=True, fail_rollback=True)
-assert rollback_failure.returncode != 0
-assert status == "failed:install:rollback-install"
-
-configure_failure, status, commands = run_update(
-    fail_install=True, fail_configure=True
-)
-assert configure_failure.returncode != 0
-assert status == "failed:install:rollback-configure"
-
-audit_failure, status, commands = run_update(
-    fail_install=True, audit_required=True, keep_audit_dirty=True
-)
-assert audit_failure.returncode != 0
-assert status == "failed:install:rollback-audit"
-
-process_failure, status, commands = run_update(unhealthy_process=True)
-assert process_failure.returncode != 0
-assert status == "failed:service-health:rollback-service-health"
-
-repaired, status, commands = run_update(audit_required=True)
-assert repaired.returncode == 0
-assert status == "succeeded:2.0"
-assert "dpkg --audit" in commands
-assert "dpkg --configure -a" in commands
-
-missing_rollback, status, commands = run_update(provide_rollback=False)
-assert missing_rollback.returncode != 0
-assert status == "failed:rollback-unavailable"
-
-incompatible, status, commands = run_update(compatible=False)
-assert incompatible.returncode != 0
-assert status == "failed:incompatible"
-assert "dpkg -i" not in commands
-assert "applaunch_arm64.deb" not in commands
-
-cancelled_download, status, commands = run_update(cancel_during_download=True)
-assert cancelled_download.returncode == 0
-assert status == "cancelled"
-assert "dpkg -i" not in commands
-
-cancelled_install, status, commands = run_update(cancel_during_install=True)
-assert cancelled_install.returncode == 0
-assert status == "cancelled"
-assert "dpkg -i" in commands
-assert "rollback.deb" in commands
-
 old_source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH")
 try:
     os.environ["SOURCE_DATE_EPOCH"] = "1704067200"
     control = packager._control_text(packager.PackageConfig())
     assert "Packaged-Date: 2024-01-01 00:00:00 UTC\n" in control
-    assert "X-CardputerZero-Update-ABI: 1\n" in control
-    other_control = packager._control_text(
-        packager.PackageConfig(app_name="OtherApp", package_name="other")
-    )
-    assert "X-CardputerZero-Update-ABI" not in other_control
     assert packager._ar_member_header("data.tar.gz", 1)[16:28].strip() == b"1704067200"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -286,34 +71,12 @@ finally:
     else:
         os.environ["SOURCE_DATE_EPOCH"] = old_source_date_epoch
 
-assert "/usr/share/APPLaunch/bin/M5CardputerZero-APPLaunch" in packager._updater_script_text()
-assert 'mktemp -d "$state_root/self.XXXXXX"' in packager._updater_script_text()
-assert "/run/applaunch-updater" not in packager._updater_script_text()
-assert "TimeoutStartSec=20min" in packager._updater_service_text()
-assert "TimeoutStopSec=5min" in packager._updater_service_text()
-assert 'action.lookup("unit") == "applaunch-updater.service"' in packager._updater_polkit_text()
-assert 'action.lookup("verb") == "stop"' in packager._updater_polkit_text()
-assert "status downloading:5" in packager._updater_script_text()
-assert "status installing:85" in packager._updater_script_text()
-assert "status restarting:95" in packager._updater_script_text()
-assert "applaunch-apps-updater.service" in packager._updater_polkit_text()
 assert str(packager.POLKIT_LOCAL_RULES_PATH) == "etc/polkit-1/rules.d"
 for action in ("wifi.scan", "network-control", "enable-disable-wifi",
                "settings.modify.own", "settings.modify.system"):
     assert f'"org.freedesktop.NetworkManager.{action}"' in packager._wifi_polkit_text()
 assert 'subject.isInGroup("netdev")' in packager._wifi_polkit_text()
 assert '"50-cp0-wifi-scan.rules"' in Path(packager.__file__).read_text()
-assert "TimeoutStartSec=30min" in packager._apps_updater_service_text()
-assert "TimeoutStopSec=5min" in packager._apps_updater_service_text()
-assert "apt-get install" in packager._apps_updater_script_text()
-assert "m5cardputerzero-recorder" in packager._apps_updater_script_text()
-assert "m5cardputerzero-keyboard-guide" in packager._apps_updater_script_text()
-assert "/usr/libexec/applaunch-apps-updater" in packager._apps_updater_service_text()
-assert subprocess.run(
-    ["sh", "-n"], input=packager._apps_updater_script_text(), text=True,
-    capture_output=True, check=False,
-).returncode == 0
-assert len(packager.APP_UPDATE_SPECS) == 14
 
 workflow = (repo / ".github" / "workflows" / "launcher-build.yml").read_text(
     encoding="utf-8"
@@ -321,26 +84,16 @@ workflow = (repo / ".github" / "workflows" / "launcher-build.yml").read_text(
 assert "branches: [master, ci/**]" in workflow
 assert "if: ${{ inputs.publish == true && github.ref == 'refs/heads/master' }}" in workflow
 assert "startsWith(github.ref, 'refs/heads/ci/')" not in workflow
-assert workflow.count("tag_name: launcher-latest") == 2
 assert "scripts/build_cardputerzero_release_local.sh" in workflow
 assert "python3 scripts/debian_packager.py --version" not in workflow
-assert "artifacts/applaunch_arm64.deb.update-info" in workflow
 assert "${{ steps.version.outputs.version }}" in workflow
-assert "${GITHUB_SHA:0:12}" in workflow
 # The release tag is pinned to the commit that was actually built.
 assert "target_commitish: ${{ github.sha }}" in workflow
 # A manual release is a normal GitHub Release; CI runs stay pre-releases.
 assert "prerelease: ${{ !inputs.publish }}" in workflow
-# The versioned release and both channel uploads reject missing assets.
-assert workflow.count("fail_on_unmatched_files: true") == 3
-assert "preserve_order: true" in workflow
+# The versioned release rejects missing assets.
+assert workflow.count("fail_on_unmatched_files: true") == 1
 assert "overwrite_files: true" in workflow
-# The update metadata is uploaded after the payload it describes.
-assert workflow.index("Publish launcher update channel (payload)") < workflow.index(
-    "Publish launcher update channel (metadata)"
-)
-# Older updaters need the revision-free rollback alias asset.
-assert 'cp "${package}" "artifacts/applaunch_${{ steps.version.outputs.version }}_arm64.deb"' in workflow
 # Deleted releases and installed versions can still raise the version floor.
 assert "LAUNCHER_RELEASE_FLOOR" in workflow
 assert "git tag -l 'launcher-v[0-9]*'" in workflow
@@ -348,9 +101,10 @@ assert "10#${BASH_REMATCH[3]}" in workflow
 assert "Publishing requires an explicit version" in workflow
 assert "Verify release preconditions" in workflow
 assert "environment: release" in workflow
-# The SDK BSP cache key must come from the version file, not a SConstruct grep.
-assert "tr -d '[:space:]' < ext_components/cp0_lvgl/sdk_version.txt" in workflow
-assert "grep '^version' projects/APPLaunch/SConstruct" not in workflow
+# CI builds its sysroot from Debian packages; there is no downloaded BSP.
+assert "sh scripts/make_sysroot.sh --docker" in workflow
+assert "key: sysroot-${{ hashFiles('scripts/make_sysroot.sh') }}" in workflow
+assert "sdk_version.txt" not in workflow
 assert "persist-credentials: false" in workflow
 assert "if-no-files-found: error" in workflow
 
@@ -374,142 +128,38 @@ release_builder = (repo / "scripts" / "build_cardputerzero_release_local.sh").re
 )
 assert 'CLEAN_BUILD=${CLEAN_BUILD:-1}' in release_builder
 assert '"$ROOT/projects/$project/main/build"' in release_builder
-assert "applaunch_arm64.deb.update-info" in release_builder
-assert "printf 'format=1\\n'" in release_builder
-assert "printf 'commit=%s\\n'" in release_builder
 
 
-def run_apps_update(fail_install_for: str = "",
-                    install_latest: bool = False) -> tuple[subprocess.CompletedProcess[str], str]:
-    with tempfile.TemporaryDirectory() as temp_dir:
-        root = Path(temp_dir)
-        fake_bin = root / "bin"
-        releases = root / "releases"
-        json_dir = root / "json"
-        installed = root / "installed"
-        state = root / "state"
-        cache = root / "cache"
-        for directory in (fake_bin, releases, json_dir, installed):
-            directory.mkdir()
-        fake_gnu_tools(fake_bin)
+with tempfile.TemporaryDirectory() as temp_dir:
+    root = Path(temp_dir)
+    project_dir = root / "projects" / "APPLaunch"
+    src_dir = project_dir / "dist"
+    images_dir = src_dir / "APPLaunch" / "share" / "images"
+    source_images = project_dir / "APPLaunch" / "share" / "images"
+    images_dir.mkdir(parents=True)
+    source_images.mkdir(parents=True)
+    expected_images = {"cli_100.png", "ssh_100.png", "line/settings.png"}
+    (images_dir / "line").mkdir()
+    for name in expected_images:
+        (images_dir / name).write_bytes(b"png")
+    (source_images / "source-only.png").write_bytes(b"not a build output")
+    (src_dir / "M5CardputerZero-APPLaunch").write_bytes(b"binary")
 
-        installed_versions = {
-            "m5cardputerzero-recorder": "0.1.9" if install_latest else "0.1.8",
-            "m5cardputerzero-compass": "0.2.4",
-            "m5cardputerzero-files": "1.0.2" if install_latest else "1.0.0",
-        }
-        for package, version in installed_versions.items():
-            (installed / package).write_text(version + "\n", encoding="ascii")
+    config = packager.PackageConfig()
+    package_root = root / "staging" / "debian-APPLaunch"
+    paths = packager.Paths(
+        repo_root=root,
+        tool_dir=root / "scripts",
+        project_dir=project_dir,
+        src_dir=src_dir,
+        output_dir=root / "out",
+        work_dir=root / "staging",
+        package_root=package_root,
+        package_file=root / "out" / config.file_name,
+    )
+    packager.prepare_package_tree(config, paths)
 
-        assets = {
-            "m5cardputerzero-recorder": (
-                "m5cardputerzero-recorder", "0.1.9", "Recorder"),
-            "m5cardputerzero-compass": (
-                "m5cardputerzero-compass", "0.2.4", "Compass"),
-            "m5cardputerzero-files": (
-                "m5cardputerzero-files", "1.0.2", "Files"),
-        }
-        for package, (prefix, version, repo) in assets.items():
-            asset = f"{prefix}_{version}_m5stack1_arm64.deb"
-            (releases / asset).write_text(
-                f"Package={package}\nArchitecture=arm64\nVersion={version}\n",
-                encoding="ascii",
-            )
-            (json_dir / f"{repo}.json").write_text(
-                '{"tag_name":"v1.0.0","assets":[{"name":"'
-                + asset + '"}]}',
-                encoding="ascii",
-            )
-
-        log = root / "commands.log"
-        executable(
-            fake_bin / "curl",
-            'url=""; dest=""; prev=""\n'
-            'for arg in "$@"; do\n'
-            '  [ "$prev" = "-o" ] && dest=$arg\n'
-            '  case "$arg" in http*) url=$arg;; esac\n'
-            '  prev=$arg\n'
-            'done\n'
-            'repo=$(printf "%s" "$url" | sed "s#.*/CardputerZero/##; s#/releases/latest##")\n'
-            'cp "$TEST_JSON_DIR/$repo.json" "$dest"\n',
-        )
-        executable(
-            fake_bin / "wget",
-            'url=""; dest=""; prev=""\n'
-            'for arg in "$@"; do\n'
-            '  [ "$prev" = "-O" ] && dest=$arg\n'
-            '  case "$arg" in http*) url=$arg;; esac\n'
-            '  prev=$arg\n'
-            'done\n'
-            'cp "$TEST_RELEASES/${url##*/}" "$dest"\n',
-        )
-        executable(
-            fake_bin / "dpkg-query",
-            'package=$3\n'
-            'if [ -f "$TEST_INSTALLED/$package" ]; then cat "$TEST_INSTALLED/$package"; '
-            'else exit 1; fi\n',
-        )
-        executable(
-            fake_bin / "dpkg",
-            'if [ "$1" = "--compare-versions" ]; then\n'
-            '  higher=$(printf "%s\\n%s\\n" "$2" "$4" | sort -V | tail -1)\n'
-            '  [ "$higher" = "$2" ] && [ "$2" != "$4" ]\n'
-            '  exit $?\n'
-            'fi\n'
-            'exit 0\n',
-        )
-        executable(
-            fake_bin / "dpkg-deb",
-            'field=$3\n'
-            'sed -n "s/^${field}=//p" "$2"\n',
-        )
-        executable(
-            fake_bin / "apt-get",
-            'case "$1" in update) exit 0;; esac\n'
-            'deb=""; for arg in "$@"; do deb=$arg; done\n'
-            'package=$(sed -n "s/^Package=//p" "$deb")\n'
-            'version=$(sed -n "s/^Version=//p" "$deb")\n'
-            'echo "apt-get install $package $version" >> "$TEST_LOG"\n'
-            'if [ -n "$TEST_FAIL_INSTALL" ] && [ "$package" = "$TEST_FAIL_INSTALL" ]; then exit 1; fi\n'
-            'printf "%s\\n" "$version" > "$TEST_INSTALLED/$package"\n',
-        )
-        env = os.environ.copy()
-        env.update(
-            {
-                "PATH": f"{fake_bin}:{env['PATH']}",
-                "APPLAUNCH_UPDATE_STATE_DIR": str(state),
-                "APPLAUNCH_APPS_UPDATE_CACHE_DIR": str(cache),
-                "APPLAUNCH_APPS_UPDATE_API_ROOT": "https://example.invalid/CardputerZero",
-                "APPLAUNCH_APPS_UPDATE_DOWNLOAD_ROOT": "https://example.invalid/dl",
-                "TEST_JSON_DIR": str(json_dir),
-                "TEST_RELEASES": str(releases),
-                "TEST_INSTALLED": str(installed),
-                "TEST_LOG": str(log),
-                "TEST_FAIL_INSTALL": fail_install_for,
-            }
-        )
-        result = subprocess.run(
-            ["sh"], input=packager._apps_updater_script_text(), text=True,
-            env=env, capture_output=True, check=False,
-        )
-        status = (state / "apps-status").read_text(encoding="utf-8").strip()
-        return result, status
-
-
-success, status = run_apps_update()
-assert success.returncode == 0, (success.stderr, success.stdout, status)
-assert status == (
-    "succeeded:updated=m5cardputerzero-recorder:0.1.9,"
-    "m5cardputerzero-files:1.0.2|failed="
-), status
-
-current, status = run_apps_update(install_latest=True)
-assert current.returncode == 0
-assert status == "succeeded:updated=|failed=", status
-
-partial, status = run_apps_update(fail_install_for="m5cardputerzero-files")
-assert partial.returncode == 0
-assert status == (
-    "succeeded:updated=m5cardputerzero-recorder:0.1.9|"
-    "failed=m5cardputerzero-files:install"
-), status
+    packaged_images = package_root / "usr" / "share" / "APPLaunch" / "share" / "images"
+    assert all((packaged_images / name).is_file() for name in expected_images)
+    assert not (packaged_images / "source-only.png").exists()
+    assert (package_root / "etc/polkit-1/rules.d/50-cp0-wifi-scan.rules").is_file()

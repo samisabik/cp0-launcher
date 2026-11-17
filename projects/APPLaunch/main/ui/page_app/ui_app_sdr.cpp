@@ -10,6 +10,8 @@
 #include "input_keys.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <csignal>
 #include <cmath>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -17,6 +19,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <poll.h>
+#include <pthread.h>
 #include <unistd.h>
 
 namespace {
@@ -95,6 +99,7 @@ UISdrPage::UISdrPage() : AppPage()
     detect_path_ = runtime_dir() + "/cp0-sdr-detect";
     out_path_ = runtime_dir() + "/cp0-sdr-out";
     iq_path_ = runtime_dir() + "/cp0-sdr-iq-" + std::to_string(getpid());
+    audio_path_ = runtime_dir() + "/cp0-sdr-audio-" + std::to_string(getpid());
     for (int i = 0; i < 64; ++i)
         palette_[i] = rgb565(spectrum_like_color(i));
     pixels_.assign(static_cast<std::size_t>(kWidth) * kCanvasH, rgb565(cp0::theme::kPanel));
@@ -180,33 +185,6 @@ void UISdrPage::create_ui()
         lv_obj_set_style_text_line_space(list_, 4, 0);
     }
 
-    listen_ = cp0::ui::box(body.box, 0, 0, 312, 88, cp0::theme::kPanel);
-    if (listen_) {
-        lv_obj_set_style_bg_opa(listen_, LV_OPA_TRANSP, 0);
-        const auto row_label = [this](int y, const char *key) {
-            if (lv_obj_t *k = cp0::ui::label(listen_, 8, y, kColorIdle)) lv_label_set_text(k, key);
-            cp0::ui::dotted_rule(listen_, 8, y + 15, 296);
-            lv_obj_t *v = cp0::ui::label(listen_, 304 - 160, y, kColorText);
-            if (v) {
-                lv_obj_set_width(v, 160);
-                lv_obj_set_style_text_align(v, LV_TEXT_ALIGN_RIGHT, 0);
-            }
-            return v;
-        };
-        demod_value_ = row_label(6, "demod");
-        state_value_ = row_label(26, "state");
-        if (lv_obj_t *k = cp0::ui::label(listen_, 8, 46, kColorIdle)) lv_label_set_text(k, "audio out");
-        audio_pill_ = cp0::ui::box(listen_, 304 - 30, 45, 30, 13, kColorAccent);
-        if (audio_pill_) {
-            audio_pill_text_ = cp0::ui::label(audio_pill_, 0, 0, cp0::theme::kBg);
-            if (audio_pill_text_) {
-                lv_obj_set_width(audio_pill_text_, 30);
-                lv_obj_set_style_text_align(audio_pill_text_, LV_TEXT_ALIGN_CENTER, 0);
-            }
-        }
-        if (lv_obj_t *presets = cp0::ui::label(listen_, 8, 68, kColorIdle))
-            lv_label_set_text(presets, "presets  1 fm  2 air  3 433  4 pmr  5 noaa  6 ads-b");
-    }
 
     hint_ = cp0::ui::footer(ui_APP_Container);
 }
@@ -268,19 +246,24 @@ std::string UISdrPage::tail()
 
 void UISdrPage::stop_proc()
 {
+    if (worker_.joinable()) {
+        worker_stop_ = true;
+        worker_.join();
+    }
     // Close the IQ pipe before signalling: rtl_sdr blocked on a full pipe
     // cannot act on SIGTERM and gets SIGKILLed with the dongle still open,
     // and the next open resets the dongle, which this board does not survive.
     // A closed pipe gives it SIGPIPE, which it handles by closing cleanly.
     if (iq_fd_ >= 0) close(iq_fd_);
     iq_fd_ = -1;
-    if (proc_pid_ > 0) {
-        const int pid = proc_pid_;
-        proc_pid_ = -1;
-        cp0_signal_process_api({"Stop", std::to_string(pid)}, [](int, std::string) {});
+    for (int *pid : {&proc_pid_, &audio_pid_}) {
+        if (*pid <= 0) continue;
+        const int target = *pid;
+        *pid = -1;
+        cp0_signal_process_api({"Stop", std::to_string(target)}, [](int, std::string) {});
     }
     unlink(iq_path_.c_str());
-    playing_ = false;
+    unlink(audio_path_.c_str());
     decoding_ = false;
 }
 
@@ -290,35 +273,83 @@ void UISdrPage::start_scope()
     if (!present_) return;
     peak_.fill(-120.0f);
     smooth_valid_ = false;
-    iq_tail_.clear();
     unlink(iq_path_.c_str());
     if (mkfifo(iq_path_.c_str(), 0600) != 0) return;
     // Open the read end first, non-blocking, so neither side waits on the other.
     iq_fd_ = open(iq_path_.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (iq_fd_ < 0) return;
     proc_pid_ = spawn("exec " + sdr::iq_cmd(center_hz_, gain_db_) + " > '" + iq_path_ + "' 2>/dev/null");
+    unlink(audio_path_.c_str());
+    if (mkfifo(audio_path_.c_str(), 0600) == 0)
+        audio_pid_ = spawn("exec pacat --raw --rate=" + std::to_string(sdr::kAudioRate) +
+                           " --channels=1 --format=s16le < '" + audio_path_ + "'");
+    {
+        std::lock_guard<std::mutex> lock(iq_mutex_);
+        iq_latest_.clear();
+        iq_sequence_ = iq_drawn_ = 0;
+    }
+    worker_audio_ = audio_out_;
+    worker_demod_ = static_cast<int>(demod_);
+    worker_stop_ = false;
+    worker_ = std::thread([this] { worker_loop(); });
+}
+
+void UISdrPage::worker_loop()
+{
+    // SIGPIPE from a write is delivered to the writing thread; blocked here,
+    // a dead pacat turns into EPIPE instead of killing the launcher.
+    sigset_t sigpipe;
+    sigemptyset(&sigpipe);
+    sigaddset(&sigpipe, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &sigpipe, nullptr);
+    const std::size_t keep = static_cast<std::size_t>(2 * sdr::kIqFft);
+    int audio_fd = -1;
+    int demod = worker_demod_;
+    sdr::Demodulator demodulator(static_cast<sdr::Demod>(demod));
+    std::vector<uint8_t> buffer(1 << 16);
+    std::vector<int16_t> audio;
+    while (!worker_stop_) {
+        // pacat opens the audio pipe for reading once it starts; until then a
+        // non-blocking writer open fails and is retried.
+        if (audio_fd < 0) audio_fd = open(audio_path_.c_str(), O_WRONLY | O_NONBLOCK | O_CLOEXEC);
+        pollfd pfd{iq_fd_, POLLIN, 0};
+        if (poll(&pfd, 1, 100) <= 0) continue;
+        const ssize_t n = read(iq_fd_, buffer.data(), buffer.size() & ~static_cast<std::size_t>(1));
+        if (n <= 0) continue;
+        if (worker_demod_ != demod) {
+            demod = worker_demod_;
+            demodulator = sdr::Demodulator(static_cast<sdr::Demod>(demod));
+        }
+        if (worker_audio_ && audio_fd >= 0) {
+            audio.clear();
+            demodulator.process(buffer.data(), static_cast<std::size_t>(n), audio);
+            if (!audio.empty() && write(audio_fd, audio.data(), audio.size() * sizeof(int16_t)) < 0 && errno == EPIPE) {
+                close(audio_fd);
+                audio_fd = -1;
+            }
+        }
+        std::lock_guard<std::mutex> lock(iq_mutex_);
+        if (static_cast<std::size_t>(n) >= keep) {
+            iq_latest_.assign(buffer.begin() + (n - static_cast<ssize_t>(keep)), buffer.begin() + n);
+        } else {
+            iq_latest_.insert(iq_latest_.end(), buffer.begin(), buffer.begin() + n);
+            if (iq_latest_.size() > keep) iq_latest_.erase(iq_latest_.begin(), iq_latest_.end() - static_cast<long>(keep));
+        }
+        ++iq_sequence_;
+    }
+    if (audio_fd >= 0) close(audio_fd);
 }
 
 void UISdrPage::read_iq()
 {
-    if (iq_fd_ < 0) return;
-    const std::size_t keep = static_cast<std::size_t>(2 * sdr::kIqFft);
-    uint8_t buffer[65536];
-    bool fresh = false;
-    for (int i = 0; i < 16; ++i) {
-        const ssize_t n = read(iq_fd_, buffer, sizeof(buffer));
-        if (n <= 0) break;
-        fresh = true;
-        if (static_cast<std::size_t>(n) >= keep) {
-            iq_tail_.assign(buffer + n - static_cast<ssize_t>(keep) - (n % 2), buffer + n - (n % 2));
-        } else {
-            iq_tail_.insert(iq_tail_.end(), buffer, buffer + n);
-            if (iq_tail_.size() > keep) iq_tail_.erase(iq_tail_.begin(), iq_tail_.end() - static_cast<long>(keep));
-        }
+    std::vector<uint8_t> block;
+    {
+        std::lock_guard<std::mutex> lock(iq_mutex_);
+        if (iq_sequence_ == iq_drawn_ || iq_latest_.size() < static_cast<std::size_t>(2 * sdr::kIqFft)) return;
+        iq_drawn_ = iq_sequence_;
+        block = iq_latest_;
     }
-    if (!fresh || iq_tail_.size() < keep) return;
-    if (iq_tail_.size() % 2) iq_tail_.erase(iq_tail_.begin());
-    const std::vector<float> bins = sdr::iq_spectrum_db(iq_tail_.data(), iq_tail_.size());
+    const std::vector<float> bins = sdr::iq_spectrum_db(block.data(), block.size());
     const std::vector<float> cols = sdr::span_columns(bins, span_hz_, kWidth);
     for (int x = 0; x < kWidth; ++x)
         smooth_[x] = smooth_valid_ ? smooth_[x] + kScopeSmoothing * (cols[x] - smooth_[x]) : cols[x];
@@ -337,30 +368,12 @@ void UISdrPage::start_decode()
     decoding_ = proc_pid_ > 0;
 }
 
-void UISdrPage::toggle_listen()
-{
-    if (playing_) {
-        stop_proc();
-        show_message("stopped");
-        render();
-        return;
-    }
-    if (!present_) return;
-    proc_pid_ = spawn(sdr::listen_cmd(center_hz_, demod_, gain_db_, audio_out_));
-    playing_ = proc_pid_ > 0;
-    render();
-}
-
 void UISdrPage::retune()
 {
     if (mode_ == Mode::Scope && present_)
         start_scope();
     else if (mode_ == Mode::Decode && decoding_)
         start_decode();
-    else if (mode_ == Mode::Listen && playing_) {
-        stop_proc();
-        toggle_listen();
-    }
     render();
 }
 
@@ -404,7 +417,10 @@ void UISdrPage::draw_scope(const std::vector<float> &cols)
         peak_[x] = std::max(peak_[x], cols[x]);
         const int peak_y = y_for(level_of(peak_[x]));
         if (peak_y < top) pixels_[static_cast<std::size_t>(peak_y) * kWidth + x] = peak;
-        wf[x] = palette_[level];
+        // The waterfall spans 30 dB above the floor and starts at a dark green,
+        // so the noise floor shows instead of disappearing into black.
+        const float over = (cols[x] - floor_db - kScopeBelowFloor) / 30.0f;
+        wf[x] = palette_[std::clamp(22 + static_cast<int>(over * 41.0f), 0, 63)];
         if (cols[x] > cols[best]) best = x;
     }
     for (int x = 0; x < kWidth; ++x) pixels_[static_cast<std::size_t>(kTraceH) * kWidth + x] = grid;
@@ -412,18 +428,17 @@ void UISdrPage::draw_scope(const std::vector<float> &cols)
 
     const float above = cols[best] - (floor_db + kScopeBelowFloor);
     const double hz = static_cast<double>(center_hz_) - span_hz_ / 2.0 + (best + 0.5) * span_hz_ / kWidth;
-    char unit[16];
-    std::snprintf(unit, sizeof(unit), "+%d dB", static_cast<int>(std::lround(above)));
-    cp0::ui::set_readout(gain_, sdr::format_mhz(static_cast<uint32_t>(hz)), unit, above >= 20.0f ? kColorAccent : kColorIdle);
+    char caption[24];
+    std::snprintf(caption, sizeof(caption), "peak  +%d dB", static_cast<int>(std::lround(above)));
+    if (gain_.label) cp0::ui::set_text(gain_.label, caption, cp0::theme::kDim);
+    cp0::ui::set_readout(gain_, sdr::format_mhz(static_cast<uint32_t>(hz)), "", above >= 20.0f ? kColorAccent : kColorIdle);
 }
 
 void UISdrPage::render()
 {
     const bool scope = mode_ == Mode::Scope;
-    const bool listen = mode_ == Mode::Listen;
     const bool decode = mode_ == Mode::Decode;
     const bool show_scope = scope && present_;
-    const bool show_listen = listen && present_;
     const bool show_decode = decode && present_;
 
     auto vis = [](lv_obj_t *obj, bool on) {
@@ -435,9 +450,7 @@ void UISdrPage::render()
     vis(big_, !present_);
     vis(sub_, !present_);
     vis(list_, show_decode);
-    vis(listen_, show_listen);
 
-    const char *mode_name = scope ? "scope" : listen ? "listen" : "decode";
     cp0::ui::set_readout(centre_, sdr::format_mhz(center_hz_), "", kColorText);
     if (centre_.label)
         cp0::ui::set_text(centre_.label, ("step " + sdr::format_hz(sdr::kSteps[step_index_])).c_str(),
@@ -460,11 +473,15 @@ void UISdrPage::render()
             color = kColorRec;
         } else if (!present_) {
             text = "no dongle";
-        } else if (playing_ || decoding_) {
-            text = "live";
+        } else if (decoding_) {
+            text = "decoding";
             color = kColorRec;
+        } else if (scope) {
+            text = std::string(sdr::demod_label(demod_)) + (audio_out_ ? "" : " muted") + "  g " +
+                   sdr::gain_label(gain_db_);
+            color = audio_out_ ? kColorAccent : kColorIdle;
         } else {
-            text = std::string(mode_name) + "  g " + sdr::gain_label(gain_db_);
+            text = "decode  g " + sdr::gain_label(gain_db_);
         }
         lv_label_set_text(status_, text.c_str());
         cp0::ui::set_text_color(status_, color);
@@ -473,15 +490,6 @@ void UISdrPage::render()
     if (!present_) {
         if (big_) lv_label_set_text(big_, "no sdr");
         if (sub_) lv_label_set_text(sub_, tools_ok_ ? "plug in the rtl-sdr dongle" : "run: sudo apt install rtl-sdr");
-    } else if (listen) {
-        cp0::ui::set_text(demod_value_, sdr::demod_label(demod_), kColorText);
-        cp0::ui::set_text(state_value_, playing_ ? "playing" : "stopped", playing_ ? kColorAccent : kColorIdle);
-        if (audio_pill_ && lv_obj_get_style_border_width(audio_pill_, LV_PART_MAIN) != (audio_out_ ? 0 : 1)) {
-            lv_obj_set_style_bg_opa(audio_pill_, audio_out_ ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-            lv_obj_set_style_border_width(audio_pill_, audio_out_ ? 0 : 1, 0);
-            lv_obj_set_style_border_color(audio_pill_, lv_color_hex(kColorIdle), 0);
-        }
-        cp0::ui::set_text(audio_pill_text_, audio_out_ ? "on" : "off", audio_out_ ? cp0::theme::kBg : kColorIdle);
     }
 
     if (decode && list_) {
@@ -498,10 +506,8 @@ void UISdrPage::render()
     if (!present_)
         cp0::ui::set_footer(hint_, {{"tab", "mode"}});
     else if (scope)
-        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"up/dn", "step"}, {"g", "gain"}, {"s", "span"}, {"tab", "mode"}});
-    else if (listen)
-        cp0::ui::set_footer(hint_, {{"ent", playing_ ? "stop" : "play"}, {"o", audio_out_ ? "mute" : "unmute"},
-                                    {"< >", "tune"}, {"m", "demod"}, {"1-6", "preset"}, {"tab", "mode"}});
+        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"m", "demod"}, {"o", audio_out_ ? "mute" : "unmute"},
+                                    {"up/dn", "step"}, {"s", "span"}, {"g", "gain"}});
     else
         cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"ent", "start"}, {"s", "save"}, {"tab", "mode"}});
 }
@@ -574,7 +580,7 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
         return;
     }
     if (key == KEY_TAB) {
-        set_mode(mode_ == Mode::Scope ? Mode::Listen : mode_ == Mode::Listen ? Mode::Decode : Mode::Scope);
+        set_mode(mode_ == Mode::Scope ? Mode::Decode : Mode::Scope);
         return;
     }
     if (key == KEY_G) {
@@ -620,26 +626,16 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
             render();
         } else if (key == KEY_H) {
             peak_.fill(-120.0f);
-        }
-        return;
-    }
-    if (mode_ == Mode::Listen) {
-        if (key == KEY_M) {
+        } else if (key == KEY_M) {
             demod_ = demod_ == sdr::Demod::WFM ? sdr::Demod::NFM
                      : demod_ == sdr::Demod::NFM ? sdr::Demod::AM
                                                  : sdr::Demod::WFM;
-            show_message(sdr::demod_label(demod_));
-            if (playing_) toggle_listen(), toggle_listen();
+            worker_demod_ = static_cast<int>(demod_);
             render();
-        } else if (key == KEY_ENTER || key == KEY_KPENTER) {
-            toggle_listen();
-        } else if (key == KEY_SPACE) {
-            if (playing_) toggle_listen();
         } else if (key == KEY_O) {
             audio_out_ = !audio_out_;
+            worker_audio_ = audio_out_;
             set_config_audio_out(audio_out_);
-            show_message(audio_out_ ? "audio on" : "audio off");
-            if (playing_) toggle_listen(), toggle_listen();
             render();
         }
         return;

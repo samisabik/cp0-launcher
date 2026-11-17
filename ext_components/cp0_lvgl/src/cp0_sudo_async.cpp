@@ -858,6 +858,47 @@ int enqueue(std::shared_ptr<Request> request, uint64_t *request_id)
     return 0;
 }
 
+void deliver_on_lvgl(void *user)
+{
+    std::unique_ptr<std::function<void()>> task(static_cast<std::function<void()> *>(user));
+    try {
+        (*task)();
+    } catch (...) {
+    }
+}
+
+// Admin commands for a user with a NOPASSWD sudo rule run straight away with
+// `sudo -n`, without the password prompt. Returns false (caller falls back to
+// the prompt) when a password is required or the probe cannot run.
+bool run_passwordless(std::vector<std::string> argv, int exec_timeout_ms, std::function<void(int, int)> complete,
+                      std::function<void(int, uint64_t)> started)
+{
+#if defined(_WIN32) || defined(HAL_PLATFORM_SDL)
+    (void)argv;
+    (void)exec_timeout_ms;
+    (void)complete;
+    (void)started;
+    return false;
+#else
+    if (cp0_runner::run(cp0_sudo::passwordless_probe_command(), nullptr, nullptr, nullptr, 3000).exit_code != 0)
+        return false;
+    if (started) started(0, 0);
+    std::thread([argv = std::move(argv), exec_timeout_ms, complete = std::move(complete)]() mutable {
+        const auto execution =
+            cp0_runner::run(cp0_sudo::passwordless_command(argv), nullptr, nullptr, nullptr, exec_timeout_ms);
+        const int result = execution.exit_code == -ETIMEDOUT ? CP0_SUDO_RESULT_TIMED_OUT
+                           : execution.exit_code == 0       ? CP0_SUDO_RESULT_SUCCESS
+                                                            : CP0_SUDO_RESULT_EXEC_FAILED;
+        if (!complete) return;
+        auto *task = new (std::nothrow)
+            std::function<void()>([complete, result, code = execution.exit_code] { complete(result, code); });
+        if (!task) return;
+        if (lv_async_call(deliver_on_lvgl, task) != LV_RESULT_OK) deliver_on_lvgl(task);
+    }).detach();
+    return true;
+#endif
+}
+
 } // namespace
 
 extern "C" int cp0_sudo_run_argv_async_ex(const char *const *argv,
@@ -992,6 +1033,9 @@ extern "C" void init_sudo_signals(void)
             if (started) started(-EINVAL, 0);
             return;
         }
+        if (run_passwordless(std::vector<std::string>(argv.begin(), argv.end()), exec_timeout_ms, complete,
+                             started))
+            return;
         cp0_signal_sudo_argv_async(std::move(argv), auth_timeout_ms, exec_timeout_ms,
                                    std::move(complete), std::move(started));
         }))) {

@@ -39,8 +39,8 @@ bluectl/
 ## Dependencies
 
 - Build: `libdbus-1` headers (cross-compilation uses the
-  `usr/include/dbus-1.0` headers and `libdbus-1.so.3` from the SDK
-  `static_lib_*` sysroot; native builds use `pkg-config dbus-1`).
+  `usr/include/dbus-1.0` headers and `libdbus-1.so.3` from `sysroot/`,
+  made by `scripts/make_sysroot.sh`; native builds use `pkg-config dbus-1`).
 - Runtime: `dbus` + `bluez` (`bluetoothd`). The calling process must have
   sufficient permissions (root, or membership in the `bluetooth`/`dbus`
   groups, depending on the distribution policy).

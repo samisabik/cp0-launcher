@@ -417,7 +417,6 @@ void UISettingTreePage::create_page_detail()
         }
         NodeIter mic_gain = mode_tree.append_child(sound, SettingEntry{"mic gain", settings_mic_gain_page_factory});
         append_mic_gain_options(mode_tree, mic_gain);
-        mode_tree.append_child(sound, SettingEntry{"system sounds", system_sounds_api, true});
     }
 
     {

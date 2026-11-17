@@ -67,7 +67,7 @@ int main()
     assert(format_duration(65000) == "1:05");
     assert(format_duration(720000) == "12:00");
 
-    // The recorder package writes 48 kHz mono float: 2.825 s is 542400 data bytes.
+    // 48 kHz mono float: 2.825 s is 542400 data bytes.
     const std::vector<uint8_t> f32 = wav_header(3, 1, 48000, 32, 542400, false);
     assert(wav_duration_ms(f32.data(), f32.size(), f32.size() + 542400) == 2825);
     // 16 kHz mono 16-bit with a LIST chunk; data size field larger than the file.

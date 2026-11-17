@@ -79,13 +79,7 @@ lv_font_t *Cp0FontService::get_chrome(uint16_t size)
     lv_font_t *font = get_mono(kCp0ChromeFont, px);
     if (font && !font->fallback && font != fallback(px)) {
         lv_font_t *latin = get("DejaVuSans.ttf", px);
-        if (latin && latin != font && latin != fallback(px)) {
-            if (!latin->fallback) {
-                lv_font_t *cjk = get("AlibabaPuHuiTi-3-55-Regular.ttf", px);
-                if (cjk && cjk != latin && cjk != fallback(px)) latin->fallback = cjk;
-            }
-            font->fallback = latin;
-        }
+        if (latin && latin != font && latin != fallback(px)) font->fallback = latin;
     }
 #if LV_USE_FREETYPE
     if (font && font != fallback(px)) {

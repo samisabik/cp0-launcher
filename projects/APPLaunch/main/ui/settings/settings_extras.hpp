@@ -28,9 +28,6 @@ std::string settings_hostname();
 // SSH server on/off toggle: `systemctl is-active ssh`, switched through the admin helper.
 void ssh_server_api(int cmd, void *data);
 
-// Launcher UI cue toggle, stored under settings_prefs::kSystemSounds.
-void system_sounds_api(int cmd, void *data);
-
 // 24h / 12h clock picker, stored under settings_prefs::kClock12h.
 void append_clock_format_options(Tree &tree, const NodeIter &parent);
 std::unique_ptr<DComponens::LvglComponensBase> settings_clock_format_page_factory(lv_obj_t *parent,

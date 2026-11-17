@@ -61,7 +61,7 @@ void cp0_dir_watch_stop(cp0_watcher_t watcher);
 int cp0_file_read_first_line(const char *path, char *out, int out_size);
 ```
 
-`cp0_file_path_c` resolves logical names such as `applications`, `appstore_exec`, `calculator_exec`, `adb_helper`, `launcher_settings`, `oobe_marker`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/`, `share/audio/`, or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. Watch handles are nonzero module-owned values and may only be passed to the matching start/poll/stop functions.
+`cp0_file_path_c` resolves logical names such as `applications`, `adb_helper`, `launcher_settings`, `oobe_marker`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/`, `share/audio/`, or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. Watch handles are nonzero module-owned values and may only be passed to the matching start/poll/stop functions.
 
 ### Network and Wi-Fi
 
@@ -94,7 +94,7 @@ int cp0_wifi_radio_set_enabled(int enabled);
 
 `cp0_battery_read` reads the latest background snapshot and performs no hardware I/O; use it only when `valid == 1`. Battery units are mV, mA, 0.1 C, mAh, and percent SOC. `cp0_bq27220_calibrate` accepts indices 0..3. `cp0_backlight_write` clamps to 0..max. `cp0_time_set` requires `YYYY-MM-DD HH:MM:SS`; manual RTC persistence requires NTP to be disabled. `cp0_time_ntp_get/set` controls NTP.
 
-Other C functions read Ethernet/default network information, account information, time text, desktop execution safety, start background updates, and request/clear LoRa initialization stop.
+Other C functions read Ethernet/default network information, account information, time text, and desktop execution safety.
 
 ## Complete `cp0_signal_*` Usage
 
@@ -104,9 +104,8 @@ All `args` below are `std::list<std::string>` with the command at element zero. 
 
 - `cp0_signal_audio_play(std::string path)`: one-way playback of a path.
 - `cp0_signal_audio_cap(bool enable)`: one-way start/stop capture.
-- `cp0_signal_system_play(std::string name)`: play a system sound name. Register extra names first with `RegisterSystemSounds`.
 - `cp0_signal_audio_setup`: `{"set_callback"}`, `{"set_waveform"}` or `{"set_waveform","0"}`, and `{"stop_play"}` set status callbacks, waveform reporting, and stop playback.
-- `cp0_signal_audio_api`: `PlayFile path`, `Play asset`, `PlayPause`, `PlayContinue`, `PlayEnd`, `Cap`, `CapPause`, `CapContinue`, `CapEnd`, `CapFileSave path`, `SetCallback`, `Preload`, `VolumeRead`, `VolumeWrite 0..100`, `DefaultSink` (sink name, or code -1 with empty data when the backend has no real sink), `MuteRead`, `MuteToggle`, `SetSystemSoundNames [up to 3 names]`, `RegisterSystemSounds [1..32 names]`, `SystemSoundPlay 0..2`, `SystemSoundSuspend`, `SystemSoundPrepare`, and `SystemSoundEnable [0|1/on/off...]`. `Preload` loads the mixer client ahead of the first volume action; `Play` resolves a separator-free name as a resource; `PlayFile` uses the supplied path. Errors are negative codes with text.
+- `cp0_signal_audio_api`: `PlayFile path`, `Play asset`, `PlayPause`, `PlayContinue`, `PlayEnd`, `Cap`, `CapPause`, `CapContinue`, `CapEnd`, `CapFileSave path`, `SetCallback`, `Preload`, `VolumeRead`, `VolumeWrite 0..100`, `DefaultSink` (sink name, or code -1 with empty data when the backend has no real sink), `MuteRead`, and `MuteToggle`. `Preload` loads the mixer client ahead of the first volume action; `Play` resolves a separator-free name as a resource; `PlayFile` uses the supplied path. Errors are negative codes with text.
 
 ### PTY
 
@@ -119,10 +118,6 @@ All `args` below are `std::list<std::string>` with the command at element zero. 
 ### Filesystem signal: `cp0_signal_filesystem_api(args, cb)`
 
 Commands are `Path logical_name`, `DirList path`, `DirListDetail path`, `Exists path`, `ReadFile path [max_bytes]`, `EnsureDirForUser path`, `Touch path`, `Remove path`, `WatchStart path`, `WatchPoll handle`, and `WatchStop handle`. `Exists` returns `1/0`; `WatchStart` returns a handle; directory data is line-encoded. Empty or NUL-containing paths are invalid. Unknown commands return code -2.
-
-### LoRa: `cp0_signal_lora_api(args, cb)`
-
-Commands are `Init`, `Poll`, `Info`, `SendText text`, `StartReceive`, `SetTxMode 0|1`, and `Shutdown`. Text must be nonempty and at most 127 bytes. `Poll` and `Info` return raw `cp0_lora_info_t` bytes; `Poll` performs hardware polling while `Info` only reads state. `cp0_lora_request_stop` and `cp0_lora_clear_stop` control initialization cancellation.
 
 ### Wi-Fi
 
@@ -144,14 +139,13 @@ Session commands are `BtSessionInit` (returns an id), `BtSessionDeinit id`, `BtS
 
 `cp0_signal_process_api` commands are `ExecBlocking executable keep_root`, `Spawn executable keep_root`, `Stop pid`, `CheckLock path`, `Kill pid grace_ms`, `RunArgv background argv...`, `RunSudo password argv...` (legacy only), `CaptureArgv argv...`, `AdbStatus`, `DesktopExecIsSafe executable`, `Shutdown`, `Reboot`, and `DelayMs milliseconds`. `Shutdown` and `Reboot` run `systemctl poweroff|reboot --check-inhibitors=yes`, so a block inhibitor (a package install, an update) refuses them; on refusal the code is the systemctl exit status and data is its first output line. `Spawn` returns a PID; `CaptureArgv` returns stdout; `AdbStatus` returns two status lines.
 
-`cp0_signal_osinfo_api` and `cp0_signal_timedate_api` share one service. Commands are `NetworkDefaultInfoRead`, `EthInfoRead` (three lines: IPv4, gateway, MAC), `NetworkList` (tab-separated interface records), `AccountInfoRead` (user and hostname), `TimeSet timestamp`, `LocalTime` (`year,month,day,hour,minute,second`), `RandomU32`, `NtpGet`, `NtpSet 0|1`, `AptUpdateBackground`, and `UpdateLauncherBackground`.
+`cp0_signal_osinfo_api` and `cp0_signal_timedate_api` share one service. Commands are `NetworkDefaultInfoRead`, `EthInfoRead` (three lines: IPv4, gateway, MAC), `NetworkList` (tab-separated interface records), `AccountInfoRead` (user and hostname), `TimeSet timestamp`, `LocalTime` (`year,month,day,hour,minute,second`), `RandomU32`, `NtpGet`, and `NtpSet 0|1`.
 
-### Battery, screenshot, camera, and soundcard
+### Battery, screenshot, and soundcard
 
 - `cp0_signal_bq27220_api`: `Read` returns encoded `cp0_battery_info_t`; `Calibrate index` accepts 0..3.
 - `cp0_signal_screenshot_api`: `Save directory` writes a BMP and returns its complete path.
 - `cp0_signal_battery_pub(std::function<void()>)`: triggers one battery event publication to the active LVGL screen. The function argument is retained for signature compatibility, not subscription registration; call on the LVGL thread.
-- `cp0_signal_camera_api`: `Open [width] [height]`, `Start`, `Close`, `Stop`, `Capture [path] [width] [height]`, `Photo`, `Status`, `SetCallback`, `SetFrameCallback`, `ZoomIn`, `ZoomOut`, and `Pan dx dy`. Defaults are 320x150. Status code 0 means streaming and 1 means stopped; unsupported libcamera returns -10. Frame callbacks may run off-thread and must be marshalled to LVGL.
 - `cp0_signal_soundcard_api`: `ListCards`, `ListControls card_index`, `GetControlDetail card_index control`, and `SetControl card_index control value`. Values preserve raw `amixer` text; unavailable ALSA/process support returns `not supported` or an error.
 
 ### Sudo signals
@@ -167,4 +161,4 @@ Session commands are `BtSessionInit` (returns an id), `BtSessionDeinit id`, `BtS
 1. Read this document and `include/signal_register_plan.h` before changing a call site.
 2. When changing an interface, update all three language documents, the matching contract, C wrapper, call sites, and tests.
 3. For bug fixes, inspect the implementation and contract files; verify callback threads, initialization, teardown, background workers, and wire escaping.
-4. Run `ext_components/cp0_lvgl/tests/run_tests.sh`. Changes involving Linux commands, BlueZ, libcamera, framebuffer, or sudo also require target-platform validation.
+4. Run `ext_components/cp0_lvgl/tests/run_tests.sh`. Changes involving Linux commands, BlueZ, framebuffer, or sudo also require target-platform validation.

@@ -65,7 +65,7 @@ if ! command -v "$SCONS" >/dev/null 2>&1 && [ ! -x "$SCONS" ]; then
     exit 1
 fi
 
-for project in APPLaunch AppStore Calculator LaunchWizard ZClaw; do
+for project in APPLaunch LaunchWizard; do
     if [ ! -f "$ROOT/projects/$project/SConstruct" ]; then
         echo "ERROR: missing project or submodule: projects/$project/SConstruct" >&2
         exit 1
@@ -81,7 +81,7 @@ export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git -C "$ROOT" show -s --format=
 build_project() {
     project=$1
     case "$project" in
-        APPLaunch|AppStore|Calculator|LaunchWizard|ZClaw) ;;
+        APPLaunch|LaunchWizard) ;;
         *) echo "ERROR: unsupported project: $project" >&2; return 2 ;;
     esac
     if [ "$CLEAN_BUILD" = 1 ]; then
@@ -99,36 +99,12 @@ build_project() {
 }
 
 build_project APPLaunch
-build_project AppStore
-build_project Calculator
 build_project LaunchWizard
-build_project ZClaw
 
 echo "=== Aggregating release payload ==="
-install -d "$ROOT/projects/APPLaunch/dist/bin"
-install -m 0755 "$ROOT/projects/AppStore/dist/M5CardputerZero-AppStore" \
-    "$ROOT/projects/APPLaunch/dist/bin/"
-calculator_bin="$ROOT/projects/Calculator/dist/M5CardputerZero-Calculator"
-if [ ! -f "$calculator_bin" ]; then
-    calculator_bin="$ROOT/projects/Calculator/dist/Calculator"
-fi
-install -m 0755 "$calculator_bin" \
-    "$ROOT/projects/APPLaunch/dist/bin/M5CardputerZero-Calculator"
-install -m 0755 "$ROOT/projects/ZClaw/dist/ZClaw" \
-    "$ROOT/projects/APPLaunch/dist/bin/"
-
 install -d "$ROOT/projects/APPLaunch/dist/APPLaunch"
-cp -a "$ROOT/projects/AppStore/dist/APPLaunch/." \
-    "$ROOT/projects/APPLaunch/dist/APPLaunch/"
-cp -a "$ROOT/projects/ZClaw/dist/APPLaunch/." \
-    "$ROOT/projects/APPLaunch/dist/APPLaunch/"
 cp -a "$ROOT/projects/LaunchWizard/dist/APPLaunch/." \
     "$ROOT/projects/APPLaunch/dist/APPLaunch/"
-PREINSTALLED_MANIFEST="$ROOT/projects/APPLaunch/dist/APPLaunch/preinstalled-desktop-apps.tsv"
-ZCLAW_DESKTOP="$ROOT/projects/APPLaunch/dist/APPLaunch/applications/zclaw.desktop"
-test -f "$ZCLAW_DESKTOP"
-python3 "$ROOT/projects/APPLaunch/build_support/verify_preinstalled_desktop.py" \
-    "$PREINSTALLED_MANIFEST" "$ZCLAW_DESKTOP" zclaw.desktop
 install -D -m 0755 "$ROOT/projects/LaunchWizard/dist/LaunchWizard" \
     "$ROOT/projects/APPLaunch/dist/APPLaunch/bin/LaunchWizard"
 aarch64-linux-gnu-gcc -std=c11 -Os -s -Wall -Wextra -Werror \
@@ -158,31 +134,10 @@ for cue in key lock unlock error notification achievement; do
     grep -q "./usr/share/APPLaunch/share/audio/launch-wizard-${cue}.wav$" "$CONTENTS"
 done
 grep -q './usr/share/APPLaunch/bin/M5CardputerZero-APPLaunch$' "$CONTENTS"
-grep -q './usr/share/APPLaunch/preinstalled-desktop-apps.tsv$' "$CONTENTS"
 
 echo "=== Release package ==="
 dpkg-deb -f "$PACKAGE" Package Version Architecture
 stat -c '%s %n' "$PACKAGE"
 sha256sum "$PACKAGE"
-ln -f "$PACKAGE" "$OUTPUT_DIR/applaunch_arm64.deb"
-(
-    cd "$OUTPUT_DIR"
-    sha256sum applaunch_arm64.deb > applaunch_arm64.deb.sha256
-    sha256sum -c applaunch_arm64.deb.sha256
-)
-printf '1\n' >"$OUTPUT_DIR/applaunch_arm64.deb.update-abi"
-PRODUCT_VERSION=${APPLAUNCH_VERSION:-${VERSION%%+*}}
-PACKAGE_VERSION=$(dpkg-deb -f "$PACKAGE" Version)
-COMMIT=$(git -C "$ROOT" rev-parse --short=12 HEAD)
-{
-    printf 'format=1\n'
-    printf 'version=%s\n' "$PRODUCT_VERSION"
-    printf 'package_version=%s\n' "$PACKAGE_VERSION"
-    printf 'commit=%s\n' "$COMMIT"
-} >"$OUTPUT_DIR/applaunch_arm64.deb.update-info"
 printf '%s\n' "$PACKAGE" >"$OUTPUT_DIR/applaunch-package.path"
-echo "Stable package: $OUTPUT_DIR/applaunch_arm64.deb"
-echo "Checksum: $OUTPUT_DIR/applaunch_arm64.deb.sha256"
-echo "Update ABI: $OUTPUT_DIR/applaunch_arm64.deb.update-abi"
-echo "Update info: $OUTPUT_DIR/applaunch_arm64.deb.update-info"
 echo "Result path: $OUTPUT_DIR/applaunch-package.path"

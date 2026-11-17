@@ -14,7 +14,6 @@ SETTINGS_ROLLER = (ROOT / "main/ui/settings/settings_menu_roller.hpp").read_text
 WIFI_PAGE = (ROOT / "main/ui/settings/settings_wifi_page.cpp").read_text()
 SETTINGS_ADAPTER = (ROOT / "main/ui/settings/settings_adapter.cpp").read_text()
 BUILTIN_REGISTRY = (ROOT / "main/ui/builtin_app_registry.cpp").read_text()
-PREINSTALLED_MANIFEST = (ROOT / "APPLaunch/preinstalled-desktop-apps.tsv").read_text()
 
 EXPECTED_ROOT_ORDER = [
     "screen",
@@ -66,10 +65,10 @@ def test_screen_keeps_lock_timeout_options():
 def test_sound_holds_volume_and_mic_gain():
     builder = settings_tree_builder()
     sound_entries = re.findall(r'append_child\(\s*sound,\s*SettingEntry\{"([^"]+)"', builder)
-    assert sound_entries == ["volume", "mic gain", "system sounds"]
+    assert sound_entries == ["volume", "mic gain"]
     assert re.search(r'sound,\s*SettingEntry\{"volume",\s*volume_page3_factory,\s*PageType::FullCustom\}', builder)
     assert "settings_mic_gain_page_factory" in builder
-    assert 'SettingEntry{"system sounds", system_sounds_api, true}' in builder
+    assert "system_sounds_api" not in SETTINGS_PAGE
 
 
 def test_wifi_menu_joins_hidden_networks_from_the_list():
@@ -137,11 +136,6 @@ def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
     assert "launcher::is_launcher_settings_origin(descriptor.origin)" in SETTINGS_ADAPTER
     assert "launcher::is_protected_launcher_app(descriptor.config_key)" in SETTINGS_ADAPTER
     assert '{"Python", "python_100.png", "app_Python", true, false}' in BUILTIN_REGISTRY
-    assert '"Snake"' not in BUILTIN_REGISTRY and '"Tank"' not in BUILTIN_REGISTRY
-    assert (
-        "zclaw.desktop\tZClaw\tshare/images/claw_100.png\t"
-        "/usr/share/APPLaunch/bin/ZClaw\tfalse\ttrue"
-    ) in PREINSTALLED_MANIFEST
 
 
 def test_system_entries_and_power_actions():

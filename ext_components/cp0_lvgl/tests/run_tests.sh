@@ -8,9 +8,9 @@ mkdir -p "$build_dir"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$(dirname "$0")/test_update_job.cpp" -o "$build_dir/test_update_job"
 "$build_dir/test_update_job"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
-    "$(dirname "$0")/test_launcher_updater.cpp" -o "$build_dir/test_launcher_updater"
-"$build_dir/test_launcher_updater"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    -I"$(dirname "$0")/../src" "$(dirname "$0")/test_system_upgrade.cpp" -o "$build_dir/test_system_upgrade"
+"$build_dir/test_system_upgrade"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$(dirname "$0")/../src" "$(dirname "$0")/test_admin_command.cpp" -o "$build_dir/test_admin_command"
 "$build_dir/test_admin_command"
@@ -33,14 +33,6 @@ trap 'rm -f "$binary" "$init_plan_object" "$esc_state_object"' EXIT HUP INT TERM
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src" "$root/tests/test_audio_runtime_lifecycle.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$root/include" -I"$root/src/cp0" \
-    -I"$root/../Miniaudio/include" \
-    -I"$root/../../SDK/github_source/eventpp/include" \
-    "$root/src/cp0/cp0_audio_system_sound_player.cpp" \
-    "$root/tests/test_audio_system_sound_player.cpp" -ldl -lm -o "$binary"
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
@@ -155,21 +147,6 @@ fi
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src" \
-    "$root/src/cp0_camera_api_contract.cpp" \
-    "$root/tests/test_camera_api_contract.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$root/include" -I"$root/src" \
-    -I"$root/../../SDK/github_source/eventpp/include" \
-    "$root/src/cp0_camera_api_contract.cpp" \
-    "$root/src/cp0/cp0_camera_viewport.cpp" \
-    "$root/src/sdl/sdl_lvgl_camera.cpp" \
-    "$root/tests/test_sdl_camera_shutdown.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src/cp0" \
     "$root/src/cp0/cp0_framebuffer_codec.cpp" \
     "$root/tests/test_framebuffer_codec.cpp" -o "$binary"
@@ -189,12 +166,6 @@ fi
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src/cp0" \
-    "$root/src/cp0/cp0_camera_viewport.cpp" \
-    "$root/tests/test_camera_viewport.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src/cp0" \
     "$root/src/cp0/cp0_desktop_exec_policy.cpp" \
     "$root/tests/test_desktop_exec_policy.cpp" -o "$binary"
 "$binary"
@@ -202,31 +173,6 @@ fi
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src" \
     "$root/tests/test_process_api_contract.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src/cp0" \
-    "$root/src/cp0/cp0_lora_runtime_policy.cpp" \
-    "$root/tests/test_lora_runtime_policy.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src/cp0" \
-    "$root/tests/test_lora_gpio_offset_policy.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$root/include" -I"$root/src" \
-    "$root/src/cp0_lora_contract.cpp" \
-    "$root/tests/test_lora_contract.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$root/include" -I"$root/src" \
-    -I"$root/../../SDK/github_source/eventpp/include" \
-    "$root/src/cp0_lora_contract.cpp" \
-    "$root/src/sdl/sdl_lvgl_lara.cpp" \
-    "$root/tests/test_sdl_lora_registration.cpp" -o "$binary"
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \

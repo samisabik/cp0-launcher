@@ -18,13 +18,11 @@ struct DynamicAppRegistration {
     std::string label;
     std::string icon;
     std::string config_key;
-    LauncherAppOrigin origin = LauncherAppOrigin::StoreInstalled;
+    LauncherAppOrigin origin = LauncherAppOrigin::External;
 
     void bind_descriptor()
     {
-        const bool settings_managed = origin == LauncherAppOrigin::Preinstalled;
-        desc = {label.c_str(), icon.c_str(), config_key.c_str(),
-                settings_managed, !settings_managed, origin};
+        desc = {label.c_str(), icon.c_str(), config_key.c_str(), false, true, origin};
     }
 
     DynamicAppRegistration(std::string app_label,

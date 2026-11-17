@@ -24,10 +24,6 @@ namespace {
 
 constexpr std::chrono::milliseconds kRequestTimeout{4000};
 
-enum class TimerInterval : uint32_t {
-    PreviewDelayMs = 180,
-};
-
 class settings_audio_com {
 public:
     enum class ErrorCode : int {
@@ -194,13 +190,6 @@ public:
             return {static_cast<int>(ErrorCode::Invalid), -1, "volume out of range"};
         return decode_volume(invoke_default({"VolumeWrite", std::to_string(value)}, std::chrono::milliseconds(3000)));
     }
-
-    static LvSettingVolumePage3::Response play_system_sound(int index)
-    {
-        if (index < 0 || index > 2)
-            return {static_cast<int>(ErrorCode::Invalid), "system sound index out of range"};
-        return {0, ""};
-    }
 };
 
 } // namespace
@@ -226,7 +215,6 @@ LvSettingVolumePage3::~LvSettingVolumePage3()
     destroying_ = true;
     ++generation_;
     LeaveSelfPage = nullptr;
-    cancel_preview_timer();
     cancel_async_tasks();
     back_callback_ = nullptr;
 }
@@ -281,8 +269,6 @@ SettingApiResult LvSettingVolumePage3::activate_selected()
     if (active_request_ && active_request_->kind == RequestKind::RestoreWrite)
         return SettingApiResult::Pending;
 
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
     commit_requested_      = true;
     commit_leave_requested_ = true;
     locked_selection_       = selected_index;
@@ -358,21 +344,16 @@ void LvSettingVolumePage3::observe_key_event(lv_event_t *event)
         lv_event_stop_processing(event);
         return;
     }
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
     preview_touched_       = true;
     select_volume(next_index);
 
     if (active_request_) {
-        if (active_request_->kind == RequestKind::PreviewSound) preview_sound_pending_ = true;
         lv_event_stop_processing(event);
         return;
     }
 
     const int requested = volume_for_selection(selected_index);
-    if (requested == backend_volume_)
-        schedule_preview_sound();
-    else
+    if (requested != backend_volume_)
         start_volume_request(RequestKind::PreviewWrite, requested);
     lv_event_stop_processing(event);
 }
@@ -381,18 +362,13 @@ void LvSettingVolumePage3::request_back()
 {
     if (destroying_ || back_requested_) return;
 
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
     commit_requested_      = false;
     commit_leave_requested_ = false;
     back_requested_        = true;
     locked_selection_      = selection_for_volume(original_volume_);
 
     if (!ready_ || !active_request_) {
-        if (active_request_ &&
-            (active_request_->kind == RequestKind::Read ||
-             active_request_->kind == RequestKind::PreviewSound ||
-             active_request_->kind == RequestKind::CommitSound))
+        if (active_request_ && active_request_->kind == RequestKind::Read)
             active_request_.reset();
         if (!active_request_) {
             if (backend_volume_ != original_volume_)
@@ -400,20 +376,6 @@ void LvSettingVolumePage3::request_back()
             else
                 finish_back();
         }
-        return;
-    }
-
-    if (active_request_->kind == RequestKind::PreviewSound) {
-        active_request_.reset();
-        if (backend_volume_ != original_volume_)
-            start_restore_if_needed();
-        else
-            finish_back();
-        return;
-    }
-    if (active_request_->kind == RequestKind::CommitSound) {
-        active_request_.reset();
-        finish_back();
     }
 }
 
@@ -481,45 +443,6 @@ void LvSettingVolumePage3::start_volume_request(RequestKind kind, int value)
     if (!scheduled && request_is_current(request))
         handle_volume_failure(request, static_cast<int>(settings_audio_com::ErrorCode::Invoker),
                               "audio request could not be scheduled");
-}
-
-void LvSettingVolumePage3::start_command_request(RequestKind kind)
-{
-    if (destroying_ || active_request_) return;
-
-    const ActiveRequest request{++next_request_id_, generation_, kind, 0};
-    active_request_ = request;
-    const bool scheduled = run_async_task<Response>(
-        {[] {
-             return settings_audio_com::play_system_sound(metric(LayoutMetric::SystemSoundSwitchIndex));
-         },
-         {},
-         {},
-         {},
-         [this, request](DComponens::LvglComponensBase::AsyncTaskContext &, const Response &result) {
-             handle_command_result(request, result);
-         },
-         [this, request](DComponens::LvglComponensBase::AsyncTaskContext &, std::exception_ptr) {
-             handle_command_result(request,
-                                   {static_cast<int>(settings_audio_com::ErrorCode::Invoker),
-                                    "audio sound request failed"});
-         },
-         [this, request](DComponens::LvglComponensBase::AsyncTaskContext &) {
-             handle_command_result(request,
-                                   {static_cast<int>(settings_audio_com::ErrorCode::Timeout),
-                                    "audio sound request timed out"});
-         },
-         [this, request](DComponens::LvglComponensBase::AsyncTaskContext &) {
-             handle_command_result(request,
-                                   {static_cast<int>(settings_audio_com::ErrorCode::Invoker),
-                                    "audio sound request could not be scheduled"});
-         }},
-        {kRequestTimeout});
-
-    if (!scheduled && request_is_current(request))
-        handle_command_result(request,
-                              {static_cast<int>(settings_audio_com::ErrorCode::Invoker),
-                               "audio sound request could not be scheduled"});
 }
 
 void LvSettingVolumePage3::handle_volume_failure(const ActiveRequest &request, int code, std::string message)
@@ -609,7 +532,7 @@ void LvSettingVolumePage3::handle_volume_result(const ActiveRequest &request,
     last_preview_actual_    = result.value;
     select_volume(selection_for_volume(result.value));
     commit_requested_ = false;
-    start_commit_sound();
+    finish_commit();
 }
 
 void LvSettingVolumePage3::handle_preview_success(const ActiveRequest &request)
@@ -633,20 +556,12 @@ void LvSettingVolumePage3::handle_preview_success(const ActiveRequest &request)
     }
 
     const int current = volume_for_selection(selected_index);
-    if (!selection_still_matches || current != request.value) {
-        if (current != backend_volume_)
-            start_volume_request(RequestKind::PreviewWrite, current);
-        else
-            schedule_preview_sound();
-        return;
-    }
-    schedule_preview_sound();
+    if ((!selection_still_matches || current != request.value) && current != backend_volume_)
+        start_volume_request(RequestKind::PreviewWrite, current);
 }
 
 void LvSettingVolumePage3::handle_write_failure()
 {
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
     commit_requested_      = false;
     commit_leave_requested_ = false;
     select_volume(selection_for_volume(original_volume_));
@@ -655,8 +570,6 @@ void LvSettingVolumePage3::handle_write_failure()
 
 void LvSettingVolumePage3::start_restore_if_needed(bool force_write)
 {
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
     locked_selection_      = selection_for_volume(original_volume_);
     rollback_pending_      = true;
     if (active_request_) return;
@@ -680,121 +593,15 @@ void LvSettingVolumePage3::accept_commit_without_write()
     if (!settings_audio_com::save_volume_config(backend_volume_))
         last_error_ = "volume config save failed";
     select_volume(selection_for_volume(backend_volume_));
-    start_commit_sound();
+    finish_commit();
 }
 
-void LvSettingVolumePage3::start_commit_sound()
+void LvSettingVolumePage3::finish_commit()
 {
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
-    locked_selection_      = selection_for_volume(backend_volume_);
-    if (!active_request_)
-        start_command_request(RequestKind::CommitSound);
-}
-
-void LvSettingVolumePage3::schedule_preview_sound()
-{
-    if (destroying_ || back_requested_ || commit_requested_ || commit_leave_requested_ ||
-        rollback_pending_)
-        return;
-    cancel_preview_timer();
-    preview_sound_pending_ = false;
-    preview_timer_ = lv_timer_create(
-        preview_timer_cb, static_cast<uint32_t>(TimerInterval::PreviewDelayMs), this);
-    if (!preview_timer_) {
-        preview_sound_pending_ = true;
-        if (!active_request_) start_preview_sound();
-        return;
-    }
-    lv_timer_set_repeat_count(preview_timer_, 1);
-}
-
-void LvSettingVolumePage3::start_preview_sound()
-{
-    if (destroying_ || back_requested_ || commit_requested_ || commit_leave_requested_ ||
-        rollback_pending_)
-        return;
-    preview_sound_pending_ = false;
-    if (active_request_) {
-        preview_sound_pending_ = true;
-        return;
-    }
-    start_command_request(RequestKind::PreviewSound);
-}
-
-void LvSettingVolumePage3::preview_timer_cb(lv_timer_t *timer) noexcept
-{
-    auto *self = timer ? static_cast<LvSettingVolumePage3 *>(lv_timer_get_user_data(timer)) : nullptr;
-    if (!self || self->destroying_ || timer != self->preview_timer_) return;
-    self->preview_timer_ = nullptr;
-    self->start_preview_sound();
-}
-
-void LvSettingVolumePage3::cancel_preview_timer()
-{
-    if (!preview_timer_) return;
-    lv_timer_delete(preview_timer_);
-    preview_timer_ = nullptr;
-}
-
-void LvSettingVolumePage3::handle_command_result(const ActiveRequest &request,
-                                                 const Response &result)
-{
-    if (!request_is_current(request)) return;
-    active_request_.reset();
-    if (result.code != 0 && last_error_.empty()) last_error_ = result.data;
-
-    if (request.kind == RequestKind::CommitSound) {
-        commit_leave_requested_ = false;
-        commit_requested_        = false;
-        back_requested_          = true;
-        original_volume_         = backend_volume_;
-        finish_back();
-        return;
-    }
-
-    if (back_requested_) {
-        if (backend_volume_ != original_volume_)
-            start_restore_if_needed();
-        else
-            finish_back();
-        return;
-    }
-
-    if (commit_requested_) {
-        pump_commit();
-        return;
-    }
-
-    if (preview_sound_pending_) {
-        preview_sound_pending_ = false;
-        pump_preview();
-    }
-}
-
-void LvSettingVolumePage3::pump_preview()
-{
-    if (destroying_ || back_requested_ || commit_requested_ || commit_leave_requested_ ||
-        rollback_pending_)
-        return;
-    if (active_request_) {
-        preview_sound_pending_ = true;
-        return;
-    }
-
-    const int requested = volume_for_selection(selected_index);
-    if (requested == backend_volume_)
-        schedule_preview_sound();
-    else
-        start_volume_request(RequestKind::PreviewWrite, requested);
-}
-
-void LvSettingVolumePage3::pump_commit()
-{
-    if (!commit_requested_ || active_request_ || destroying_) return;
-    const int requested = volume_for_selection(selected_index);
-    if (requested == backend_volume_)
-        accept_commit_without_write();
-    else
-        start_volume_request(RequestKind::CommitWrite, requested);
+    locked_selection_       = selection_for_volume(backend_volume_);
+    commit_leave_requested_ = false;
+    commit_requested_       = false;
+    back_requested_         = true;
+    original_volume_        = backend_volume_;
+    finish_back();
 }

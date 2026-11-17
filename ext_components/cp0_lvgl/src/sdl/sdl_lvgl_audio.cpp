@@ -62,13 +62,6 @@ public:
         }
     }
 
-    void system_play(const std::string &name)
-    {
-        if (!system_sound_enabled_)
-            return;
-        play(name);
-    }
-
     void api_call(arg_t arg, callback_t callback)
     {
         cp0::audio::ApiRequest request;
@@ -95,8 +88,6 @@ public:
             map_fun(DefaultSink),
             map_fun(MuteRead),
             map_fun(MuteToggle),
-            map_fun(SetSystemSoundNames),
-            map_fun(RegisterSystemSounds),
         };
 #undef map_fun
 
@@ -104,23 +95,6 @@ public:
             VolumeWrite(request.value, callback);
             return;
         }
-        if (request.command == cp0::audio::ApiCommand::SystemSoundPlay) {
-            SystemSoundPlay(request.value, callback);
-            return;
-        }
-        if (request.command == cp0::audio::ApiCommand::SystemSoundSuspend) {
-            SystemSoundSuspend(arg, callback);
-            return;
-        }
-        if (request.command == cp0::audio::ApiCommand::SystemSoundPrepare) {
-            SystemSoundPrepare(arg, callback);
-            return;
-        }
-        if (request.command == cp0::audio::ApiCommand::SystemSoundEnable) {
-            SystemSoundEnable(request.enabled, callback);
-            return;
-        }
-
         for (const auto &it : cmd_map) {
             if (it.first == arg.front()) {
                 it.second(arg, callback);
@@ -143,8 +117,6 @@ private:
     bool waveform_enabled_ = false;
     int volume_ = kDefaultVolume;
     bool muted_ = false;
-    std::vector<std::string> system_sound_names_ = {"Ding2.wav", "switch.wav", "enter.wav"};
-    bool system_sound_enabled_ = true;
 
     void report(callback_t callback, int code, const std::string &data)
     {
@@ -358,75 +330,11 @@ private:
         muted_ = !muted_;
         report(callback, 0, muted_ ? "1" : "0");
     }
-
-    void SetSystemSoundNames(arg_t arg, callback_t callback)
-    {
-        std::vector<std::string> names;
-        auto it = arg.begin();
-        if (it != arg.end())
-            ++it;
-        for (; it != arg.end(); ++it) names.push_back(*it);
-        if (names.size() > system_sound_names_.size())
-            system_sound_names_.resize(names.size());
-        for (size_t i = 0; i < names.size(); ++i) {
-            if (!names[i].empty())
-                system_sound_names_[i] = names[i];
-        }
-        report(callback, 0, "ok");
-    }
-
-    void RegisterSystemSounds(arg_t arg, callback_t callback)
-    {
-        auto it = arg.begin();
-        if (it != arg.end())
-            ++it;
-        for (; it != arg.end(); ++it) {
-            if (it->empty()) continue;
-            const auto found = std::find(system_sound_names_.begin(), system_sound_names_.end(), *it);
-            if (found == system_sound_names_.end())
-                system_sound_names_.push_back(*it);
-        }
-        report(callback, 0, "ok");
-    }
-
-    void SystemSoundPlay(int index, callback_t callback)
-    {
-        if (index < 0 || index >= static_cast<int>(system_sound_names_.size())) {
-            report(callback, -1, "invalid system sound index\n");
-            return;
-        }
-        if (!system_sound_enabled_) {
-            report(callback, 0, "system sound disabled\n");
-            return;
-        }
-        system_play(system_sound_names_[static_cast<size_t>(index)]);
-        report(callback, 0, "system sound play\n");
-    }
-
-    void SystemSoundSuspend(arg_t arg, callback_t callback)
-    {
-        (void)arg;
-        playing_ = false;
-        report(callback, 0, "system sound suspended\n");
-    }
-
-    void SystemSoundPrepare(arg_t arg, callback_t callback)
-    {
-        (void)arg;
-        report(callback, 0, "system sound ready\n");
-    }
-
-    void SystemSoundEnable(bool enabled, callback_t callback)
-    {
-        system_sound_enabled_ = enabled;
-        report(callback, 0, system_sound_enabled_ ? "1" : "0");
-    }
 };
 
 using AudioRegistrations = cp0::SignalRegistrationBundle<
     decltype(cp0_signal_audio_play), decltype(cp0_signal_audio_cap),
-    decltype(cp0_signal_audio_setup), decltype(cp0_signal_audio_api),
-    decltype(cp0_signal_system_play)>;
+    decltype(cp0_signal_audio_setup), decltype(cp0_signal_audio_api)>;
 
 std::mutex g_audio_mutex;
 std::shared_ptr<AudioSystem> g_audio;
@@ -471,9 +379,7 @@ extern "C" void init_audio(void)
                                  cp0::audio::invoke_callback(
                                      callback, -1, "audio backend failure\n");
                              }
-                         }),
-        cp0::bind_signal(cp0_signal_system_play,
-                         [audio](std::string name) { audio->system_play(std::move(name)); }))) {
+                         }))) {
         g_audio_lifecycle.rollback_init();
         return;
     }

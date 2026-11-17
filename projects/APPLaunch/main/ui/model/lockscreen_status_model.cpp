@@ -28,12 +28,15 @@ std::string battery_line(int soc, int remain_mah, int avg_current_ma)
     return text;
 }
 
-std::string recordings_line(int total, int untranscribed)
+std::string uptime_line(long seconds)
 {
-    if (total <= 0) return "none";
-    std::string text = std::to_string(total) + (total == 1 ? " clip" : " clips");
-    if (untranscribed > 0) text += ", " + std::to_string(untranscribed) + " to transcribe";
-    return text;
+    if (seconds < 0) seconds = 0;
+    const long minutes = seconds / 60;
+    const long hours = minutes / 60;
+    const long days = hours / 24;
+    if (days > 0) return std::to_string(days) + "d " + std::to_string(hours % 24) + "h";
+    if (hours > 0) return std::to_string(hours) + "h " + std::to_string(minutes % 60) + "m";
+    return std::to_string(minutes) + "m";
 }
 
 } // namespace lockscreen_status

@@ -28,9 +28,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <future>
 #include <string>
 #include <vector>
 
@@ -98,7 +98,6 @@ void life_run(bool running);
 ScreensaverModel s_model;
 LockscreenStateModel s_lock;
 bool s_exiting = false;
-std::future<bool> s_audio_prepare_future;
 /* Raw backlight value captured when the panel is forced dark, or -1 while the
  * backlight is under normal control. */
 int s_screen_off_backlight_raw = -1;
@@ -221,23 +220,15 @@ std::string network_status()
     return "offline";
 }
 
-std::string recordings_status()
+std::string uptime_status()
 {
-    const char *home = std::getenv("HOME");
-    const std::string dir = std::string(home && home[0] ? home : "/tmp") + "/Recordings";
-    DIR *handle = opendir(dir.c_str());
-    if (!handle) return lockscreen_status::recordings_line(0, 0);
-    int total = 0;
-    int untranscribed = 0;
-    while (dirent *entry = readdir(handle)) {
-        const std::string name = entry->d_name;
-        if (name.size() <= 4 || name.compare(name.size() - 4, 4, ".wav") != 0) continue;
-        ++total;
-        const std::string txt = dir + "/" + name.substr(0, name.size() - 4) + ".txt";
-        if (access(txt.c_str(), F_OK) != 0) ++untranscribed;
+    std::FILE *file = std::fopen("/proc/uptime", "r");
+    double seconds = 0.0;
+    if (file) {
+        if (std::fscanf(file, "%lf", &seconds) != 1) seconds = 0.0;
+        std::fclose(file);
     }
-    closedir(handle);
-    return lockscreen_status::recordings_line(total, untranscribed);
+    return lockscreen_status::uptime_line(static_cast<long>(seconds));
 }
 
 void refresh_status(bool force)
@@ -247,7 +238,7 @@ void refresh_status(bool force)
     s_status_refreshed = now;
     const std::string tailscale = interface_ipv4("tailscale0");
     const std::string values[kStatusRows] = {
-        battery_status(), network_status(), tailscale.empty() ? std::string("off") : tailscale, recordings_status()};
+        battery_status(), network_status(), tailscale.empty() ? std::string("off") : tailscale, uptime_status()};
     for (int i = 0; i < kStatusRows; ++i)
         if (s_status_values[i] && values[i] != lv_label_get_text(s_status_values[i]))
             lv_label_set_text(s_status_values[i], values[i].c_str());
@@ -428,7 +419,7 @@ void create_content()
     s_date = content_label(s_content, kCp0ChromeFontSize, kColorDim);
     if (s_date) lv_obj_set_pos(s_date, kDateLeft, kDateTop);
 
-    static const char *const kStatusKeys[kStatusRows] = {"bat", "net", "ts", "rec"};
+    static const char *const kStatusKeys[kStatusRows] = {"bat", "net", "ts", "up"};
     for (int i = 0; i < kStatusRows; ++i) {
         const lv_coord_t y = kStatusTop + i * kStatusRowH;
         if (lv_obj_t *key = content_label(s_content, kCp0ChromeFontSize, kColorDim)) {
@@ -479,24 +470,6 @@ void hide_hold_hint()
     launcher_toast().hide();
 }
 
-/* ---- lock-screen sounds ------------------------------------------------
- * The platform's system-sound player decodes each registered sound once, keeps
- * the decoded PCM and a warm engine, and plays it on its own worker thread.  So
- * the assets are registered by name once and then played through the by-name
- * signal: the unregistered fallback would instead re-open the audio device on
- * every play, which also swallows the start of a short sound while the sink
- * settles.  Registration appends after the platform's indexed sounds, so the
- * launcher's own startup/switch/enter slots are untouched. */
-/* Last asset asked for, kept for diagnostics and for tests to observe the
- * request without racing the player's worker. */
-const char *s_last_sound_asset = "";
-
-void play_lockscreen_sound(const char *asset) noexcept
-{
-    if (asset) s_last_sound_asset = asset;
-    settings_prefs::play_system_sound(asset);
-}
-
 void update_timer_period()
 {
     if (!s_timer) return;
@@ -527,47 +500,6 @@ void release_screen_off_backlight() noexcept
     }
 }
 
-void suspend_system_sound() noexcept
-{
-    try {
-        cp0_signal_audio_api({"SystemSoundSuspend"}, nullptr);
-    } catch (...) {
-    }
-}
-
-bool prepare_system_sound() noexcept
-{
-    int code = -1;
-    try {
-        cp0_signal_audio_api({"SystemSoundPrepare"},
-                             [&](int result, std::string) { code = result; });
-    } catch (...) {
-    }
-    return code == 0;
-}
-
-void start_system_sound_prepare() noexcept
-{
-    try {
-        if (s_audio_prepare_future.valid())
-            (void)s_audio_prepare_future.get();
-        s_audio_prepare_future = std::async(
-            std::launch::async, [] { return prepare_system_sound(); });
-    } catch (...) {
-    }
-}
-
-bool finish_system_sound_prepare() noexcept
-{
-    if (!s_audio_prepare_future.valid())
-        return false;
-    try {
-        return s_audio_prepare_future.get();
-    } catch (...) {
-        return false;
-    }
-}
-
 void curtain_exit_anim_exec(void *object, int32_t y) noexcept
 {
     try {
@@ -579,7 +511,6 @@ void curtain_exit_anim_exec(void *object, int32_t y) noexcept
 
 void finish_screensaver_exit() noexcept
 {
-    (void)finish_system_sound_prepare();
     release_screen_off_backlight();
     try {
         life_run(false);
@@ -709,8 +640,6 @@ void create_objects()
 void stop_screensaver(bool was_active = false, bool animated = false)
 {
     const bool active = was_active || s_model.active();
-    if (active)
-        start_system_sound_prepare();
 
     /* Bring the panel back before the exit animation so wake-up is visible, and
      * drop the lock so the next entry starts black. */
@@ -770,9 +699,7 @@ void enter_lockscreen()
     s_lock.reset(now);
     launcher_battery_ui::refresh_visibility();
 
-    suspend_system_sound();
     suspend_screen_off_backlight();
-    play_lockscreen_sound("lock.mp3");
 
     lv_obj_move_foreground(s_overlay);
     lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
@@ -799,7 +726,6 @@ void sleep_lockscreen()
     apply_panel(full_screen_panel());
     hide_hint();
     suspend_screen_off_backlight();
-    play_lockscreen_sound("lock.mp3");
 }
 
 void timer_cb(lv_timer_t *timer) noexcept
@@ -872,7 +798,6 @@ extern "C" void ui_screensaver_deinit(void)
         s_timer = nullptr;
     }
     cancel_exit_animation();
-    (void)finish_system_sound_prepare();
     release_screen_off_backlight();
     if (s_overlay)
         lv_obj_delete(s_overlay);
@@ -913,16 +838,11 @@ extern "C" int ui_screensaver_filter_key(const struct key_item *item)
         const LockscreenDecision decision =
             s_lock.handle_key(item->key_code, pressed, released, now);
         if (decision.unlock) {
-            play_lockscreen_sound("unlock.mp3");
             stop_screensaver(true, true);
         } else if (decision.sleep) {
             sleep_lockscreen();
-        } else {
-            if (decision.blocked)
-                play_lockscreen_sound("blocked.mp3");
-            else if (decision.show_panel)
-                play_lockscreen_sound("select.mp3");
-            if (decision.show_panel) show_lockscreen_panel();
+        } else if (decision.show_panel) {
+            show_lockscreen_panel();
         }
         return decision.consumed ? 1 : 0;
     }

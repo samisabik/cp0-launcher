@@ -8,6 +8,9 @@
 #include "cp0_theme.hpp"
 
 #include <array>
+#include <atomic>
+#include <mutex>
+#include <thread>
 #include <cstdint>
 #include <deque>
 #include <string>
@@ -17,7 +20,6 @@
 //  SDR  UISdrPage
 //  RTL-SDR front end with three modes, driven by the rtl-sdr CLI tools.
 //    Scope   wideband spectrum + waterfall over a 2 MHz span (rtl_power)
-//    Listen  tune and demodulate to the speaker (rtl_fm | aplay)
 //    Decode  named devices in range (rtl_433)
 //  Shows "connect RTL-SDR" until a dongle is detected.
 //
@@ -28,7 +30,7 @@
 //    1..6           presets (fm air 433 pmr noaa ads-b)
 //    G              cycle gain (auto / 20 / 30 / 40 dB)
 //    Scope: S span, H clear peak hold
-//    Listen: M demod mode, ENTER play, SPACE stop, O audio out on/off
+//    Scope: M demod (wfm/nfm/am), O audio on/off
 //    Decode: ENTER start/stop, S save log
 //    ESC            home
 // ============================================================
@@ -39,7 +41,7 @@ public:
     ~UISdrPage() override;
 
 private:
-    enum class Mode { Scope, Listen, Decode };
+    enum class Mode { Scope, Decode };
 
     static constexpr int kWidth = 310;
     static constexpr int kCanvasTop = 64;
@@ -54,7 +56,6 @@ private:
     int step_index_ = 3;
     int gain_db_ = -1;
     sdr::Demod demod_ = sdr::Demod::NFM;
-    bool playing_ = false;
     bool audio_out_ = true;
     bool decoding_ = false;
 
@@ -69,8 +70,19 @@ private:
     std::array<float, kWidth> smooth_{};
     bool smooth_valid_ = false;
     int iq_fd_ = -1;
+    int audio_pid_ = -1;
     std::string iq_path_;
-    std::vector<uint8_t> iq_tail_;
+    std::string audio_path_;
+    // The worker reads the IQ pipe, demodulates to the audio pipe, and keeps
+    // the newest FFT block for the scope.
+    std::thread worker_;
+    std::atomic<bool> worker_stop_{false};
+    std::atomic<bool> worker_audio_{true};
+    std::atomic<int> worker_demod_{0};
+    std::mutex iq_mutex_;
+    std::vector<uint8_t> iq_latest_;
+    uint64_t iq_sequence_ = 0;
+    uint64_t iq_drawn_ = 0;
     std::array<uint16_t, 64> palette_{};
     std::vector<uint16_t> pixels_;
     std::deque<std::string> devices_;
@@ -87,11 +99,7 @@ private:
     lv_obj_t *big_ = nullptr;
     lv_obj_t *sub_ = nullptr;
     lv_obj_t *list_ = nullptr;
-    lv_obj_t *listen_ = nullptr;
-    lv_obj_t *demod_value_ = nullptr;
-    lv_obj_t *state_value_ = nullptr;
-    lv_obj_t *audio_pill_ = nullptr;
-    lv_obj_t *audio_pill_text_ = nullptr;
+
     lv_obj_t *hint_ = nullptr;
     lv_timer_t *timer_ = nullptr;
 
@@ -107,7 +115,7 @@ private:
     void stop_proc();
     void start_scope();
     void start_decode();
-    void toggle_listen();
+    void worker_loop();
     std::string tail();
 
     void read_iq();

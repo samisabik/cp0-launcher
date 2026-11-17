@@ -3,7 +3,6 @@ dist
 .gdb_history
 ui.bak
 static
-static_lib
 keyboard_input.c
 doc
 tools
@@ -42,3 +41,5 @@ runpool*
 RUNPOOL-VERDICT.md
 council
 .workbuddy
+/sysroot/
+/sysroot.tmp/

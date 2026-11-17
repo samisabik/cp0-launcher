@@ -11,8 +11,8 @@
 
 enum class LauncherAppOrigin : std::uint8_t {
     Builtin,
-    Preinstalled,
-    StoreInstalled,
+    // A .desktop entry in the applications folder; always shown.
+    External,
 };
 
 struct AppDescriptor {

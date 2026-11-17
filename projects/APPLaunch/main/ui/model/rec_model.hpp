@@ -12,7 +12,7 @@
 // kept free of LVGL and process access so they can be unit-tested on the host.
 namespace rec {
 
-// "20261115_044536", the file name stem the recorder package already used.
+// "20261115_044536", the file name stem for a recording.
 std::string recording_stem(int year, int month, int day, int hour, int minute, int second);
 
 // "11-15 04:45" for a recording stem; other stems are returned unchanged.

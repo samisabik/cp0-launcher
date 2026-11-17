@@ -19,12 +19,6 @@ inline const lv_font_t *sans(uint16_t size,
     return cp0_fonts().get_chrome(size);
 }
 
-inline const lv_font_t *serif(uint16_t size,
-                              lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL)
-{
-    return cp0_fonts().get("DejaVuSerif.ttf", size, style);
-}
-
 inline const lv_font_t *mono(uint16_t size,
                              lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL)
 {
@@ -32,22 +26,13 @@ inline const lv_font_t *mono(uint16_t size,
     return cp0_fonts().get_chrome(size);
 }
 
-// User strings (SSIDs, device names) also use the pixel font; its fallback
-// chain ends in AlibabaPuHuiTi, which still draws CJK glyphs.
+// User strings (SSIDs, device names) also use the pixel font, falling back to
+// DejaVu Sans. No CJK font ships, so CJK glyphs do not render.
 inline const lv_font_t *cjk_sans(uint16_t size,
                                  lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL)
 {
     (void)style;
     return cp0_fonts().get_chrome(size);
-}
-
-inline const lv_font_t *cjk_serif(uint16_t size,
-                                  lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL)
-{
-    const lv_font_t *font = cp0_fonts().get("NotoSerifCJK-Regular.ttc", size, style);
-    if (font == cp0_fonts().fallback(size))
-        font = cp0_fonts().get("AlibabaPuHuiTi-3-55-Regular.ttf", size, style);
-    return font;
 }
 
 } // namespace settings_fonts
