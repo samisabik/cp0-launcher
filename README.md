@@ -13,7 +13,7 @@ and a small set of built-in apps sharing one theme. Forked from
 - **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker.
 - **Rec**: voice recorder with on-device transcription (whisper.cpp).
 - **Audio**: live microphone spectrum and pitch readout.
-- **Settings**, **CLI**, **Python**, **SSH**, **IP Panel**; Settings -> system -> updates runs `apt update` and `apt upgrade`.
+- **Settings**, **CLI**, **Python**, **SSH**, **IP Panel**.
 
 | | |
 |---|---|
