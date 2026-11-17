@@ -4,18 +4,29 @@ A personal launcher for the M5Stack CardputerZero: a terminal-styled home screen
 and a small set of built-in apps sharing one theme. Forked from
 [CardputerZero/launcher](https://github.com/CardputerZero/launcher) (MIT).
 
-<img src="docs/screenshots/lockscreen.gif" alt="Lock screen" width="320">
+<img src="docs/screenshots/hero.gif" alt="cp0-launcher lock screen with Game of Life" width="100%">
+
+## Apps
+
+- **Files**: browse, preview text, rename, copy/move, delete, new folders; `e` opens a file in micro.
+- **Spectrum**: sub-GHz scanner and recorder on the CC1101 radio. RX watches the 315, 433 and 868 MHz bands with per-channel level bars and auto-captures any signal over the trigger to `~/spectrum` as Flipper `.sub` and rtl_433 `.ook` files; TX lists the captures and replays one on its own frequency.
+- **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker.
+- **Rec**: voice recorder with on-device transcription (whisper.cpp).
+- **Audio**: live microphone spectrum and pitch readout.
+- **Settings**, **CLI**, **Python**, **SSH**, **IP Panel**; Settings -> system -> updates runs `apt update` and `apt upgrade`.
 
 | | |
 |---|---|
-| <img src="docs/screenshots/home.png" width="320"><br>Home | <img src="docs/screenshots/home-2.png" width="320"><br>Home, page 2 |
-| <img src="docs/screenshots/files.png" width="320"><br>Files | <img src="docs/screenshots/files-preview.png" width="320"><br>Files: preview |
-| <img src="docs/screenshots/rec.png" width="320"><br>Rec: recordings with transcripts | <img src="docs/screenshots/rec-clip.png" width="320"><br>Rec: clip |
-| <img src="docs/screenshots/spectrum.png" width="320"><br>Spectrum | <img src="docs/screenshots/sdr.png" width="320"><br>SDR (waiting for a dongle) |
-| <img src="docs/screenshots/audio.png" width="320"><br>Audio | <img src="docs/screenshots/settings.png" width="320"><br>Settings |
-| <img src="docs/screenshots/settings-battery.png" width="320"><br>Settings: battery | <img src="docs/screenshots/settings-updates.png" width="320"><br>Settings: apt update and upgrade |
+| <img src="docs/screenshots/home.png" width="400"><br>Home | <img src="docs/screenshots/home-2.png" width="400"><br>Home, page 2 |
+| <img src="docs/screenshots/files.png" width="400"><br>Files | <img src="docs/screenshots/files-preview.png" width="400"><br>Files: preview |
+| <img src="docs/screenshots/spectrum.png" width="400"><br>Spectrum: CC1101 RX | <img src="docs/screenshots/sdr.png" width="400"><br>SDR (waiting for a dongle) |
+| <img src="docs/screenshots/rec.png" width="400"><br>Rec: recordings with transcripts | <img src="docs/screenshots/rec-clip.png" width="400"><br>Rec: clip |
+| <img src="docs/screenshots/audio.png" width="400"><br>Audio | <img src="docs/screenshots/lockscreen.png" width="400"><br>Lock screen |
+| <img src="docs/screenshots/settings.png" width="400"><br>Settings | <img src="docs/screenshots/settings-battery.png" width="400"><br>Settings: battery |
 
-Screenshots are captured from the device framebuffer at its native 320x170.
+Images are the device's 320x170 framebuffer drawn at 4x; the UI font is the pixel font
+DepartureMono, so the enlargement is exact. Network name and address on the lock screen
+are placeholders.
 
 ## Install on a CardputerZero
 
