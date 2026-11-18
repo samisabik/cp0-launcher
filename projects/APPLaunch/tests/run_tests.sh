@@ -166,6 +166,66 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -o "$build_dir/test_files_model"
 "$build_dir/test_files_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_location_model.cpp" \
+    "$test_root/../main/ui/model/location_model.cpp" \
+    -o "$build_dir/test_location_model"
+"$build_dir/test_location_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_adsb_model.cpp" \
+    "$test_root/../main/ui/model/adsb_model.cpp" \
+    -o "$build_dir/test_adsb_model"
+"$build_dir/test_adsb_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_sat_model.cpp" \
+    "$test_root/../main/ui/model/sat_model.cpp" \
+    -o "$build_dir/test_sat_model"
+"$build_dir/test_sat_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_sensors_model.cpp" \
+    "$test_root/../main/ui/model/sensors_model.cpp" \
+    -o "$build_dir/test_sensors_model"
+"$build_dir/test_sensors_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_keys_model.cpp" \
+    "$test_root/../main/ui/model/keys_model.cpp" \
+    -o "$build_dir/test_keys_model"
+"$build_dir/test_keys_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_fox_model.cpp" \
+    "$test_root/../main/ui/model/fox_model.cpp" \
+    -o "$build_dir/test_fox_model"
+"$build_dir/test_fox_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_ir_model.cpp" \
+    "$test_root/../main/ui/model/ir_model.cpp" \
+    -o "$build_dir/test_ir_model"
+"$build_dir/test_ir_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_pins_model.cpp" \
+    "$test_root/../main/ui/model/pins_model.cpp" \
+    -o "$build_dir/test_pins_model"
+"$build_dir/test_pins_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_tailnet_model.cpp" \
+    "$test_root/../main/ui/model/tailnet_model.cpp" \
+    -o "$build_dir/test_tailnet_model"
+"$build_dir/test_tailnet_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_air_model.cpp" \
+    "$test_root/../main/ui/model/air_model.cpp" \
+    -o "$build_dir/test_air_model"
+"$build_dir/test_air_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_slime_model.cpp" \
+    "$test_root/../main/ui/model/slime_model.cpp" \
+    -o "$build_dir/test_slime_model"
+"$build_dir/test_slime_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_tracker_model.cpp" \
+    "$test_root/../main/ui/model/tracker_model.cpp" \
+    -o "$build_dir/test_tracker_model"
+"$build_dir/test_tracker_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_rec_model.cpp" \
     "$test_root/../main/ui/model/rec_model.cpp" \
     -o "$build_dir/test_rec_model"
