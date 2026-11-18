@@ -19,7 +19,7 @@ and a small set of built-in apps sharing one theme. Forked from
 |---|---|
 | <img src="docs/screenshots/home.png" width="400"><br>Home | <img src="docs/screenshots/home-2.png" width="400"><br>Home, page 2 |
 | <img src="docs/screenshots/files.png" width="400"><br>Files | <img src="docs/screenshots/files-preview.png" width="400"><br>Files: preview |
-| <img src="docs/screenshots/spectrum.png" width="400"><br>Spectrum: CC1101 RX | <img src="docs/screenshots/sdr.png" width="400"><br>SDR (waiting for a dongle) |
+| <img src="docs/screenshots/spectrum.png" width="400"><br>Spectrum: CC1101 RX | <img src="docs/screenshots/sdr.png" width="400"><br>SDR: scope and waterfall around 433.92 MHz |
 | <img src="docs/screenshots/rec.png" width="400"><br>Rec: recordings with transcripts | <img src="docs/screenshots/rec-clip.png" width="400"><br>Rec: clip |
 | <img src="docs/screenshots/audio.png" width="400"><br>Audio | <img src="docs/screenshots/lockscreen.png" width="400"><br>Lock screen |
 | <img src="docs/screenshots/settings.png" width="400"><br>Settings | <img src="docs/screenshots/settings-battery.png" width="400"><br>Settings: battery |
