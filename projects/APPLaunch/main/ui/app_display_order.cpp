@@ -28,9 +28,14 @@ std::string normalized_label(std::string_view label)
     return normalized;
 }
 
-// The first home page, in this order, ahead of the rest of the list.
-constexpr std::array<std::string_view, 6> kHomeFirstPage = {
-    "settings", "sdr", "spectrum", "rec", "cli", "files",
+// Home order for the built-in apps, grouped by type. The home grid shows six
+// per page, so each row of six below is one page: system, radio, then
+// hardware and network, then sound.
+constexpr std::array<std::string_view, 21> kHomeOrder = {
+    "settings", "files",  "cli",  "python",  "ssh",      "ippanel",
+    "sdr",      "adsb",   "sat",  "sensors", "spectrum", "keys",
+    "fox",      "ir",     "pins", "tailnet", "air",      "slime",
+    "rec",      "audio",  "tracker",
 };
 
 } // namespace
@@ -39,8 +44,8 @@ int launcher_home_first_page_order(std::string_view label) noexcept
 {
     try {
         const std::string normalized = normalized_label(label);
-        for (std::size_t index = 0; index < kHomeFirstPage.size(); ++index)
-            if (normalized == kHomeFirstPage[index]) return static_cast<int>(index);
+        for (std::size_t index = 0; index < kHomeOrder.size(); ++index)
+            if (normalized == kHomeOrder[index]) return static_cast<int>(index);
     } catch (...) {
     }
     return -1;

@@ -23,9 +23,16 @@ int main()
     assert(launcher_builtin_app_display_order("IP_PANEL") == 4);
     assert(launcher_builtin_app_display_order("Vim") == -1);
     assert(launcher_home_first_page_order("Settings") == 0);
-    assert(launcher_home_first_page_order("SDR") == 1);
-    assert(launcher_home_first_page_order("Files") == 5);
-    assert(launcher_home_first_page_order("Python") == -1);
+    assert(launcher_home_first_page_order("Files") == 1);
+    assert(launcher_home_first_page_order("IP Panel") == 5);
+    // Each page of six is one type: radio starts the second page, hardware
+    // and network the third, sound the fourth.
+    assert(launcher_home_first_page_order("SDR") == 6);
+    assert(launcher_home_first_page_order("Keys") == 11);
+    assert(launcher_home_first_page_order("Fox") == 12);
+    assert(launcher_home_first_page_order("Rec") == 18);
+    assert(launcher_home_first_page_order("Tracker") == 20);
+    assert(launcher_home_first_page_order("Vim") == -1);
 
     return 0;
 }
