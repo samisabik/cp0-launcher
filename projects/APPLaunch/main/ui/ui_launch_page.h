@@ -16,9 +16,11 @@
 
 class Launch;
 
-// Home screen: a 3x2 grid of panel tiles (icon and name) with a
-// footer of key hints and page dots. Moving the selection only restyles the
-// two affected tiles; nothing animates.
+// Home screen: a rail of app types on the left and a 3x2 grid of panel tiles
+// (icon and name) for the apps of the highlighted type, over a footer of key
+// hints and page dots. Focus is either in the grid or in the rail: left from
+// the first column enters the rail, where up and down switch type and right
+// returns to the grid. Nothing animates.
 class UILaunchPage : public home_base
 {
 public:
@@ -49,11 +51,23 @@ private:
         lv_obj_t *icon = nullptr;
         lv_obj_t *name = nullptr;
     };
+    // One rail row: a type and the launcher indices of its apps.
+    struct Group
+    {
+        int category = 0;
+        std::vector<size_t> apps;
+    };
     static constexpr size_t kMaxPageDots = 6;
+    static constexpr size_t kMaxGroups = 7;
 
     void create_grid(lv_obj_t *parent);
-    void move_selection(int delta);
+    void move_selection(int dx, int dy);
+    void move_group(int delta);
+    void activate();
+    void set_rail_focus(bool focus);
+    void rebuild_groups();
     void apply_selection();
+    void apply_rail();
     void fill_page();
     void handle_home_key(lv_event_t *event);
     void forget_widgets();
@@ -66,8 +80,20 @@ private:
     lv_obj_t *container_ = nullptr;
     std::array<Tile, kTilesPerPage> tiles_ = {};
     std::array<lv_obj_t *, kMaxPageDots> page_dots_ = {};
+    std::array<lv_obj_t *, kMaxGroups> rail_labels_ = {};
+    lv_obj_t *rail_highlight_ = nullptr;
+    lv_obj_t *rail_marker_ = nullptr;
+    lv_obj_t *hints_ = nullptr;
+    std::vector<Group> groups_;
+    // Group and position inside it of the launcher's current app.
+    size_t group_ = 0;
+    size_t position_ = 0;
+    bool rail_focus_ = false;
     size_t focused_slot_ = SIZE_MAX;
     size_t shown_page_ = SIZE_MAX;
+    size_t shown_group_ = SIZE_MAX;
+    // SIZE_MAX forces the rail to be restyled.
+    size_t rail_state_ = SIZE_MAX;
     std::vector<std::string> icon_paths_;
     HomeIconBufferPool home_icon_pool_;
     bool home_key_registered_ = false;

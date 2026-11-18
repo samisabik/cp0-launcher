@@ -28,15 +28,23 @@ std::string normalized_label(std::string_view label)
     return normalized;
 }
 
-// Home order for the built-in apps, grouped by type. The home grid shows six
-// per page, so each row of six below is one page: system, radio, then
-// hardware and network, then sound.
-constexpr std::array<std::string_view, 21> kHomeOrder = {
-    "settings", "files",  "cli",  "python",  "ssh",      "ippanel",
-    "sdr",      "adsb",   "sat",  "sensors", "spectrum", "keys",
-    "fox",      "ir",     "pins", "tailnet", "air",      "slime",
-    "rec",      "audio",  "tracker",
+// Home order and type of the built-in apps. The home screen lists the types
+// in a rail and shows the apps of one type at a time, in this order.
+struct HomeApp {
+    std::string_view label;
+    int category;
 };
+constexpr std::array<const char *, kHomeCategoryCount> kCategoryNames = {
+    "system", "network", "radio", "hardware", "sound", "play", "apps",
+};
+constexpr std::array<HomeApp, 22> kHomeOrder = {{
+    {"settings", 0}, {"files", 0},   {"cli", 0},     {"python", 0},
+    {"ssh", 1},      {"ippanel", 1}, {"tailnet", 1}, {"air", 1}, {"portal", 1},
+    {"sdr", 2},      {"adsb", 2},    {"sat", 2},     {"sensors", 2}, {"spectrum", 2}, {"keys", 2}, {"fox", 2},
+    {"ir", 3},       {"pins", 3},
+    {"rec", 4},      {"audio", 4},   {"tracker", 4},
+    {"slime", 5},
+}};
 
 } // namespace
 
@@ -45,10 +53,21 @@ int launcher_home_first_page_order(std::string_view label) noexcept
     try {
         const std::string normalized = normalized_label(label);
         for (std::size_t index = 0; index < kHomeOrder.size(); ++index)
-            if (normalized == kHomeOrder[index]) return static_cast<int>(index);
+            if (normalized == kHomeOrder[index].label) return static_cast<int>(index);
     } catch (...) {
     }
     return -1;
+}
+
+int launcher_home_category(std::string_view label) noexcept
+{
+    const int order = launcher_home_first_page_order(label);
+    return order >= 0 ? kHomeOrder[static_cast<std::size_t>(order)].category : kHomeCategoryCount - 1;
+}
+
+const char *launcher_home_category_name(int category) noexcept
+{
+    return category >= 0 && category < kHomeCategoryCount ? kCategoryNames[static_cast<std::size_t>(category)] : "";
 }
 
 int launcher_builtin_app_display_order(std::string_view label) noexcept

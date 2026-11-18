@@ -46,16 +46,16 @@ void UILaunchPage::handle_home_key(lv_event_t *event)
     if (elm->key_state == KBD_KEY_PRESSED || elm->key_state == KBD_KEY_REPEATED) {
         switch (code) {
         case KEY_LEFT:
-            move_selection(-1);
+            move_selection(-1, 0);
             break;
         case KEY_RIGHT:
-            move_selection(1);
+            move_selection(1, 0);
             break;
         case KEY_UP:
-            move_selection(-static_cast<int>(kColumns));
+            move_selection(0, -1);
             break;
         case KEY_DOWN:
-            move_selection(static_cast<int>(kColumns));
+            move_selection(0, 1);
             break;
         case KEY_TAB:
             if (elm->key_state == KBD_KEY_PRESSED) ui_screensaver_lock_now();
@@ -64,7 +64,7 @@ void UILaunchPage::handle_home_key(lv_event_t *event)
             break;
         }
     } else if (elm->key_state == KBD_KEY_RELEASED && code == KEY_ENTER) {
-        launch_selected_app();
+        activate();
     }
 }
 
