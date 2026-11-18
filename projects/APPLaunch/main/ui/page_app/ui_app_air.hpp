@@ -25,6 +25,7 @@
 //    UP / DOWN   select a network or device
 //    5           wi-fi: switch between the 2.4 GHz and 5 GHz views
 //    S           wi-fi: cycle the sort (signal / channel / name)
+//    W           wi-fi: scan with the next adapter (wlan0, a USB wlan1, ...)
 //    ESC         home
 // ============================================================
 class UIAirPage : public AppPage
@@ -75,6 +76,8 @@ private:
     air::Sort sort_ = air::Sort::Signal;
 
     bool nmcli_ok_ = false;
+    // Adapter the scan runs on; empty until one is found.
+    std::string iface_;
     bool wifi_known_ = false;
     std::string wifi_error_;
     std::vector<air::Network> all_;
@@ -122,6 +125,7 @@ private:
     void create_ui();
     void show_message(const std::string &text);
     void save_view_config();
+    void next_adapter();
 
     static void start_job(Job &job, const std::string &command);
     static bool finish_job(Job &job, uint32_t timeout_ms, int &rc, std::string &out, std::string &err);

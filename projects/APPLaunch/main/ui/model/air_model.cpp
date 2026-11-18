@@ -115,9 +115,23 @@ std::vector<Network> parse_nmcli(const std::string &output)
     return networks;
 }
 
-std::string scan_cmd()
+std::string scan_cmd(const std::string &ifname)
 {
-    return "nmcli -t -f SSID,CHAN,SIGNAL,SECURITY device wifi list --rescan auto";
+    // Interface names come from /sys/class/net; anything that is not a plain
+    // name is dropped instead of reaching the shell.
+    const bool plain = !ifname.empty() && std::all_of(ifname.begin(), ifname.end(), [](unsigned char c) {
+        return std::isalnum(c) || c == '-' || c == '_' || c == '.';
+    });
+    return std::string("nmcli -t -f SSID,CHAN,SIGNAL,SECURITY device wifi list") + (plain ? " ifname " + ifname : "") +
+           " --rescan auto";
+}
+
+std::string next_interface(const std::vector<std::string> &interfaces, const std::string &current)
+{
+    if (interfaces.empty()) return {};
+    const auto found = std::find(interfaces.begin(), interfaces.end(), current);
+    if (found == interfaces.end() || found + 1 == interfaces.end()) return interfaces.front();
+    return *(found + 1);
 }
 
 Band band_of(int channel)

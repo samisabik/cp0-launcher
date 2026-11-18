@@ -46,6 +46,7 @@ constexpr int kNameColumns = 12;
 constexpr int kGlyphW = 7;
 
 constexpr const char *kViewConfigKey = "air_view";
+constexpr const char *kAdapterConfigKey = "air_iface";
 
 void set_visible(lv_obj_t *obj, bool on)
 {
@@ -103,6 +104,13 @@ UIAirPage::UIAirPage() : AppPage()
     ble_replies_ = std::make_shared<BleReplies>();
     pixels_.assign(static_cast<std::size_t>(kMapW) * kMapH, app_support::rgb565(cp0::theme::kPanel));
     nmcli_ok_ = app_support::tool_present("nmcli");
+    cp0_signal_config_api({"GetStr", kAdapterConfigKey, ""}, [&](int code, std::string data) {
+        if (code == 0) iface_ = data;
+    });
+    // A stored adapter that is unplugged falls back to the first one.
+    const std::vector<std::string> adapters = app_support::wifi_interfaces();
+    if (std::find(adapters.begin(), adapters.end(), iface_) == adapters.end())
+        iface_ = adapters.empty() ? std::string() : adapters.front();
     create_ui();
     if (nmcli_ok_) start_scan();
     draw_map();
@@ -251,7 +259,26 @@ void UIAirPage::start_scan()
 {
     if (!nmcli_ok_ || scan_job_.pid > 0) return;
     last_scan_ = lv_tick_get();
-    start_job(scan_job_, air::scan_cmd());
+    start_job(scan_job_, air::scan_cmd(iface_));
+}
+
+void UIAirPage::next_adapter()
+{
+    const std::vector<std::string> adapters = app_support::wifi_interfaces();
+    const std::string next = air::next_interface(adapters, iface_);
+    if (next == iface_) {
+        show_message(adapters.empty() ? "no wi-fi adapter" : "only " + iface_);
+        return;
+    }
+    iface_ = next;
+    cp0_signal_config_api({"SetStr", kAdapterConfigKey, iface_}, nullptr);
+    cp0_signal_config_api({"Save"}, nullptr);
+    cancel_job(scan_job_);
+    wifi_known_ = false;
+    all_.clear();
+    rebuild_view();
+    start_scan();
+    show_message("scanning on " + iface_);
 }
 
 std::string UIAirPage::key_of(const air::Network &network)
@@ -630,7 +657,8 @@ void UIAirPage::render()
         cp0::ui::set_footer_message(hint_, message_.c_str());
     else if (wifi)
         cp0::ui::set_footer(hint_, {{"tab", "ble"}, {"5", band_ == air::Band::G24 ? "5 ghz" : "2.4 ghz"},
-                                    {"s", "sort"}, {"up/dn", "select"}});
+                                    {"s", "sort"}, {"w", iface_.empty() ? "adapter" : iface_.c_str()},
+                                    {"up/dn", "select"}});
     else
         cp0::ui::set_footer(hint_, {{"tab", "wi-fi"}, {"up/dn", "select"}});
 }
@@ -729,5 +757,7 @@ void UIAirPage::handle_key(uint32_t key, bool repeat)
         save_view_config();
         show_message(std::string("sort by ") + air::sort_label(sort_));
         rebuild_view();
+    } else if (key == KEY_W) {
+        next_adapter();
     }
 }

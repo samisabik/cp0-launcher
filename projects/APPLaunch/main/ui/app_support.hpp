@@ -10,8 +10,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
+#include <dirent.h>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 // Small helpers shared by the built-in app pages: child processes through the
 // platform process API, the directories pages keep their files in, and pixel
@@ -56,6 +59,23 @@ inline bool tool_present(const std::string &name)
     for (const char *dir : {"/usr/bin/", "/usr/local/bin/", "/usr/sbin/", "/bin/"})
         if (access((std::string(dir) + name).c_str(), X_OK) == 0) return true;
     return false;
+}
+
+// Names of the Wi-Fi adapters the kernel knows, sorted: "wlan0" is the
+// built-in radio the system connects with, later ones are USB adapters.
+inline std::vector<std::string> wifi_interfaces()
+{
+    std::vector<std::string> names;
+    DIR *dir = opendir("/sys/class/net");
+    if (!dir) return names;
+    while (const dirent *entry = readdir(dir)) {
+        const std::string name = entry->d_name;
+        if (name[0] == '.') continue;
+        if (access(("/sys/class/net/" + name + "/phy80211").c_str(), F_OK) == 0) names.push_back(name);
+    }
+    closedir(dir);
+    std::sort(names.begin(), names.end());
+    return names;
 }
 
 // Whole file as a string; empty when it cannot be read.
