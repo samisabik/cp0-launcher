@@ -261,4 +261,14 @@ std::string command(uint32_t hz, const std::string &outpath)
            "'";
 }
 
+const char *source_name(Source source)
+{
+    return source == Source::Sdr ? "sdr" : "cc1101";
+}
+
+std::string decode_command(const std::string &inpath, const std::string &outpath)
+{
+    return "( rtl_433 -r '" + inpath + "' -F json 2>/dev/null; echo '" + kExitMark + "' ) >> '" + outpath + "'";
+}
+
 } // namespace sensors

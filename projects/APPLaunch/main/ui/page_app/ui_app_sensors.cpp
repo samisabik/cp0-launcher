@@ -34,6 +34,9 @@ constexpr long kOutputLimit = 1 << 20;
 constexpr int kNameChars = 19;
 constexpr const char *kDetectDone = "cp0-detect-done";
 constexpr const char *kFrequencyConfigKey = "sensors_freq";
+constexpr const char *kSourceConfigKey = "sensors_source";
+// Packets waiting for rtl_433 while an earlier batch is still being decoded.
+constexpr std::size_t kPacketBacklog = 32;
 
 double now_seconds()
 {
@@ -53,6 +56,21 @@ int config_frequency()
 void set_config_frequency(int index)
 {
     cp0_signal_config_api({"SetInt", kFrequencyConfigKey, std::to_string(index)}, nullptr);
+    cp0_signal_config_api({"Save"}, nullptr);
+}
+
+sensors::Source config_source()
+{
+    int value = 0;
+    cp0_signal_config_api({"GetInt", kSourceConfigKey, "0"}, [&](int code, std::string data) {
+        if (code == 0) value = std::atoi(data.c_str());
+    });
+    return value == 1 ? sensors::Source::Sdr : sensors::Source::Cc1101;
+}
+
+void set_config_source(sensors::Source source)
+{
+    cp0_signal_config_api({"SetInt", kSourceConfigKey, source == sensors::Source::Sdr ? "1" : "0"}, nullptr);
     cp0_signal_config_api({"Save"}, nullptr);
 }
 
@@ -92,6 +110,8 @@ UISensorsPage::UISensorsPage() : AppPage()
     set_page_title("Sensors");
     reclaim_top_bar();
     frequency_index_ = config_frequency();
+    source_ = config_source();
+    ook_path_ = app_support::runtime_dir() + "/cp0-sensors-in.ook";
     detect_path_ = app_support::runtime_dir() + "/cp0-sensors-detect";
     out_path_ = app_support::runtime_dir() + "/cp0-sensors-out";
     for (RowView &row : rows_)
@@ -100,16 +120,7 @@ UISensorsPage::UISensorsPage() : AppPage()
     can_detect_ = app_support::tool_present("rtl_test");
     create_ui();
     render();
-    if (tools_ok_) {
-        if (can_detect_) {
-            start_detect();
-        } else {
-            // Without rtl_test the only probe is rtl_433 itself: it is
-            // started and taken as "no dongle" when it exits.
-            present_ = true;
-            start_receiver();
-        }
-    }
+    if (tools_ok_) start_source();
     timer_ = lv_timer_create(timer_cb, kRefreshMs, this);
     if (root_screen_)
         lv_obj_add_event_cb(root_screen_, event_cb, static_cast<lv_event_code_t>(LV_EVENT_KEYBOARD), this);
@@ -120,10 +131,102 @@ UISensorsPage::~UISensorsPage()
     if (timer_) lv_timer_delete(timer_);
     timer_ = nullptr;
     if (root_screen_) lv_obj_remove_event_cb_with_user_data(root_screen_, event_cb, this);
-    stop_receiver();
-    app_support::stop(detect_pid_);
+    stop_source();
     unlink(detect_path_.c_str());
     unlink(out_path_.c_str());
+    unlink(ook_path_.c_str());
+}
+
+uint32_t UISensorsPage::frequency_hz() const
+{
+    return sensors::kFrequenciesHz[static_cast<std::size_t>(frequency_index_)];
+}
+
+void UISensorsPage::start_source()
+{
+    if (source_ == sensors::Source::Cc1101) {
+        start_radio();
+    } else if (can_detect_) {
+        start_detect();
+    } else {
+        // Without rtl_test the only probe is rtl_433 itself: it is
+        // started and taken as "no dongle" when it exits.
+        present_ = true;
+        start_receiver();
+    }
+}
+
+void UISensorsPage::stop_source()
+{
+    stop_receiver();
+    app_support::stop(detect_pid_);
+    present_ = false;
+    stop_radio();
+}
+
+void UISensorsPage::set_source(sensors::Source source)
+{
+    if (source == source_) return;
+    stop_source();
+    source_ = source;
+    set_config_source(source);
+    if (tools_ok_) start_source();
+    show_message(sensors::source_name(source));
+}
+
+void UISensorsPage::start_radio()
+{
+    last_radio_try_ = lv_tick_get();
+    packets_.clear();
+    out_offset_ = 0;
+    pending_.clear();
+    if (std::FILE *file = std::fopen(out_path_.c_str(), "w")) std::fclose(file);
+    radio_error_.clear();
+    radio_ok_ = scanner_.start(radio_error_);
+    if (!radio_ok_) return;
+    // Paused, so the scanner does nothing but hold the capture open.
+    scanner_.set_paused(true);
+    scanner_.listen(frequency_hz());
+}
+
+void UISensorsPage::stop_radio()
+{
+    app_support::stop(proc_pid_);
+    if (radio_ok_) {
+        scanner_.listen(0);
+        scanner_.stop();
+    }
+    radio_ok_ = false;
+    packets_.clear();
+}
+
+// Moves captured packets to rtl_433, one batch at a time, and reads what it
+// decoded. Returns true when the screen needs redrawing.
+bool UISensorsPage::poll_radio()
+{
+    const std::string message = scanner_.take_message();
+    if (!scanner_.listening()) {
+        // The capture could not be opened; start_radio is retried later.
+        radio_error_ = message.empty() ? "capture failed" : message;
+        stop_radio();
+        last_radio_try_ = lv_tick_get();
+        return true;
+    }
+    for (std::string &packet : scanner_.take_listen_packets())
+        if (packets_.size() < kPacketBacklog) packets_.push_back(std::move(packet));
+
+    bool changed = false;
+    if (proc_pid_ > 0) changed = read_lines();
+    if (proc_pid_ <= 0 && !packets_.empty()) {
+        if (std::FILE *file = std::fopen(ook_path_.c_str(), "w")) {
+            std::fputs(spectrum::ook_file_header("").c_str(), file);
+            for (const std::string &packet : packets_) std::fputs(packet.c_str(), file);
+            std::fclose(file);
+            proc_pid_ = app_support::spawn(sensors::decode_command(ook_path_, out_path_));
+        }
+        packets_.clear();
+    }
+    return changed;
 }
 
 void UISensorsPage::create_ui()
@@ -209,8 +312,7 @@ void UISensorsPage::start_receiver()
     if (std::FILE *file = std::fopen(out_path_.c_str(), "w")) std::fclose(file);
     // Output goes to a regular file, so rtl_433 is never blocked on a pipe
     // when it is signalled to stop and can close the dongle.
-    proc_pid_ = app_support::spawn(
-        sensors::command(sensors::kFrequenciesHz[static_cast<std::size_t>(frequency_index_)], out_path_));
+    proc_pid_ = app_support::spawn(sensors::command(frequency_hz(), out_path_));
     if (proc_pid_ <= 0) present_ = false;
 }
 
@@ -241,9 +343,13 @@ bool UISensorsPage::read_lines()
 
     if (exited) {
         stop_receiver();
-        present_ = false;
-        last_detect_ = lv_tick_get();
-        return true;
+        // The SDR receiver only exits when the dongle is gone; a CC1101
+        // decode run exits after every batch of packets.
+        if (source_ == sensors::Source::Sdr) {
+            present_ = false;
+            last_detect_ = lv_tick_get();
+            return true;
+        }
     }
     // rtl_433 appends, so emptying the file under it keeps the scratch file
     // small; a line written between the read above and here is lost.
@@ -259,7 +365,11 @@ void UISensorsPage::set_frequency(int index)
     frequency_index_ = index;
     set_config_frequency(index);
     if (present_) start_receiver();
-    show_message(sensors::format_frequency(sensors::kFrequenciesHz[static_cast<std::size_t>(index)]) + " mhz");
+    if (radio_ok_) {
+        scanner_.listen(frequency_hz());
+        packets_.clear();
+    }
+    show_message(sensors::format_frequency(frequency_hz()) + " mhz");
 }
 
 void UISensorsPage::save_log()
@@ -316,11 +426,12 @@ void UISensorsPage::render()
     last_render_ = lv_tick_get();
     const std::vector<sensors::Sensor> &all = table_.sensors();
     const int count = static_cast<int>(all.size());
-    const bool receiving = present_ && proc_pid_ > 0;
-    const std::string mhz = sensors::format_frequency(sensors::kFrequenciesHz[static_cast<std::size_t>(frequency_index_)]);
+    const bool sdr = source_ == sensors::Source::Sdr;
+    const bool receiving = sdr ? present_ && proc_pid_ > 0 : radio_ok_;
+    const std::string mhz = sensors::format_frequency(frequency_hz());
 
     if (status_) {
-        std::string text = mhz + "  " + std::to_string(count) + " seen";
+        std::string text = std::string(sensors::source_name(source_)) + " " + mhz + "  " + std::to_string(count) + " seen";
         uint32_t color = receiving ? cp0::theme::kAccent : cp0::theme::kIdle;
         if (lv_tick_get() < message_until_) {
             text = message_;
@@ -329,7 +440,7 @@ void UISensorsPage::render()
             text = "not installed";
             color = cp0::theme::kDanger;
         } else if (!receiving) {
-            text = "no dongle";
+            text = sdr ? "no dongle" : "no cc1101";
         }
         cp0::ui::set_text(status_, text.c_str(), color);
     }
@@ -367,16 +478,19 @@ void UISensorsPage::render()
         if (!tools_ok_) {
             cp0::ui::set_text(big_, "rtl_433 not installed", cp0::theme::kText);
             cp0::ui::set_text(sub_, "run: sudo apt install rtl-433", cp0::theme::kIdle);
-        } else if (!receiving) {
+        } else if (!receiving && sdr) {
             cp0::ui::set_text(big_, "no sdr", cp0::theme::kText);
-            cp0::ui::set_text(sub_, "plug in the rtl-sdr dongle", cp0::theme::kIdle);
+            cp0::ui::set_text(sub_, "plug in the rtl-sdr, or r for cc1101", cp0::theme::kIdle);
+        } else if (!receiving) {
+            cp0::ui::set_text(big_, "no cc1101", cp0::theme::kText);
+            cp0::ui::set_text(sub_, (radio_error_ + ", r for sdr").c_str(), cp0::theme::kIdle);
         } else {
             cp0::ui::set_text(big_, "listening", cp0::theme::kText);
             cp0::ui::set_text(sub_, ("waiting for sensors on " + mhz + " mhz").c_str(), cp0::theme::kIdle);
         }
     }
 
-    cp0::ui::set_footer(hint_, {{"up/dn", "select"}, {"< >", "band"}, {"s", "log"}});
+    cp0::ui::set_footer(hint_, {{"up/dn", "select"}, {"< >", "band"}, {"r", "radio"}, {"s", "log"}});
 }
 
 void UISensorsPage::timer_cb(lv_timer_t *timer) noexcept
@@ -397,18 +511,27 @@ void UISensorsPage::on_timer()
         message_until_ = 0;
         changed = true;
     }
-    if (tools_ok_ && !present_ && detect_pid_ <= 0 && tick - last_detect_ >= kDetectEveryMs) {
-        if (can_detect_) {
-            start_detect();
-        } else {
-            present_ = true;
-            start_receiver();
-            last_detect_ = tick;
-            changed = true;
+    if (source_ == sensors::Source::Cc1101) {
+        if (radio_ok_) {
+            if (poll_radio()) changed = true;
+        } else if (tools_ok_ && tick - last_radio_try_ >= kDetectEveryMs) {
+            start_radio();
+            changed = radio_ok_;
         }
+    } else {
+        if (tools_ok_ && !present_ && detect_pid_ <= 0 && tick - last_detect_ >= kDetectEveryMs) {
+            if (can_detect_) {
+                start_detect();
+            } else {
+                present_ = true;
+                start_receiver();
+                last_detect_ = tick;
+                changed = true;
+            }
+        }
+        if (detect_pid_ > 0) poll_detect();
+        if (present_ && proc_pid_ > 0 && read_lines()) changed = true;
     }
-    if (detect_pid_ > 0) poll_detect();
-    if (present_ && proc_pid_ > 0 && read_lines()) changed = true;
     // Ages tick over even when nothing new arrives.
     if (changed || tick - last_render_ >= kRenderEveryMs) render();
 }
@@ -440,6 +563,8 @@ void UISensorsPage::handle_key(uint32_t key, bool repeat)
     if (repeat) return;
     if (key == KEY_LEFT || key == KEY_RIGHT) {
         set_frequency(frequency_index_ + (key == KEY_RIGHT ? 1 : -1));
+    } else if (key == KEY_R) {
+        set_source(source_ == sensors::Source::Sdr ? sensors::Source::Cc1101 : sensors::Source::Sdr);
     } else if (key == KEY_S) {
         save_log();
     }

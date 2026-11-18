@@ -75,6 +75,8 @@ constexpr int64_t kAutoGiveUpNs = 2500000000LL;
 constexpr int kAutoCaptureMarginDb = 10;
 // Synthetic trailing gap when a packet ends on a high level.
 constexpr int32_t kTrailingGapUs = 10000;
+// Packets held for a listener that has stopped collecting them.
+constexpr std::size_t kListenQueueMax = 32;
 
 int64_t monotonic_ns()
 {
@@ -421,6 +423,7 @@ void SpectrumScanner::stop()
     close_capture(false);
     close_file(false);
     radio_.close();
+    listen_active_hz_ = 0;
 }
 
 void SpectrumScanner::toggle_capture(uint32_t hz)
@@ -585,12 +588,12 @@ void SpectrumScanner::run_transmit(const std::string &path)
 #endif
 }
 
-bool SpectrumScanner::open_capture(uint32_t hz, int threshold_dbm)
+bool SpectrumScanner::open_capture(uint32_t hz, int threshold_dbm, bool save)
 {
 #if CP0_SPECTRUM_HAS_GPIO_V2
     const char *home = std::getenv("HOME");
     const std::string directory = std::string(home && home[0] ? home : "/tmp") + "/spectrum";
-    if (mkdir(directory.c_str(), 0755) != 0 && errno != EEXIST) {
+    if (save && mkdir(directory.c_str(), 0755) != 0 && errno != EEXIST) {
         post_message("cannot create ~/spectrum");
         return false;
     }
@@ -638,18 +641,20 @@ bool SpectrumScanner::open_capture(uint32_t hz, int threshold_dbm)
 
     const std::string stem = directory + "/capture-" + local_stamp("%Y%m%d-%H%M%S") + "-" +
                              spectrum::format_mhz(hz);
-    capture_stem_ = stem;
-    ook_file_ = std::fopen((stem + ".ook").c_str(), "w");
-    sub_file_ = std::fopen((stem + ".sub").c_str(), "w");
-    if (!ook_file_ || !sub_file_) {
-        close_capture(false);
-        post_message("cannot write capture files");
-        return false;
+    capture_stem_ = save ? stem : std::string();
+    if (save) {
+        ook_file_ = std::fopen((stem + ".ook").c_str(), "w");
+        sub_file_ = std::fopen((stem + ".sub").c_str(), "w");
+        if (!ook_file_ || !sub_file_) {
+            close_capture(false);
+            post_message("cannot write capture files");
+            return false;
+        }
+        std::fputs(spectrum::ook_file_header(local_stamp("%Y-%m-%d %H:%M:%S")).c_str(), ook_file_);
+        std::fputs(spectrum::sub_file_header(hz).c_str(), sub_file_);
+        std::fflush(ook_file_);
+        std::fflush(sub_file_);
     }
-    std::fputs(spectrum::ook_file_header(local_stamp("%Y-%m-%d %H:%M:%S")).c_str(), ook_file_);
-    std::fputs(spectrum::sub_file_header(hz).c_str(), sub_file_);
-    std::fflush(ook_file_);
-    std::fflush(sub_file_);
 
     history_.clear();
     packet_.clear();
@@ -664,6 +669,8 @@ bool SpectrumScanner::open_capture(uint32_t hz, int threshold_dbm)
     return true;
 #else
     (void)hz;
+    (void)threshold_dbm;
+    (void)save;
     post_message("GPIO events are not available");
     return false;
 #endif
@@ -722,9 +729,11 @@ void SpectrumScanner::finish_packet(int64_t now_ns)
     durations = spectrum::normalize_durations(durations);
     if (durations.size() < kPacketMinDurations) return;
 
+    std::string ook;
+    if (ook_file_ || listen_active_hz_)
+        ook = spectrum::ook_packet(durations, capture_.freq_hz, local_stamp("%Y-%m-%d %H:%M:%S"), packet_peak_dbm_);
     if (ook_file_) {
-        std::fputs(spectrum::ook_packet(durations, capture_.freq_hz, local_stamp("%Y-%m-%d %H:%M:%S"),
-                                        packet_peak_dbm_).c_str(), ook_file_);
+        std::fputs(ook.c_str(), ook_file_);
         std::fflush(ook_file_);
     }
     if (sub_file_) {
@@ -733,6 +742,7 @@ void SpectrumScanner::finish_packet(int64_t now_ns)
     }
     last_packet_ns_ = monotonic_ns();
     std::lock_guard<std::mutex> lock(mutex_);
+    if (listen_active_hz_ && listen_packets_.size() < kListenQueueMax) listen_packets_.push_back(std::move(ook));
     ++capture_.packets;
     ++capture_.sequence;
     capture_.last = std::move(durations);
@@ -783,6 +793,27 @@ void SpectrumScanner::capture_step()
     if (now - last_strong_ns_ > kPacketEndNs || now - packet_start_ns_ > kPacketMaxNs ||
         packet_.size() > kPacketMaxEdges)
         finish_packet(now);
+}
+
+void SpectrumScanner::handle_listen()
+{
+    const uint32_t hz = listen_hz_.load();
+    if (hz == listen_active_hz_) return;
+    if (capture_active_.load()) close_capture(false);
+    listen_active_hz_ = hz;
+    if (hz == 0 || open_capture(hz, spectrum::kMinDbm, false)) return;
+    listen_active_hz_ = 0;
+    // Left alone when the caller has asked for another frequency meanwhile.
+    uint32_t expected = hz;
+    listen_hz_.compare_exchange_strong(expected, 0);
+}
+
+std::vector<std::string> SpectrumScanner::take_listen_packets()
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::string> packets;
+    packets.swap(listen_packets_);
+    return packets;
 }
 
 SpectrumFrame SpectrumScanner::snapshot()
@@ -948,6 +979,7 @@ void SpectrumScanner::run()
     std::array<int8_t, spectrum::kBins> sweep{};
     while (running_.load()) {
         handle_record_request();
+        handle_listen();
         handle_capture_request();
         handle_transmit_request();
         if (capture_active_.load()) {
