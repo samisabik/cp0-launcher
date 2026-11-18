@@ -8,39 +8,64 @@ and a small set of built-in apps sharing one theme. Forked from
 
 ## Apps
 
+The home screen groups the apps by type, one type per page.
+
+| | |
+|---|---|
+| <img src="docs/screenshots/home.png" width="400"><br>Home: system | <img src="docs/screenshots/home-2.png" width="400"><br>Home: radio |
+| <img src="docs/screenshots/home-3.png" width="400"><br>Home: hardware, network and play | <img src="docs/screenshots/home-4.png" width="400"><br>Home: sound |
+
+### System
+
+- **Settings**, **CLI**, **Python**, **SSH**, **IP Panel**.
 - **Files**: browse, preview text, rename, copy/move, delete, new folders; `e` opens a file in micro.
-- **Spectrum**: sub-GHz scanner and recorder on the CC1101 radio. RX watches the 315, 433 and 868 MHz bands with per-channel level bars and auto-captures any signal over the trigger to `~/spectrum` as Flipper `.sub` and rtl_433 `.ook` files; TX lists the captures and replays one on its own frequency.
+
+| | |
+|---|---|
+| <img src="docs/screenshots/files.png" width="400"><br>Files | <img src="docs/screenshots/files-preview.png" width="400"><br>Files: preview |
+| <img src="docs/screenshots/settings.png" width="400"><br>Settings | <img src="docs/screenshots/settings-battery.png" width="400"><br>Settings: battery |
+| <img src="docs/screenshots/lockscreen.png" width="400"><br>Lock screen |  |
+
+### Radio
+
 - **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker.
-- **Rec**: voice recorder with on-device transcription (whisper.cpp).
-- **Audio**: live microphone spectrum and pitch readout.
 - **ADSB**: aircraft scope and flight list decoded from `rtl_adsb` on 1090 MHz. Range and bearing use the position in `~/.config/cp0/location` (one line, `lat,lon`).
 - **Sat**: pass predictor and sky plot from Celestrak TLEs, for the ISS and Meteor-M by default and anything named in `~/sat/watch.txt`; records a pass as FM audio with `rtl_fm`. The orbit model is a simplified one, not SGP4.
 - **Sensors**: dashboard of the 433 and 868 MHz temperature and humidity sensors that `rtl_433` decodes.
+- **Spectrum**: sub-GHz scanner and recorder on the CC1101 radio. RX watches the 315, 433 and 868 MHz bands with per-channel level bars and auto-captures any signal over the trigger to `~/spectrum` as Flipper `.sub` and rtl_433 `.ook` files; TX lists the captures and replays one on its own frequency.
 - **Keys**: looks inside the captures Spectrum saves: waveform, pulse-width decode to bits and hex, replay.
+
+| | |
+|---|---|
+| <img src="docs/screenshots/sdr.png" width="400"><br>SDR: scope and waterfall around 433.92 MHz | <img src="docs/screenshots/adsb.png" width="400"><br>ADSB: scope and flight list |
+| <img src="docs/screenshots/sat.png" width="400"><br>Sat: next passes and sky plot | <img src="docs/screenshots/sensors.png" width="400"><br>Sensors |
+| <img src="docs/screenshots/spectrum.png" width="400"><br>Spectrum: CC1101 RX | <img src="docs/screenshots/keys.png" width="400"><br>Keys: decoded capture |
+
+### Hardware, network and play
+
 - **Fox**: transmitter hunting on one frequency with a live RSSI meter, peak hold, history strip and a beep that speeds up with the signal.
 - **IR**: learns an infrared remote button by button (NEC decode, raw timings otherwise) and replays it; four remotes of eight buttons.
 - **Pins**: I2C bus scanner that only reads and skips addresses a kernel driver owns, and a GPIO logic view with I2C decode.
 - **Tailnet**: Tailscale peers with status, path and ping; `s` opens SSH to a peer, `e` sets an exit node.
 - **Air**: 2.4 and 5 GHz Wi-Fi channel map with a network list, and nearby Bluetooth devices.
-- **Slime**: Physarum slime-mould simulation with six species.
-- **Tracker**: four-channel chiptune tracker (two squares, wave, noise) with song save and WAV export.
-- **Settings**, **CLI**, **Python**, **SSH**, **IP Panel**.
+- **Slime**: Physarum slime-mould simulation with six species and eight colour palettes, seven of them from the PHOSPHN Game Boy Advance ROM.
 
 | | |
 |---|---|
-| <img src="docs/screenshots/home.png" width="400"><br>Home | <img src="docs/screenshots/home-2.png" width="400"><br>Home, page 2 |
-| <img src="docs/screenshots/files.png" width="400"><br>Files | <img src="docs/screenshots/files-preview.png" width="400"><br>Files: preview |
-| <img src="docs/screenshots/spectrum.png" width="400"><br>Spectrum: CC1101 RX | <img src="docs/screenshots/sdr.png" width="400"><br>SDR: scope and waterfall around 433.92 MHz |
-| <img src="docs/screenshots/rec.png" width="400"><br>Rec: recordings with transcripts | <img src="docs/screenshots/rec-clip.png" width="400"><br>Rec: clip |
-| <img src="docs/screenshots/audio.png" width="400"><br>Audio | <img src="docs/screenshots/lockscreen.png" width="400"><br>Lock screen |
-| <img src="docs/screenshots/settings.png" width="400"><br>Settings | <img src="docs/screenshots/settings-battery.png" width="400"><br>Settings: battery |
-| <img src="docs/screenshots/home-3.png" width="400"><br>Home, page 3 | <img src="docs/screenshots/home-4.png" width="400"><br>Home, page 4 |
-| <img src="docs/screenshots/adsb.png" width="400"><br>ADSB: scope and flight list | <img src="docs/screenshots/sat.png" width="400"><br>Sat: next passes and sky plot |
-| <img src="docs/screenshots/sensors.png" width="400"><br>Sensors | <img src="docs/screenshots/keys.png" width="400"><br>Keys: decoded capture |
 | <img src="docs/screenshots/fox.png" width="400"><br>Fox | <img src="docs/screenshots/ir.png" width="400"><br>IR: learned remote |
 | <img src="docs/screenshots/pins.png" width="400"><br>Pins: I2C scan | <img src="docs/screenshots/tailnet.png" width="400"><br>Tailnet |
-| <img src="docs/screenshots/air.png" width="400"><br>Air: Wi-Fi channel map | <img src="docs/screenshots/slime.png" width="400"><br>Slime |
-| <img src="docs/screenshots/tracker.png" width="400"><br>Tracker | |
+| <img src="docs/screenshots/air.png" width="400"><br>Air: Wi-Fi channel map | <img src="docs/screenshots/slime.png" width="400"><br>Slime: bioluminescence palette |
+
+### Sound
+
+- **Rec**: voice recorder with on-device transcription (whisper.cpp).
+- **Audio**: live microphone spectrum and pitch readout.
+- **Tracker**: four-channel chiptune tracker (two squares, wave, noise) with song save and WAV export.
+
+| | |
+|---|---|
+| <img src="docs/screenshots/rec.png" width="400"><br>Rec: recordings with transcripts | <img src="docs/screenshots/rec-clip.png" width="400"><br>Rec: clip |
+| <img src="docs/screenshots/audio.png" width="400"><br>Audio | <img src="docs/screenshots/tracker.png" width="400"><br>Tracker |
 
 Images are the device's 320x170 framebuffer drawn at 4x; the UI font is the pixel font
 DepartureMono, so the enlargement is exact. Network name and address on the lock screen,
