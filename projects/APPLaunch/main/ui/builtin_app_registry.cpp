@@ -109,6 +109,8 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_page_app<UITailnetPage>},
     {{"Air", "line/air.png", "app_Air", true, false},
      nullptr, false, true, false, append_page_app<UIAirPage>},
+    {{"Portal", "line/portal.png", "app_Portal", true, false},
+     nullptr, false, true, false, append_page_app<UIPortalPage>},
     {{"Slime", "line/slime.png", "app_Slime", true, false},
      nullptr, false, true, false, append_page_app<UISlimePage>},
     {{"Tracker", "line/tracker.png", "app_Tracker", true, false},
