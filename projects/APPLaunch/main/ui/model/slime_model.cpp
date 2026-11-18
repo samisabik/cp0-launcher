@@ -87,6 +87,77 @@ uint32_t palette_rgb(int index)
     return 0xFFFFFF;
 }
 
+namespace {
+
+struct RampStop {
+    int at, r, g, b;
+};
+struct Ramp {
+    const char *name;
+    const RampStop *stops;
+    int count;
+};
+
+// Front-loaded on purpose: most of a field sits at low intensity, so the
+// first third of each ramp covers the widest colour span.
+constexpr RampStop kBio[] = {{0, 0, 0, 0},        {14, 8, 0, 26},      {40, 46, 2, 86},     {86, 146, 10, 158},
+                             {140, 236, 62, 128}, {196, 255, 150, 96}, {230, 255, 216, 150}, {255, 255, 252, 236}};
+constexpr RampStop kCyan[] = {{0, 0, 0, 0},        {14, 0, 6, 30},       {40, 0, 38, 92},      {86, 0, 104, 168},
+                              {140, 30, 176, 216}, {196, 120, 232, 240}, {230, 208, 250, 255}, {255, 255, 255, 255}};
+constexpr RampStop kEmber[] = {{0, 0, 0, 0},        {14, 22, 2, 0},      {40, 84, 10, 4},      {86, 176, 40, 6},
+                               {140, 240, 108, 16}, {196, 255, 178, 56}, {230, 255, 228, 140}, {255, 255, 255, 238}};
+constexpr RampStop kSpectral[] = {{0, 0, 0, 0},        {12, 26, 0, 48},     {44, 20, 32, 150},
+                                  {84, 0, 148, 156},   {124, 108, 216, 70}, {166, 250, 210, 44},
+                                  {206, 252, 92, 56},  {236, 255, 176, 200}, {255, 255, 255, 255}};
+constexpr RampStop kBone[] = {{0, 0, 0, 0},         {16, 10, 16, 18},     {46, 36, 56, 54},     {96, 92, 108, 98},
+                              {150, 156, 164, 146}, {200, 208, 208, 188}, {236, 240, 238, 224}, {255, 255, 255, 250}};
+constexpr RampStop kUv[] = {{0, 0, 0, 0},        {14, 12, 0, 34},      {42, 46, 0, 104},     {88, 106, 18, 196},
+                            {140, 176, 70, 246}, {192, 224, 146, 255}, {230, 246, 208, 255}, {255, 255, 250, 255}};
+constexpr RampStop kAbyss[] = {{0, 1, 3, 9},        {14, 3, 12, 32},      {42, 0, 44, 72},      {88, 0, 98, 108},
+                               {140, 36, 168, 150}, {192, 132, 224, 186}, {230, 214, 250, 230}, {255, 255, 255, 248}};
+
+constexpr Ramp kRamps[kPaletteCount - 1] = {
+    {"bioluminescence", kBio, 8}, {"cyanotype", kCyan, 8}, {"ember", kEmber, 8}, {"spectral", kSpectral, 9},
+    {"bone", kBone, 8},           {"ultraviolet", kUv, 8}, {"abyss", kAbyss, 8},
+};
+
+int wrap_palette(int palette)
+{
+    return ((palette % kPaletteCount) + kPaletteCount) % kPaletteCount;
+}
+
+} // namespace
+
+const char *palette_name(int palette)
+{
+    palette = wrap_palette(palette);
+    return palette == 0 ? "phosphor" : kRamps[palette - 1].name;
+}
+
+uint32_t palette_rgb(int palette, int index)
+{
+    palette = wrap_palette(palette);
+    if (palette == 0) return palette_rgb(index);
+    index = std::clamp(index, 0, 63);
+    if (index < 12) return 0x000000;
+    // Visible trails use indices 12..63; spread them over the ramp from just
+    // above black to its top.
+    const int at = 14 + (index - 12) * 241 / 51;
+    const Ramp &ramp = kRamps[palette - 1];
+    for (int i = 1; i < ramp.count; ++i) {
+        const RampStop &a = ramp.stops[i - 1];
+        const RampStop &b = ramp.stops[i];
+        if (at <= b.at) {
+            const int span = b.at - a.at;
+            const int t = at - a.at;
+            return static_cast<uint32_t>(((a.r + (b.r - a.r) * t / span) << 16) |
+                                         ((a.g + (b.g - a.g) * t / span) << 8) | (a.b + (b.b - a.b) * t / span));
+        }
+    }
+    const RampStop &top = ramp.stops[ramp.count - 1];
+    return static_cast<uint32_t>((top.r << 16) | (top.g << 8) | top.b);
+}
+
 uint8_t palette_index(float trail)
 {
     if (!(trail > kVisible)) return 0;

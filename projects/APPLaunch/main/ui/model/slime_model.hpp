@@ -54,6 +54,11 @@ int clamp_sensor_angle(int degrees);
 
 // Green-through-white scale, the same stops as the SDR waterfall. index 0..63.
 uint32_t palette_rgb(int index);
+// Colour ramps: 0 is the green scale above, the rest are the ramps of the
+// PHOSPHN Game Boy Advance ROM. Out-of-range palettes wrap.
+constexpr int kPaletteCount = 8;
+const char *palette_name(int palette);
+uint32_t palette_rgb(int palette, int index);
 // Palette index for a trail value: 0 for an empty cell, otherwise 12..63.
 uint8_t palette_index(float trail);
 

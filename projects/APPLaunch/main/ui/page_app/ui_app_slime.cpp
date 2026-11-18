@@ -24,6 +24,7 @@ constexpr int kStepsPerFrame = 2;
 
 constexpr const char *kSpeciesConfigKey = "slime_species";
 constexpr const char *kAgentsConfigKey = "slime_agents";
+constexpr const char *kPaletteConfigKey = "slime_palette";
 
 int config_int(const char *key, int fallback)
 {
@@ -51,8 +52,8 @@ UISlimePage::UISlimePage() : AppPage(), model_(kFieldW, kFieldH, 0, 1u)
     sensor_angle_ = slime::kSpecies[species_].params.sensor_angle_deg;
     seed_ = lv_tick_get() * 2654435761u + 1u;
 
-    palette_[0] = app_support::rgb565(cp0::theme::kPanel);
-    for (int i = 1; i < 64; ++i) palette_[i] = app_support::rgb565(slime::palette_rgb(i));
+    colour_ = std::clamp(config_int(kPaletteConfigKey, 1), 0, slime::kPaletteCount - 1);
+    load_palette();
     const std::size_t cells = static_cast<std::size_t>(kFieldW) * kFieldH;
     pixels_.assign(cells, palette_[0]);
     levels_.assign(cells, 0);
@@ -96,7 +97,17 @@ void UISlimePage::create_ui()
         lv_obj_set_pos(canvas_, 5, 20);
     }
     hint_ = cp0::ui::footer(ui_APP_Container);
-    cp0::ui::set_footer(hint_, {{"r", "seed"}, {"1-6", "species"}, {"up/dn", "sense"}, {"< >", "agents"}});
+    cp0::ui::set_footer(hint_, {{"r", "seed"}, {"1-6", "species"}, {"p", "colour"}, {"< >", "agents"}});
+}
+
+// Rebuilds the level-to-colour table and repaints the last frame with it, so
+// a palette change shows at once even while paused.
+void UISlimePage::load_palette()
+{
+    palette_[0] = app_support::rgb565(cp0::theme::kPanel);
+    for (int i = 1; i < 64; ++i) palette_[i] = app_support::rgb565(slime::palette_rgb(colour_, i));
+    for (std::size_t i = 0; i < pixels_.size() && i < levels_.size(); ++i) pixels_[i] = palette_[levels_[i] & 63];
+    if (canvas_) lv_obj_invalidate(canvas_);
 }
 
 void UISlimePage::show_message(const std::string &text)
@@ -258,6 +269,13 @@ void UISlimePage::handle_key(uint32_t key, bool repeat)
         set_config_int(kAgentsConfigKey, agents_);
         message_until_ = 0;
         render();
+        return;
+    }
+    if (key == KEY_P) {
+        colour_ = (colour_ + 1) % slime::kPaletteCount;
+        load_palette();
+        set_config_int(kPaletteConfigKey, colour_);
+        show_message(slime::palette_name(colour_));
         return;
     }
     if (key == KEY_SPACE) {

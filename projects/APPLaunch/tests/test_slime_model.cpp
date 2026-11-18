@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using namespace slime;
@@ -157,6 +158,22 @@ void test_palette()
     assert(palette_rgb(63) == 0xFFFFFFu);
     assert(palette_rgb(-5) == 0x000000u);
     assert(palette_rgb(99) == 0xFFFFFFu);
+    // Palette 0 is the green scale; the others are coloured ramps that start
+    // black, end at their top stop and never repeat a name.
+    assert(std::string(palette_name(0)) == "phosphor");
+    assert(std::string(palette_name(1)) == "bioluminescence");
+    assert(std::string(palette_name(kPaletteCount)) == "phosphor");
+    assert(std::string(palette_name(-1)) == "abyss");
+    for (int p = 0; p < kPaletteCount; ++p) {
+        assert(palette_rgb(p, 0) == 0x000000u);
+        assert(palette_rgb(p, 11) == 0x000000u);
+        assert(palette_rgb(p, 12) != 0x000000u || p == 0);
+        for (int q = p + 1; q < kPaletteCount; ++q) assert(std::string(palette_name(p)) != palette_name(q));
+    }
+    assert(palette_rgb(0, 46) == palette_rgb(46));
+    assert(palette_rgb(1, 63) == 0xFFFCECu);
+    assert(palette_rgb(4, 63) == 0xFFFFFFu);
+    assert(palette_rgb(7, 63) == 0xFFFFF8u);
     assert(palette_index(0.0f) == 0);
     assert(palette_index(0.04f) == 0);
     assert(palette_index(0.1f) == 15);

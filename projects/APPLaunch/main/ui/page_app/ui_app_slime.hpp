@@ -22,6 +22,7 @@
 //  Keys:
 //    R              reseed, cycling the start pattern (scatter / disc / ring)
 //    1..6           species (parameter presets)
+//    P              next colour palette
 //    UP / DOWN      wider / narrower sensor angle
 //    LEFT / RIGHT   fewer / more agents
 //    SPACE          pause
@@ -44,6 +45,7 @@ private:
     };
 
     int species_ = 0;
+    int colour_ = 1;
     int agents_ = 3500;
     int sensor_angle_ = 0;
     int pattern_ = 0;
@@ -76,6 +78,7 @@ private:
 
     void create_ui();
     void show_message(const std::string &text);
+    void load_palette();
     void push(Command::Type type, int value, uint32_t seed = 0);
     void worker_loop();
     void draw_frame();
