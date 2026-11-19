@@ -8455,6 +8455,9 @@ protected:
         right_arrow_ = lv_img_create(ComponensObj);
         if (right_arrow_) {
             lv_img_set_src(right_arrow_, &setting_right_arrow);
+            // The image has the default accent baked in; the recolour makes it follow the theme.
+            lv_obj_set_style_image_recolor_opa(right_arrow_, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_image_recolor(right_arrow_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
             lv_image_set_pivot(right_arrow_, 0, 0);
             lv_image_set_scale(right_arrow_, LV_SCALE_NONE);
             lv_obj_update_layout(right_arrow_);
