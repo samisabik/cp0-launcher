@@ -4,7 +4,7 @@ Inventory checked against this checkout on 2026-09-09. Build references distingu
 
 ## Project code
 
-The [root MIT license](../LICENSE) uses `2026 M5Stack Technology CO LTD`. Copies are in `ext_components/{cp0_lvgl,bluectl,nmtui}/LICENSE`.
+The [root MIT license](../LICENSE) uses `2026 M5Stack Technology CO LTD`. A copy is in `ext_components/cp0_lvgl/LICENSE`.
 
 ## Embedded, fetched and linked source dependencies
 

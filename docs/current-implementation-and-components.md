@@ -61,8 +61,7 @@ SConstruct selecting the services it needs.
 | Settings | `projects/APPLaunch/main/ui/settings` with policy/model/page files and generated UI component data |
 | Built-in pages | `projects/APPLaunch/main/ui/page_app` for Audio, Files, IP Panel, Rec, SDR, Spectrum, SSH, and ST terminal pages |
 | External applications | `.desktop` discovery in `desktop_app_loader.*`, process policy in cp0, and process-group cleanup in `cp0_external_app_runner.*` |
-| Bluetooth | `ext_components/bluectl` provides the C DBus API; cp0 contains the C++ BlueZ bridge |
-| Wi-Fi | `ext_components/nmtui` implements the NetworkManager signal adapter for the cp0 Wi-Fi contract |
+| Bluetooth and Wi-Fi | BlueZ and NetworkManager bridges inside `ext_components/cp0_lvgl/src/cp0` |
 
 ## Input delivery contract
 

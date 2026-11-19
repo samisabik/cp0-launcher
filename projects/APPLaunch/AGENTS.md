@@ -9,7 +9,7 @@ the config matching your current platform, then run one cross-compilation:
 
 ```bash
 export CONFIG_DEFAULT_FILE=linux_x86_cross_cp0_config_defaults.mk
-bbear -- scons -j22
+bear -- scons -j22
 ```
 
 `linux_x86_cross_cp0_config_defaults.mk` corresponds to the current platform

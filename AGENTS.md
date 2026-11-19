@@ -49,7 +49,7 @@ launcher/
 ├── SDK/                       # [submodule] M5Stack_Linux_Libs: component libs + SCons toolchain + 3rd-party source cache
 ├── ext_components/            # vendored external components (cp0_lvgl is the core platform layer)
 │   ├── cp0_lvgl/              #   ★ platform adapter: LVGL runner, AppPage bases, cp0_signal_* service bus
-│   ├── Miniaudio/ Sigslot/ SmoothUI/ Spdlog/ bluectl/ nmtui/
+│   ├── Miniaudio/ Sigslot/ SmoothUI/ Spdlog/
 │   └── THIRD_PARTY_NOTICES.md
 ├── projects/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
@@ -65,8 +65,7 @@ launcher/
 ├── scripts/                   # packaging / release / RPC / logging / hotplug scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
 ├── .github/workflows/         # CI: launcher-build.yml / launcher-release.yml / emulator-build.yml
-├── .clang-format              # Google-derived, see §8
-└── tests/                     # empty directory, no content — NOT a test entry point
+└── .clang-format              # Google-derived, see §8
 ```
 
 ---
@@ -156,7 +155,7 @@ projects/APPLaunch/
 
 ### 4.3 `compile_commands.json`
 
-SCons itself **does not** generate it. The `bbear -- scons` command in `projects/APPLaunch/AGENTS.md` cannot run on this machine (there is no `bbear`, only `bear`):
+SCons itself **does not** generate it:
 
 ```bash
 cd projects/APPLaunch && bear -- scons -j$(nproc)   # writes ./compile_commands.json (do not commit)
@@ -334,7 +333,7 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
    * SPDX-License-Identifier: MIT
    */
   ```
-- **Logging uses `SLOG*`** (`SLOGI`/`SLOGE` from `sample_log.h`), **not spdlog** (spdlog is only used by side projects such as LaunchWizard).
+- **Logging uses `SLOG*`** (`SLOGI`/`SLOGE` from `sample_log.h`), not a logging library.
 - **`enum class` conversions use `CP0_ENUM_CAST`**: `#include "cp0_enum_cast.h"`, then `CP0_ENUM_CAST(Target, value)` or `CP0_ENUM_CAST_INT/SIZE_T/UINT8/...`. Do not add a project-local helper that merely wraps one of these casts; do not use them for pointer casts or for converting unvalidated external integers into enums. See [`projects/APPLaunch/AGENTS.md`](projects/APPLaunch/AGENTS.md).
 - **Put new testable logic in `main/ui/model/`** (or `ui/settings/`): pure logic with no LVGL dependency is what makes unit tests possible outside the UI.
 - **Do not reflow whole files**: format only the lines you changed; a large formatting sweep makes the diff unreviewable.
@@ -352,7 +351,6 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
 | cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | 79 `.cpp` | ✅ run |
 | cp0_lvgl (Bluetooth, on-device) | `run_bluetooth_reset_test.sh`, `build_bluetooth_backend_smoke.sh` | 2 `.cpp` (need real hardware) | ❌ |
 | LaunchWizard | `cmake --preset dev && ctest --preset dev` | 10 | ❌ |
-| Repo-root `tests/` | — | **empty directory, not an entry point** | — |
 
 On-disk file counts are 42 (APPLaunch) and 81 (cp0_lvgl); the difference is exactly the 1 + 2 hardware/LVGL-dependent tests that have their own dedicated runners above.
 
@@ -396,15 +394,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 - Missing `CONFIG_REPO_AUTOMATION=y` → CI/automation hangs on `input()`.
 - No `sysroot/` → cross builds stop; run `scripts/make_sysroot.sh`.
 - Changing a third-party pin without deleting `SDK/github_source/<repo>` → the old sources are still used.
-- `bbear` does not exist (use `bear`).
 - Cross-compiling without `aarch64-linux-gnu-g++`.
-- `scripts/create_settings_ui_worker.sh` is a **dead script** (the template `projects/ui_test` it copies was removed).
-
-### 10.5 Known outdated documentation
-
-| Location | Problem |
-| --- | --- |
-| `projects/APPLaunch/AGENTS.md` | Its `bbear` command cannot run on this machine |
 
 ---
 
@@ -461,7 +451,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 ### How `ext_components` is consumed
 
 - Among `ext_components`, APPLaunch **depends directly only on `cp0_lvgl`**. The base `REQUIREMENTS` list in `main/SConstruct` is `cp0_lvgl`, `eventpp`, `utilities`, `lvgl_component`, `freetype`, `pthread` — the latter five are SDK or system libraries, not `ext_components`. `Miniaudio` is pulled in transitively by `cp0_lvgl` via `CONFIG_CP0_LVGL_INIT_AUDIO`.
-- `SmoothUI` / `Spdlog` are used only by LaunchWizard; `bluectl` / `nmtui` are currently **enabled by no project** (do not treat them as default dependencies); `Sigslot` is never `#include`d and serves only as an OR-gate in cp0_lvgl; `eventpp` is an SDK component and a global dependency.
+- `Sigslot`, `SmoothUI` and `Spdlog` are enabled only by LaunchWizard (`main/SConstruct` and its `*_config_defaults.mk`); no LaunchWizard source includes SmoothUI or spdlog. `eventpp` is an SDK component and a global dependency.
 - The cache of upstream-fetched components **does not validate versions**; after changing a pin you must delete `SDK/github_source/<repo>`.
 
 ---
