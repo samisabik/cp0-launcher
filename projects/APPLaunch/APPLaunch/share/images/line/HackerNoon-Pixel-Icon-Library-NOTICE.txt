@@ -1,0 +1,8 @@
+Icons from Pixel Icon Library by HackerNoon
+https://github.com/hackernoon/pixel-icon-library
+
+Licensed under CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+Files: adsb.png (plane-solid), tailnet.png (chart-network)
+Changes: rasterised from the 24x24 SVG to a 24x24 white PNG alpha mask.

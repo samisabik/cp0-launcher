@@ -124,6 +124,12 @@ https://github.com/merbanan/rtl_433
 
 Pixelarticons, MIT
 https://github.com/halfmage/pixelarticons
+Pixel Icon Library by HackerNoon, CC BY 4.0
+https://github.com/hackernoon/pixel-icon-library
+Memory icons by Pictogrammers, Apache-2.0
+https://github.com/Pictogrammers/Memory
+1-bit Pixel Icons by Nikoichu, CC0-1.0
+https://nikoichu.itch.io/pixel-icons
 
 - Fonts
 

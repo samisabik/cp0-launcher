@@ -1,0 +1,10 @@
+1-bit Pixel Icons by Nikoichu
+https://nikoichu.itch.io/pixel-icons
+
+Released under CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Files: fox.png, ip_panel.png, pins.png, portal.png, sat.png, sensors.png,
+slime.png, tracker.png
+Changes: the white fill of each 16x16 sprite, centred unscaled in a 24x24
+white PNG alpha mask.
