@@ -166,11 +166,13 @@ cd projects/APPLaunch && bear -- scons -j$(nproc)   # writes ./compile_commands.
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| `.github/workflows/launcher-build.yml` | push to `master`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch/LaunchWizard → aggregates → `debian_packager.py` produces the `.deb`; a separate `unit-tests` job runs the `cp0_lvgl` tests |
-| `.github/workflows/launcher-release.yml` | manual | Release publishing (whether prereleases are published automatically varies by branch, see §10.1) |
-| `.github/workflows/emulator-build.yml` | push/PR (paths such as `projects/CardputerZero-Emulator/**`) | 4 jobs: macos / linux / windows / web |
+| `.github/workflows/launcher-build.yml` | push to `main`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch/LaunchWizard → `package_release.sh` packs `cp0-launcher-arm64.tar.gz` → aggregates → `debian_packager.py` produces the `.deb`; a separate `unit-tests` job runs the `cp0_lvgl` tests |
+| `.github/workflows/launcher-release.yml` | manual, on `main` | Calls `launcher-build.yml` with `publish: true` and publishes `cp0-launcher-arm64.tar.gz` as release `launcher-vX.Y.Z`; the `.deb` stays a CI artifact |
+| `.github/workflows/emulator-build.yml` | push/PR (paths such as `projects/CardputerZero-Emulator/**`) | 1 job: linux |
 
-Release pipeline (local equivalent): `scripts/build_cardputerzero_release_local.sh <ver> m5stack1`
+Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scripts/package_release.sh` → `release/cp0-launcher-arm64.tar.gz`, installed on the device by its `install.sh` (`scripts/device_install.sh`).
+
+`.deb` pipeline (CI artifact only): `scripts/build_cardputerzero_release_local.sh <ver> m5stack1`
 → cross-build the five projects → aggregate `dist/` → build `cardputer-adb-hotplug` → `scripts/debian_packager.py` → `applaunch_<ver>-m5stack1_arm64.deb`.
 
 **Note**: `debian_packager.py` only packages the **already-existing** `projects/APPLaunch/dist/APPLaunch`; it will not compile for you. The claim in `09-*.md` that packaging prefers the source tree is out of date.
@@ -478,8 +480,8 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 
 ## 13. Collaboration and Commits
 
-- **Commit messages**: Conventional Commits — `type(scope): one-line summary`, with type ∈ `feat|fix|chore|refactor|docs|ci|test|perf|style`; details go in the body as `-` bullets. Example (from `git log`): `fix(audio): stop the saved-volume restore when audio tears down`.
-- **Branches**: prefixes `fix/`, `feat/`, `feature/`, `refactor/`, `ci/`, `codex/`; PRs land on `master` via merge commits; release tags are `launcher-vX.Y.Z`.
+- **Commit messages**: a one-sentence subject with no `type:` prefix and no trailing full stop; the body, wrapped at 72 columns, explains why. Example (from `git log`): `Let the Air scanner pick which Wi-Fi adapter it uses`.
+- **Branches**: prefixes `fix/`, `feat/`, `feature/`, `refactor/`, `ci/`, `codex/`; PRs land on `main` via merge commits; release tags are `launcher-vX.Y.Z`.
 - **There is no CONTRIBUTING file, no PR template, and no issue template.**
 - **Licensing**: the root [`LICENSE`](LICENSE) is MIT (M5Stack code). [`LICENSES/`](LICENSES/) holds verbatim third-party texts plus provenance and **does not relicense this repo**.
   New third-party components must be registered following [`docs/OPEN_SOURCE_COMPONENTS.md`](docs/OPEN_SOURCE_COMPONENTS.md): the verbatim text in `LICENSES/` + a provenance row in `LICENSES/README.md` + a row in `OPEN_SOURCE_COMPONENTS.md` (plus `ext_components/THIRD_PARTY_NOTICES.md` if the component lives under `ext_components/`).
@@ -517,4 +519,4 @@ Before handing off, confirm each of the following:
 - [ ] New/modified files carry an SPDX header
 - [ ] If a `cp0_signal_*` signature or return format changed: trilingual docs + `*_contract.*` + C wrappers + all call sites + tests are all updated
 - [ ] If resources changed: rebuilt, and `dist/APPLaunch/` actually contains the new files
-- [ ] The commit message follows Conventional Commits, and no one else's changes were swept into the commit
+- [ ] The commit message follows the §13 format, and no one else's changes were swept into the commit

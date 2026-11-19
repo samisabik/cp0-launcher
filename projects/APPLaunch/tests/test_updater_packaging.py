@@ -94,6 +94,10 @@ assert "prerelease: ${{ !inputs.publish }}" in workflow
 # The versioned release rejects missing assets.
 assert workflow.count("fail_on_unmatched_files: true") == 1
 assert "overwrite_files: true" in workflow
+# The release ships the install tarball the README downloads, and only that.
+assert "files: artifacts/cp0-launcher-arm64.tar.gz" in workflow
+assert "artifacts/*.deb" not in workflow
+assert 'sh scripts/package_release.sh "$GITHUB_WORKSPACE/release"' in workflow
 # Deleted releases and installed versions can still raise the version floor.
 assert "LAUNCHER_RELEASE_FLOOR" in workflow
 assert "git tag -l 'launcher-v[0-9]*'" in workflow
