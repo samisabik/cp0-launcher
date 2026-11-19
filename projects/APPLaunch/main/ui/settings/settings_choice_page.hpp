@@ -24,14 +24,18 @@ public:
     using Writer = std::function<std::string(int)>;
     // Runs on the LVGL thread after a successful write, before the page closes.
     using Applied = std::function<void(int)>;
+    // Shows the option at index without saving it. Runs on the LVGL thread as
+    // the highlight moves, and again with the saved index when the page closes.
+    using Preview = std::function<void(int)>;
 
     LvSettingChoicePage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback,
-                         Reader reader, Writer writer, Applied applied = {});
+                         Reader reader, Writer writer, Applied applied = {}, Preview preview = {});
     ~LvSettingChoicePage3() override;
 
 protected:
     int initial_selection() const override;
     SettingApiResult activate_selected() override;
+    void selection_moved() override;
 
 private:
     void request_back();
@@ -43,6 +47,7 @@ private:
     Reader reader_;
     Writer writer_;
     Applied applied_;
+    Preview preview_;
     std::function<void()> back_callback_;
     lv_obj_t *status_label_ = nullptr;
     bool page_alive_ = true;

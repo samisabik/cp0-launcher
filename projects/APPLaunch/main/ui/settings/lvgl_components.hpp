@@ -8359,11 +8359,13 @@ protected:
             if (selected_index > 0) {
                 --selected_index;
                 scroll_to_selected(true);
+                selection_moved();
             }
         } else if (key == LV_KEY_DOWN) {
             if (selected_index + 1 < static_cast<int32_t>(item_count_)) {
                 ++selected_index;
                 scroll_to_selected(true);
+                selection_moved();
             }
         } else if (key == LV_KEY_ENTER || key == LV_KEY_RIGHT) {
             activate_selected();
@@ -8371,6 +8373,9 @@ protected:
 
         lv_event_stop_processing(event);
     }
+
+    // Called after the user moves the highlight to another option.
+    virtual void selection_moved() {}
 
     void create_ui(lv_obj_t *parent) override
     {
@@ -8452,14 +8457,9 @@ protected:
             update_title_position();
         }
 
-        right_arrow_ = lv_img_create(ComponensObj);
+        right_arrow_ = cp0::ui::label(ComponensObj, 0, 0, cp0::theme::kAccent);
         if (right_arrow_) {
-            lv_img_set_src(right_arrow_, &setting_right_arrow);
-            // The image has the default accent baked in; the recolour makes it follow the theme.
-            lv_obj_set_style_image_recolor_opa(right_arrow_, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_image_recolor(right_arrow_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
-            lv_image_set_pivot(right_arrow_, 0, 0);
-            lv_image_set_scale(right_arrow_, LV_SCALE_NONE);
+            lv_label_set_text(right_arrow_, ">");
             lv_obj_update_layout(right_arrow_);
             lv_obj_set_pos(
                 right_arrow_, metric(LayoutMetric::ValueListX) - lv_obj_get_width(right_arrow_) - 4,

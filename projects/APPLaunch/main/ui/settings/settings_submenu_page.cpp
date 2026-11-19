@@ -811,13 +811,9 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(selection_bg_, LV_OBJ_FLAG_SCROLLABLE);
 
-    right_arrow_ = lv_img_create(utility_obj_);
+    right_arrow_ = cp0::ui::label(utility_obj_, 0, 0, cp0::theme::kAccent);
     if (right_arrow_) {
-        lv_img_set_src(right_arrow_, &setting_right_arrow);
-        // The image has the default accent baked in; the recolour makes it follow the theme.
-        lv_obj_set_style_image_recolor_opa(right_arrow_, LV_OPA_COVER, LV_PART_MAIN);
-        lv_obj_set_style_image_recolor(right_arrow_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
-        lv_image_set_pivot(right_arrow_, 0, 0);
+        lv_label_set_text(right_arrow_, ">");
         lv_obj_update_layout(right_arrow_);
         lv_obj_set_pos(right_arrow_, metric(LayoutMetric::PanelX) - lv_obj_get_width(right_arrow_) - 4,
                        metric(LayoutMetric::BarY) + (metric(LayoutMetric::BarH) - lv_obj_get_height(right_arrow_)) / 2);

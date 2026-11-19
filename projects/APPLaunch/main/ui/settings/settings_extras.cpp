@@ -349,6 +349,9 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_accent_page_factory(lv_o
             return settings_prefs::set_int(cp0::theme::kAccentConfigKey, index) ? std::string()
                                                                                 : std::string("save failed");
         },
+        LvSettingChoicePage3::Applied{},
+        // The accent shows on the whole screen as the highlight moves; Enter
+        // saves it and leaving without Enter restores the saved one.
         [](int index) {
             cp0::ui::apply_accent(cp0::theme::kAccentPresets[static_cast<std::size_t>(cp0::theme::accent_index(index))].color);
         });

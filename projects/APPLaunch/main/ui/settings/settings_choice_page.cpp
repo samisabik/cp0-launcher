@@ -52,9 +52,9 @@ std::string settings_run_admin(std::list<std::string> arguments, int timeout_ms)
 
 LvSettingChoicePage3::LvSettingChoicePage3(lv_obj_t *parent, const NodeIter &parent_node,
                                            std::function<void()> back_callback, Reader reader, Writer writer,
-                                           Applied applied)
+                                           Applied applied, Preview preview)
     : LvSettingValuePage3Base(parent_node, {}), reader_(std::move(reader)), writer_(std::move(writer)),
-      applied_(std::move(applied)), back_callback_(std::move(back_callback))
+      applied_(std::move(applied)), preview_(std::move(preview)), back_callback_(std::move(back_callback))
 {
     LeaveSelfPage = [this] { request_back(); };
     initialize(parent);
@@ -93,7 +93,14 @@ void LvSettingChoicePage3::request_back()
     pending_ = false;
     ++generation_;
     cancel_async_tasks();
+    // Leaving without confirming puts the saved option back on screen.
+    if (preview_ && saved_index_ >= 0) preview_(saved_index_);
     if (back_callback_) back_callback_();
+}
+
+void LvSettingChoicePage3::selection_moved()
+{
+    if (preview_ && !pending_) preview_(selected_index);
 }
 
 void LvSettingChoicePage3::set_status(const std::string &text, bool error)

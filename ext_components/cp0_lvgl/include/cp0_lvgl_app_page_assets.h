@@ -13,7 +13,6 @@ LV_IMAGE_DECLARE(cp0_status_battery_background);
 LV_IMAGE_DECLARE(cp0_status_ethernet);
 LV_IMAGE_DECLARE(setting_cross);
 LV_IMAGE_DECLARE(setting_ok);
-LV_IMAGE_DECLARE(setting_right_arrow);
 LV_IMAGE_DECLARE(settings_icon_screen);
 LV_IMAGE_DECLARE(settings_icon_sound);
 LV_IMAGE_DECLARE(settings_icon_wifi);
