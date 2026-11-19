@@ -35,11 +35,11 @@
 #include <cctype>
 #include <string>
 
-#define LOADING_BG_COLOR    0x000000
-#define LOADING_BORDER      0x1E2B23
-#define LOADING_TEXT_COLOR  0xE6E6E6
-#define LOADING_DOT_ON      0x3DDC84
-#define LOADING_DOT_OFF     0x13261B
+#define LOADING_BG_COLOR    cp0::theme::kBg
+#define LOADING_BORDER      cp0::theme::kLine
+#define LOADING_TEXT_COLOR  cp0::theme::kText
+#define LOADING_DOT_ON      cp0::theme::kAccent
+#define LOADING_DOT_OFF     cp0::theme::kSelect
 #define LOADING_WIDTH       200
 #define LOADING_HEIGHT      34
 #define LOADING_DOT_SIZE    4

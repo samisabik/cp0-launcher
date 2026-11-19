@@ -57,10 +57,10 @@ lv_obj_t *s_content = nullptr;
 lv_obj_t *s_clock = nullptr;
 lv_obj_t *s_date = nullptr;
 lv_obj_t *s_prompt_text = nullptr;
-constexpr uint32_t kColorAccent = 0x3DDC84;
-constexpr uint32_t kColorText = 0xE6E6E6;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
+const uint32_t &kColorAccent = cp0::theme::kAccent;
+const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
 constexpr lv_coord_t kContentLeft = 16;
 constexpr lv_coord_t kClockTop = 16;
 constexpr lv_coord_t kDateLeft = 96;
@@ -261,14 +261,22 @@ uint16_t rgb565(uint32_t rgb)
  * short trail that fades to black after they die. */
 uint16_t life_color(int8_t age)
 {
-    static const uint16_t kAlive[] = {
-        rgb565(0x3DDC84), rgb565(0x34BF72), rgb565(0x2C9E60), rgb565(0x24824F),
-        rgb565(0x1F6E44), rgb565(0x1B603B),
-    };
-    static const uint16_t kTrail[] = {
-        rgb565(0x123D27), rgb565(0x0F321F), rgb565(0x0C2819), rgb565(0x0A2014),
-        rgb565(0x081910), rgb565(0x06130C), rgb565(0x040D08), rgb565(0x020604),
-    };
+    static uint16_t kAlive[6];
+    static uint16_t kTrail[8];
+    static uint32_t built_for = 0xFFFFFFFFu;
+    if (built_for != cp0::theme::kAccent) {
+        built_for = cp0::theme::kAccent;
+        static const int kAliveScale[6] = {100, 87, 72, 59, 50, 44};
+        static const int kTrailScale[8] = {28, 23, 18, 15, 11, 9, 6, 3};
+        const auto scaled = [](int percent) {
+            const uint32_t c = cp0::theme::kAccent;
+            const uint32_t r = ((c >> 16) & 0xFF) * percent / 100, g = ((c >> 8) & 0xFF) * percent / 100,
+                           bl = (c & 0xFF) * percent / 100;
+            return rgb565((r << 16) | (g << 8) | bl);
+        };
+        for (int i = 0; i < 6; ++i) kAlive[i] = scaled(kAliveScale[i]);
+        for (int i = 0; i < 8; ++i) kTrail[i] = scaled(kTrailScale[i]);
+    }
     if (age > 0) return kAlive[std::min<int>(age, 6) - 1];
     const int faded = -age;
     return faded < 8 ? kTrail[faded] : 0;

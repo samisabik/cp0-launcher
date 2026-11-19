@@ -51,9 +51,10 @@ std::string settings_run_admin(std::list<std::string> arguments, int timeout_ms)
 }
 
 LvSettingChoicePage3::LvSettingChoicePage3(lv_obj_t *parent, const NodeIter &parent_node,
-                                           std::function<void()> back_callback, Reader reader, Writer writer)
+                                           std::function<void()> back_callback, Reader reader, Writer writer,
+                                           Applied applied)
     : LvSettingValuePage3Base(parent_node, {}), reader_(std::move(reader)), writer_(std::move(writer)),
-      back_callback_(std::move(back_callback))
+      applied_(std::move(applied)), back_callback_(std::move(back_callback))
 {
     LeaveSelfPage = [this] { request_back(); };
     initialize(parent);
@@ -169,6 +170,7 @@ void LvSettingChoicePage3::begin_write()
         if (error.empty()) {
             saved_index_ = target;
             parent_node()->selected_index = target;
+            if (applied_) applied_(target);
             request_back();
             return;
         }

@@ -20,6 +20,8 @@
 #include <cstdlib>
 #include "lvgl/src/widgets/gif/lv_gif.h"
 #include "cp0_lvgl_app.h"
+#include "cp0_theme.hpp"
+#include "settings/settings_prefs.hpp"
 #include "sample_log.h"
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
@@ -38,6 +40,11 @@ void init()
 {
     if (home)
         return;
+    // The saved accent has to be in place before the first widget is built.
+    cp0::ui::set_palette(cp0::theme::accent_palette(
+        cp0::theme::kAccentPresets[static_cast<std::size_t>(cp0::theme::accent_index(
+                                       settings_prefs::get_int(cp0::theme::kAccentConfigKey, 0)))]
+            .color));
     /* Cache the system volume once here so the shortcut OSD and
      * Settings -> Speaker share one value for the whole launcher session. */
     launcher_media_controls::start_volume_cache();

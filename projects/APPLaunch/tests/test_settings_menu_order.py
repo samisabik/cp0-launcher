@@ -55,7 +55,7 @@ def test_screen_keeps_lock_timeout_options():
     screen_entries = re.findall(
         r'append_child\(\s*screen,\s*SettingEntry\{"([^"]+)"', builder
     )
-    assert screen_entries == ["brightness", "auto-lock"]
+    assert screen_entries == ["brightness", "auto-lock", "accent"]
     timeouts = re.findall(
         r'append_child\(\s*dark_time,\s*SettingEntry\{"([^"]+)"', builder
     )

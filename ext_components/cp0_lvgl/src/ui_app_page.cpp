@@ -49,7 +49,7 @@ lv_obj_t *get_release_fallback_screen(lv_display_t *display)
     release_fallback_display = display;
     lv_obj_add_event_cb(release_fallback_screen, release_fallback_delete_cb,
                         LV_EVENT_DELETE, nullptr);
-    lv_obj_set_style_bg_color(release_fallback_screen, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_color(release_fallback_screen, lv_color_hex(cp0::theme::kBg), 0);
     lv_obj_set_style_bg_opa(release_fallback_screen, LV_OPA_COVER, 0);
     return release_fallback_screen;
 }
@@ -205,7 +205,7 @@ void AppPageRoot::create_base_ui()
     lv_obj_add_event_cb(root_screen_, screen_delete_cb, LV_EVENT_DELETE, this);
     lv_obj_clear_flag(root_screen_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_pad_all(root_screen_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(root_screen_, lv_color_hex(0x000000),
+    lv_obj_set_style_bg_color(root_screen_, lv_color_hex(cp0::theme::kBg),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(root_screen_, LV_OPA_COVER,
                             LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -498,7 +498,7 @@ void AppTopBarBatteryComponent::on_create(lv_obj_t *obj)
     lv_obj_set_size(battery_bar_, 33, 14);
     lv_obj_set_align(battery_bar_, LV_ALIGN_CENTER);
     lv_obj_set_style_radius(battery_bar_, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(battery_bar_, lv_color_hex(0x484847),
+    lv_obj_set_style_bg_color(battery_bar_, lv_color_hex(cp0::theme::kTrack),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(battery_bar_, LV_OPA_TRANSP,
                             LV_PART_MAIN | LV_STATE_DEFAULT);

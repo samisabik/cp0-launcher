@@ -13,8 +13,8 @@
 namespace {
 
 constexpr uint32_t kShowDurationMs = 1500;
-constexpr uint32_t kBackgroundColor = cp0::theme::kSelect;
-constexpr uint32_t kTextColor = cp0::theme::kText;
+static const uint32_t &kBackgroundColor = cp0::theme::kSelect;
+static const uint32_t &kTextColor = cp0::theme::kText;
 constexpr lv_coord_t kWidth = 240;
 constexpr lv_coord_t kHeight = 22;
 constexpr lv_coord_t kMultilineHeight = 38;

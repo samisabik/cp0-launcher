@@ -36,6 +36,12 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_clock_format_page_factor
 
 // Microphone PGA gain, 0..42 dB in 3 dB steps; children are the option labels.
 void append_mic_gain_options(Tree &tree, const NodeIter &parent);
+// screen > accent: the options are cp0::theme::kAccentPresets, in order.
+void append_accent_options(Tree &tree, const NodeIter &parent);
+std::unique_ptr<DComponens::LvglComponensBase> settings_accent_page_factory(lv_obj_t *parent,
+                                                                            const NodeIter &page_node,
+                                                                            std::function<void()> on_back);
+
 std::unique_ptr<DComponens::LvglComponensBase> settings_mic_gain_page_factory(lv_obj_t *parent,
                                                                               const NodeIter &page_node,
                                                                               std::function<void()> on_back);

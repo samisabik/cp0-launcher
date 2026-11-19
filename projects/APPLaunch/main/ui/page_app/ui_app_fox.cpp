@@ -25,14 +25,14 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = cp0::theme::kAccent;
-constexpr uint32_t kColorText = cp0::theme::kText;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorWarn = cp0::theme::kWarn;
-constexpr uint32_t kColorRed = cp0::theme::kDanger;
+static const uint32_t &kColorAccent = cp0::theme::kAccent;
+static const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorWarn = cp0::theme::kWarn;
+static const uint32_t &kColorRed = cp0::theme::kDanger;
 // The trace fill the SDR scope uses under its line.
-constexpr uint32_t kColorFill = 0x0D2216;
+static const uint32_t &kColorFill = cp0::theme::kFill;
 constexpr uint32_t kRefreshMs = 50;
 // The big reading turns accent above this level.
 constexpr float kStrongDbm = -62.0f;

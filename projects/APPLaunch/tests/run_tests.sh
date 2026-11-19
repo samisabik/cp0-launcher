@@ -86,6 +86,10 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -o "$build_dir/test_keyboard_text_input"
 "$build_dir/test_keyboard_text_input"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_accent.cpp" \
+    -o "$build_dir/test_accent"
+"$build_dir/test_accent"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_setup_value_policy.cpp" \
     "$test_root/../main/ui/model/setup_value_policy.cpp" \
     -o "$build_dir/test_setup_value_policy"
