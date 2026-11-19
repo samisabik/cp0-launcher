@@ -44,10 +44,8 @@ and injects the launcher version, channel, build date, and Git commit into the
 compile. APPLaunch uses the local FreeType override in `main/lvgl/` while the
 remaining LVGL implementation comes from the SDK.
 
-The build configurations include device framebuffer, Linux and Windows SDL2,
-and Linux AArch64 cross-builds. macOS instructions use the documented Docker
-build flow. LaunchWizard reuses the same component graph, with its
-SConstruct selecting the services it needs.
+The build profiles cover the device framebuffer, Linux and macOS SDL2 hosts,
+and AArch64 cross-builds from Linux and macOS. `AGENTS.md` lists them.
 
 ## Current module boundaries
 

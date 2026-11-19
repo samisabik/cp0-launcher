@@ -1,0 +1,15 @@
+[Unit]
+Description=APPLaunch Service
+After=pipewire-pulse.service
+Wants=pipewire-pulse.service
+
+[Service]
+ExecStartPre=-/usr/bin/xdg-user-dirs-update
+ExecStart=/usr/share/APPLaunch/bin/M5CardputerZero-APPLaunch
+WorkingDirectory=/usr/share/APPLaunch
+Restart=always
+RestartSec=1
+StartLimitInterval=0
+
+[Install]
+WantedBy=default.target

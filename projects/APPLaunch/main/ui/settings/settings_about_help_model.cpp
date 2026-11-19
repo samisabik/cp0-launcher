@@ -94,8 +94,6 @@ miniaudio, Unlicense or MIT-0
 https://github.com/mackron/miniaudio
 eventpp, Apache-2.0
 https://github.com/wqking/eventpp
-sigslot, MIT
-https://github.com/palacaze/sigslot
 tree.hh, GPL-3.0-only
 https://github.com/kpeeters/tree.hh
 

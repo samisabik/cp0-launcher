@@ -29,6 +29,12 @@ for unit in applaunch-updater.service applaunch-apt-update.service applaunch-app
     sudo systemctl mask --now "$unit" >/dev/null 2>&1 || true
 done
 
+# The launcher is a user service with no seat session, so NetworkManager
+# needs this rule before it lets the netdev group scan and join Wi-Fi.
+if [ -f "$HERE/50-cp0-wifi-scan.rules" ]; then
+    sudo install -D -m 644 "$HERE/50-cp0-wifi-scan.rules" /etc/polkit-1/rules.d/50-cp0-wifi-scan.rules
+fi
+
 [ -e "$BIN.stock" ] || sudo cp -p "$BIN" "$BIN.stock"
 sudo install -m 755 "$HERE/M5CardputerZero-APPLaunch" "$BIN"
 sudo cp -R "$HERE/share/." "$ROOT/share/"

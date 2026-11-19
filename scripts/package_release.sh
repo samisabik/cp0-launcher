@@ -27,6 +27,7 @@ mkdir -p "$PKG"
 "$STRIP" -o "$PKG/M5CardputerZero-APPLaunch" "$DIST/M5CardputerZero-APPLaunch"
 cp -R "$DIST/APPLaunch/share" "$PKG/share"
 install -m 755 "$REPO/scripts/device_install.sh" "$PKG/install.sh"
+install -m 644 "$REPO/scripts/50-cp0-wifi-scan.rules" "$PKG/50-cp0-wifi-scan.rules"
 cp "$REPO/LICENSE" "$PKG/LICENSE"
 
 mkdir -p "$OUT"

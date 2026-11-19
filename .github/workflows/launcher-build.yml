@@ -5,14 +5,11 @@ on:
     branches: [main, ci/**]
     paths:
       - 'projects/APPLaunch/**'
-      - 'projects/LaunchWizard/**'
       - 'SDK/**'
       - 'ext_components/**'
       - '.gitmodules'
       - '.github/workflows/launcher-build.yml'
-      - 'scripts/build_cardputerzero_release_local.sh'
-      - 'scripts/cardputer_adb_hotplug.c'
-      - 'scripts/debian_packager.py'
+      - 'scripts/50-cp0-wifi-scan.rules'
       - 'scripts/device_install.sh'
       - 'scripts/package_release.sh'
   pull_request:
@@ -87,7 +84,8 @@ jobs:
 
         version_re='^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'
 
-        baseline="$(sed -nE 's/^DEFAULT_VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' scripts/debian_packager.py | head -n1)"
+        # Lower bound when the repository has no release or tag yet.
+        baseline="0.0.0"
 
         # Read the release list only when the version has to be derived or when a
         # release is about to be published (the guard needs the current maximum).
@@ -100,14 +98,14 @@ jobs:
               echo "Unable to query existing releases from GitHub; refusing to publish." >&2
               exit 1
             fi
-            echo "warning: unable to query existing releases; using the packager default for this build" >&2
+            echo "warning: unable to query existing releases; using the baseline for this build" >&2
             release_tags=""
           fi
         fi
 
         # A deleted release can still be installed on a device, and its tag can
         # survive the deletion, so the lower bound is the maximum of the release
-        # list, the repository tags, the packager default and the admin floor.
+        # list, the repository tags, the baseline and the admin floor.
         git_tags="$(git tag -l 'launcher-v[0-9]*' 2>/dev/null || true)"
         latest="$(printf '%s\n%s\n%s\n%s\n' "${baseline}" "${release_tags}" "${git_tags}" "${floor}" \
           | sed -E 's/^launcher-v//' | sed '/^$/d' \
@@ -115,7 +113,7 @@ jobs:
 
         if [[ -z "${version}" ]]; then
           if [[ ! "${latest}" =~ ${version_re} ]]; then
-            echo "Unable to determine a semantic version from releases, tags or the packager default: ${latest:-<none>}" >&2
+            echo "Unable to determine a semantic version from releases, tags or the baseline: ${latest:-<none>}" >&2
             exit 1
           fi
           # 10# keeps bash from treating a leading zero as octal (the regex
@@ -164,7 +162,7 @@ jobs:
     - name: Install cross-compilation toolchain
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu dpkg-dev \
+        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
           libfreetype-dev libpng-dev
 
     - name: Install Python build dependencies
@@ -215,39 +213,11 @@ jobs:
     - name: Package release tarball
       run: sh scripts/package_release.sh "$GITHUB_WORKSPACE/release"
 
-    - name: Build LaunchWizard (cross-compile aarch64)
-      run: |
-        cd projects/LaunchWizard
-        rm -rf build dist
-        export CardputerZero=y
-        export CONFIG_REPO_AUTOMATION=y
-        scons -j$(nproc)
-
-    - name: Bundle LaunchWizard into APPLaunch package tree
-      run: |
-        cp -a projects/LaunchWizard/dist/APPLaunch/. projects/APPLaunch/dist/APPLaunch/
-        mkdir -p projects/APPLaunch/dist/APPLaunch/bin
-        cp projects/LaunchWizard/dist/LaunchWizard projects/APPLaunch/dist/APPLaunch/bin/LaunchWizard
-        chmod 0755 projects/APPLaunch/dist/APPLaunch/bin/LaunchWizard
-
-    - name: Build .deb package
-      run: |
-        SCONS=scons \
-          OUTPUT_DIR="$GITHUB_WORKSPACE/projects/APPLaunch/tools" \
-          APPLAUNCH_CHANNEL=${{ inputs.publish && 'release' || 'prerelease' }} \
-          scripts/build_cardputerzero_release_local.sh \
-            "${{ steps.version.outputs.version }}" m5stack1
-
     - name: Collect artifacts
       run: |
         mkdir -p artifacts
         cp projects/APPLaunch/dist/M5CardputerZero-APPLaunch artifacts/
-        cp projects/APPLaunch/tools/*.deb artifacts/
         cp release/cp0-launcher-arm64.tar.gz artifacts/
-        package="$(find projects/APPLaunch/tools -maxdepth 1 -type f -name 'applaunch_*_arm64.deb' -print)"
-        test "$(printf '%s\n' "${package}" | sed '/^$/d' | wc -l)" -eq 1
-        package_version="$(dpkg-deb -f "${package}" Version)"
-        test "${package_version}" = "${{ steps.version.outputs.version }}"
 
     - uses: actions/upload-artifact@v4
       with:
@@ -299,7 +269,7 @@ jobs:
     - name: Run APPLaunch packaging tests
       # Guards the release workflow contract (publish gate, tag/version rules)
       # on every CI run.
-      run: python3 projects/APPLaunch/tests/test_updater_packaging.py
+      run: python3 projects/APPLaunch/tests/test_release_workflow.py
 
   # Publishing is manual on purpose: launcher-release.yml calls this workflow with
   # publish=true after the merged change has been reviewed. Pushes, pull requests
@@ -383,5 +353,4 @@ jobs:
         fail_on_unmatched_files: true
         overwrite_files: true
         # The README installs from releases/latest/download/ by this name.
-        # The .deb stays a CI artifact: install.sh holds the applaunch package.
         files: artifacts/cp0-launcher-arm64.tar.gz

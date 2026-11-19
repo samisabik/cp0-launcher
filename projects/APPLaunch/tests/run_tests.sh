@@ -32,7 +32,7 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$test_root/test_page_timer_lifecycle.cpp" \
     -o "$build_dir/test_page_timer_lifecycle"
 "$build_dir/test_page_timer_lifecycle"
-python3 "$test_root/test_updater_packaging.py"
+python3 "$test_root/test_release_workflow.py"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../main/include" \
     -I"$test_root/../../../ext_components/cp0_lvgl/include" \

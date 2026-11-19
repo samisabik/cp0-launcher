@@ -13,7 +13,6 @@ Related files (all worth a quick scan):
 | [`README.md`](README.md) | Apps, sysroot, build, test and deploy commands. **Start here for build problems** |
 | [`projects/APPLaunch/AGENTS.md`](projects/APPLaunch/AGENTS.md) | APPLaunch specifics: `compile_commands.json` prerequisite, `CP0_ENUM_CAST` macro conventions |
 | [`ext_components/cp0_lvgl/AGENTS.md`](ext_components/cp0_lvgl/AGENTS.md) | **Platform-layer contract**; required reading before touching `cp0_signal_*` |
-| [`projects/LaunchWizard/AGENTS.md`](projects/LaunchWizard/AGENTS.md) | LaunchWizard's single hard rule: UI font size ≥ 12px |
 | [`docs/current-implementation-and-components.md`](docs/current-implementation-and-components.md) | Self-declared source-of-truth implementation snapshot + component inventory |
 
 **Contents**:
@@ -49,20 +48,19 @@ launcher/
 ├── SDK/                       # [submodule] M5Stack_Linux_Libs: component libs + SCons toolchain + 3rd-party source cache
 ├── ext_components/            # vendored external components (cp0_lvgl is the core platform layer)
 │   ├── cp0_lvgl/              #   ★ platform adapter: LVGL runner, AppPage bases, cp0_signal_* service bus
-│   ├── Miniaudio/ Sigslot/ SmoothUI/ Spdlog/
+│   ├── Miniaudio/
 │   └── THIRD_PARTY_NOTICES.md
 ├── projects/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
 │   │   ├── SConstruct         #   project entry: pick config → invoke SDK build
-│   │   ├── *_config_defaults.mk  # 7 build profiles (see §4.1)
+│   │   ├── *_config_defaults.mk  # 5 build profiles (see §4.1)
 │   │   ├── main/              #   main/{src,ui,ui/{animation,model,page_app,settings},include}/ + main/SConstruct
-│   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share applications adb
+│   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share
 │   │   ├── tests/             #   42 .cpp unit tests + 12 Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
 │   │   └── dist/ build/       #   artifacts (git-ignored, wholly replaced on every build)
-│   ├── LaunchWizard/          # OOBE first-boot wizard (SCons for the GUI + CMake for pure-logic tests)
 │   ├── CardputerZero-Emulator/ # desktop/web device emulator (**CMake**, reuses APPLaunch/main at source level)
 ├── docs/                      # topical docs (see §11)
-├── scripts/                   # packaging / release / RPC / logging / hotplug scripts
+├── scripts/                   # sysroot, packaging, install, RPC and logging scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
 ├── .github/workflows/         # CI: launcher-build.yml / launcher-release.yml / emulator-build.yml
 └── .clang-format              # Google-derived, see §8
@@ -92,8 +90,8 @@ file dist/M5CardputerZero-APPLaunch            # expect ARM aarch64
 sh projects/APPLaunch/tests/run_tests.sh          # 41 C++ + 12 Python contracts
 sh ext_components/cp0_lvgl/tests/run_tests.sh     # 79 C++
 
-# 4. Build the .deb (**does not compile anything** — packages the existing dist/)
-python3 scripts/debian_packager.py
+# 4. Pack the install tarball (**does not compile anything**; packs the existing dist/)
+sh scripts/package_release.sh
 
 # 5. Generate compile_commands.json (for clangd / code navigation)
 cd projects/APPLaunch && bear -- scons -j$(nproc)
@@ -111,14 +109,13 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 | Project | Purpose | Build | Artifacts | Host SDL2 | Repo nature |
 | --- | --- | --- | --- | --- | --- |
 | **APPLaunch** | Launcher: grid home, built-in pages, `.desktop` app management | SCons | `M5CardputerZero-APPLaunch` + `APPLaunch/` resource tree | ✅ | plain directory |
-| LaunchWizard | OOBE first-boot wizard | SCons (GUI) / CMake `ctest --preset dev` (tests) | `LaunchWizard` (CI copies it into `APPLaunch/bin/`) | ✅ | plain directory |
 | CardputerZero-Emulator | Desktop/web device emulator | **CMake** (not SCons) | `cardputer-zero-emu`; web `index.html/js/wasm/data` | ✅ | plain directory (`lib/lvgl` is a submodule) |
 
 ---
 
 ## 4. Build System
 
-### 4.1 Seven profiles — select with `CONFIG_DEFAULT_FILE`, never hand-edit
+### 4.1 Five profiles — select with `CONFIG_DEFAULT_FILE`, never hand-edit
 
 | File | Target |
 | --- | --- |
@@ -127,8 +124,6 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 | `linux_x86_cross_cp0_config_defaults.mk` | Linux x86_64 → aarch64 cross-compile |
 | `darwin_config_defaults.mk` | macOS native SDL |
 | `mac_cross_cp0_config_defaults.mk` | macOS → aarch64 cross-compile |
-| `win_x86_sdl2_config_defaults.mk` | Windows MSYS2/MinGW SDL2 |
-| `win_x86_cross_config_defaults.mk` | Windows SysGCC → aarch64 cross-compile |
 
 **Hard rules**:
 
@@ -146,7 +141,7 @@ projects/APPLaunch/
 ├── main/build/static/APPLaunch/         # staged resource tree (re-copied on every scons run)
 └── dist/
     ├── M5CardputerZero-APPLaunch        # executable
-    └── APPLaunch/{adb,applications,share}/
+    └── APPLaunch/share/
 ```
 
 - **`dist/` is wholly replaced on every build** (`rmtree` + `copytree`). Never place things there by hand.
@@ -165,16 +160,13 @@ cd projects/APPLaunch && bear -- scons -j$(nproc)   # writes ./compile_commands.
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| `.github/workflows/launcher-build.yml` | push to `main`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch/LaunchWizard → `package_release.sh` packs `cp0-launcher-arm64.tar.gz` → aggregates → `debian_packager.py` produces the `.deb`; a separate `unit-tests` job runs the `cp0_lvgl` tests |
-| `.github/workflows/launcher-release.yml` | manual, on `main` | Calls `launcher-build.yml` with `publish: true` and publishes `cp0-launcher-arm64.tar.gz` as release `launcher-vX.Y.Z`; the `.deb` stays a CI artifact |
+| `.github/workflows/launcher-build.yml` | push to `main`/`ci/**` (path-filtered), PR, manual | Cross-builds APPLaunch → `package_release.sh` packs `cp0-launcher-arm64.tar.gz`; a separate `unit-tests` job runs the `cp0_lvgl` tests and the workflow contract test |
+| `.github/workflows/launcher-release.yml` | manual, on `main` | Calls `launcher-build.yml` with `publish: true` and publishes `cp0-launcher-arm64.tar.gz` as release `launcher-vX.Y.Z` |
 | `.github/workflows/emulator-build.yml` | push/PR (paths such as `projects/CardputerZero-Emulator/**`) | 1 job: linux |
 
 Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scripts/package_release.sh` → `release/cp0-launcher-arm64.tar.gz`, installed on the device by its `install.sh` (`scripts/device_install.sh`).
 
-`.deb` pipeline (CI artifact only): `scripts/build_cardputerzero_release_local.sh <ver> m5stack1`
-→ cross-build the five projects → aggregate `dist/` → build `cardputer-adb-hotplug` → `scripts/debian_packager.py` → `applaunch_<ver>-m5stack1_arm64.deb`.
-
-**Note**: `debian_packager.py` only packages the **already-existing** `projects/APPLaunch/dist/APPLaunch`; it will not compile for you. The claim in `09-*.md` that packaging prefers the source tree is out of date.
+`install.sh` also installs `scripts/50-cp0-wifi-scan.rules`, the polkit rule that lets the launcher scan and join Wi-Fi. `scripts/APPLaunch.service` is the user unit the launcher runs under; the stock image already has it, so the tarball does not install it.
 
 ### 4.5 Other build notes
 
@@ -252,7 +244,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Settings value ranges (brightness/volume) | `main/ui/model/setup_value_policy.{hpp,cpp}` | unit-tested |
 | Theme / display initialization | `main/ui/launcher_ui_runtime.cpp` | `create_display`, `build_launcher_home`, `show_initial_screen` |
 | Resource install layout | `main/SConstruct` | `STATIC_FILES` ← `projects/APPLaunch/APPLaunch/` |
-| Deployment / systemd | `scripts/debian_packager.py` | — |
+| Deployment / systemd | `scripts/device_install.sh`, `scripts/APPLaunch.service` | — |
 
 ---
 
@@ -350,7 +342,6 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
 | APPLaunch (LVGL UI) | `sh projects/APPLaunch/tests/low_battery_ui/run_tests.sh` | 1 `.cpp` (needs an LVGL build) | ❌ |
 | cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | 79 `.cpp` | ✅ run |
 | cp0_lvgl (Bluetooth, on-device) | `run_bluetooth_reset_test.sh`, `build_bluetooth_backend_smoke.sh` | 2 `.cpp` (need real hardware) | ❌ |
-| LaunchWizard | `cmake --preset dev && ctest --preset dev` | 10 | ❌ |
 
 On-disk file counts are 42 (APPLaunch) and 81 (cp0_lvgl); the difference is exactly the 1 + 2 hardware/LVGL-dependent tests that have their own dedicated runners above.
 
@@ -414,7 +405,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 | I want to… | Read first | Then work on |
 | --- | --- | --- |
 | Get it running on the host | `README.md` build section + §2 of this file | `projects/APPLaunch` with `linux_x86_sdl2_config_defaults.mk` |
-| Produce device/release artifacts | §4.4 of this file + `README.md` | `scripts/build_cardputerzero_release_local.sh` → `scripts/debian_packager.py` |
+| Produce device/release artifacts | §4.4 of this file + `README.md` | `scripts/package_release.sh` → `scripts/device_install.sh` |
 | Add a home-screen app (built-in page) | §6.2 of this file | `main/ui/page_app/` + `builtin_app_registry.cpp` |
 | Add an external app (`.desktop`) | §6.3 of this file | `projects/APPLaunch/APPLaunch/applications/` |
 | Change the home UI | §5.3 of this file, the home rows | `main/ui/ui_launch_page*.cpp` |
@@ -451,7 +442,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 ### How `ext_components` is consumed
 
 - Among `ext_components`, APPLaunch **depends directly only on `cp0_lvgl`**. The base `REQUIREMENTS` list in `main/SConstruct` is `cp0_lvgl`, `eventpp`, `utilities`, `lvgl_component`, `freetype`, `pthread` — the latter five are SDK or system libraries, not `ext_components`. `Miniaudio` is pulled in transitively by `cp0_lvgl` via `CONFIG_CP0_LVGL_INIT_AUDIO`.
-- `Sigslot`, `SmoothUI` and `Spdlog` are enabled only by LaunchWizard (`main/SConstruct` and its `*_config_defaults.mk`); no LaunchWizard source includes SmoothUI or spdlog. `eventpp` is an SDK component and a global dependency.
+- `eventpp` is an SDK component and a global dependency.
 - The cache of upstream-fetched components **does not validate versions**; after changing a pin you must delete `SDK/github_source/<repo>`.
 
 ---
@@ -464,7 +455,7 @@ Before handing off, confirm each of the following:
 - [ ] `sh projects/APPLaunch/tests/run_tests.sh` passes (if APPLaunch was touched)
 - [ ] `sh ext_components/cp0_lvgl/tests/run_tests.sh` passes (if the platform layer was touched)
 - [ ] The SDL2 build passes: `cd projects/APPLaunch && CONFIG_DEFAULT_FILE=linux_x86_sdl2_config_defaults.mk scons -j$(nproc)`
-- [ ] New UI text is at least 12px (a LaunchWizard hard rule; applies elsewhere too on a 320×170 screen)
+- [ ] New UI text is at least 11px, the size of the chrome font (`cp0::theme::kFontPx`)
 - [ ] New/modified files carry an SPDX header
 - [ ] If a `cp0_signal_*` signature or return format changed: `docs/cp0_lvgl.en.md` + `*_contract.*` + C wrappers + all call sites + tests are all updated
 - [ ] If resources changed: rebuilt, and `dist/APPLaunch/` actually contains the new files

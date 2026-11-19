@@ -17,9 +17,6 @@ Paths in the evidence column are relative to the repository root.
 | FreeType | APPLaunch `main/lvgl/ftmodule.h` and `main/SConstruct` | FTL or GPL-2.0; [FTL text](../projects/APPLaunch/main/lvgl/freetype-LICENSE.txt) |
 | tree.hh 3.20 | `ext_components/cp0_lvgl/include/tree.hh`, Kasper Peeters 2001–2024 | [GPL-3.0-only](../LICENSES/tree.hh-GPL-3.0-only.txt): header specifies version 3 without an “or later” grant |
 | miniaudio 0.11.25 | `ext_components/Miniaudio/include/miniaudio.h`; audio service | [Unlicense OR MIT-0](../ext_components/Miniaudio/LICENSE), David Reid |
-| sigslot | `ext_components/Sigslot/SConstruct`, pinned commit `b588b791b9cf7eb17ff0a74d8aebd4a61166c2e1` | [MIT](../ext_components/Sigslot/LICENSE) |
-| smooth_ui_toolkit | `ext_components/SmoothUI/SConstruct`, pinned optional UI helper | [MIT](../ext_components/SmoothUI/LICENSE) |
-| spdlog | `ext_components/Spdlog/SConstruct`, pinned optional logging component | [MIT](../ext_components/Spdlog/LICENSE); bundled fmt notice also retained |
 | eventpp | cp0_lvgl and APPLaunch requirements; SDK eventpp component | [Apache-2.0](../LICENSES/eventpp-Apache-2.0.txt) |
 | fmt | `SDK/components/utilities/SConstruct`, `party/fmt` | [MIT with optional compiled-object exception](../LICENSES/fmt-MIT.txt) |
 | nlohmann/json 3.11.3 | `projects/CardputerZero-Emulator/vendor/nlohmann/json.hpp` | [MIT](../LICENSES/nlohmann-json-MIT.txt), Niels Lohmann; original SPDX preserved |

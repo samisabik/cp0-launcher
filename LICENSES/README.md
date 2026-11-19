@@ -18,8 +18,7 @@ selection inventory is in [OPEN_SOURCE_COMPONENTS.md](../docs/OPEN_SOURCE_COMPON
 | nlohmann-json-MIT.txt | Standard MIT text with 2013–2023 Niels Lohmann attribution from the emulator's vendor/nlohmann/json.hpp |
 | GPL-2.0.txt, LGPL-2.0.txt, LGPL-2.1.txt | Full standard texts from /usr/share/common-licenses/GPL-2, LGPL-2 and LGPL-2.1 |
 
-Wrapper-local LICENSE files for Sigslot, SmoothUI and Spdlog were
-copied from their corresponding SDK/github_source trees. Miniaudio/LICENSE
+Miniaudio/LICENSE
 is the complete dual-license block extracted from its single header.
 APPLaunch's local LVGL directory contains copies of the LVGL and FreeType
 notices.

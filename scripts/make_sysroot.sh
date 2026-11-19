@@ -21,7 +21,7 @@ HOST=${1:-cp0}
 REPO=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${2:-$REPO/sysroot}
 
-# Headers the APPLaunch and LaunchWizard cross builds include or link against.
+# Headers the APPLaunch cross build includes or links against.
 PACKAGES="libc6-dev linux-libc-dev libcrypt-dev libglib2.0-dev libdbus-1-dev libinput-dev
 libxkbcommon-dev libudev-dev libfreetype-dev libpng-dev zlib1g-dev"
 
