@@ -7,7 +7,6 @@ menu "APPLaunch"
 config APPLAUNCH_CROSS
     bool "cross compile"
     default y if APPLAUNCH_LINUX_X86_CROSS_CP0
-    default y if APPLAUNCH_WIN_X86_CROSS_CP0
     default y if APPLAUNCH_MAC_CROSS_CP0
 
 choice APPLAUNCH_BUILD_TARGET
@@ -19,12 +18,6 @@ config APPLAUNCH_LINUX_X86_SDL2
 
 config APPLAUNCH_LINUX_X86_CROSS_CP0
     bool "Linux x86 cross CP0"
-
-config APPLAUNCH_WIN_X86_SDL2
-    bool "Windows x86 SDL2"
-
-config APPLAUNCH_WIN_X86_CROSS_CP0
-    bool "Windows x86 cross CP0"
 
 config APPLAUNCH_LINUX_CP0
     bool "Linux CP0"
@@ -41,7 +34,7 @@ endchoice
 # disabled for SDL targets so host storage is never exposed as product media.
 config APPLAUNCH_TARGET_SD_MMC_STORAGE
     bool
-    depends on APPLAUNCH_LINUX_CP0 || APPLAUNCH_LINUX_X86_CROSS_CP0 || APPLAUNCH_MAC_CROSS_CP0 || APPLAUNCH_WIN_X86_CROSS_CP0
+    depends on APPLAUNCH_LINUX_CP0 || APPLAUNCH_LINUX_X86_CROSS_CP0 || APPLAUNCH_MAC_CROSS_CP0
     default y
 
 endmenu

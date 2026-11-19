@@ -139,10 +139,9 @@ if 'CONFIG_APPLAUNCH_CROSS' in os.environ:
     LDFLAGS += [rootfs_path/"usr"/"lib"/"aarch64-linux-gnu"/"libstdc++.so.6"]
 
 
-# Host SDL2 builds (Linux x86_64 and Windows x86) need pkg-config flags
-# for the APPLaunch sources and for LVGL's SDL/FreeType features.
-if ('CONFIG_APPLAUNCH_LINUX_X86_SDL2' in os.environ or
-        'CONFIG_APPLAUNCH_WIN_X86_SDL2' in os.environ):
+# Host SDL2 builds need pkg-config flags for the APPLaunch sources and for
+# LVGL's SDL/FreeType features.
+if 'CONFIG_APPLAUNCH_LINUX_X86_SDL2' in os.environ:
     lvgl_component['DEFINITIONS'] += pkg_config_cflags("freetype2")
     lvgl_component['REQUIREMENTS'] += pkg_config_ldflags("freetype2")
     DEFINITIONS += pkg_config_cflags("sdl2")
@@ -180,16 +179,6 @@ if 'CONFIG_APPLAUNCH_DARWIN_SDL' in os.environ:
 #     # FreeType
 #     lvgl_component['DEFINITIONS'] += pkg_config_cflags("freetype2")
 #     REQUIREMENTS += pkg_config_ldflags("freetype2")
-
-if 'CONFIG_APPLAUNCH_WIN_X86_CROSS_CP0' in os.environ:
-    rootfs_lib_path = rootfs_path/"lib"/"aarch64-linux-gnu"
-    rootfs_usr_lib_path = rootfs_path/"usr"/"lib"/"aarch64-linux-gnu"
-
-    LDFLAGS += [rootfs_usr_lib_path/'libstdc++.so.6',
-                f'-Wl,-rpath-link,{rootfs_lib_path}',
-                f'-Wl,-rpath-link,{rootfs_usr_lib_path}',
-                f'-B{rootfs_usr_lib_path}']
-    DEFINITIONS += ['-Wno-format-truncation']
 
 # Stage the complete resource tree for the package.
 _static_source = os.path.abspath('../APPLaunch')
