@@ -131,7 +131,7 @@ public:
                 continue;
             out[count++] = entry->value;
         }
-        cp0_zmq_logf("bt", "cache list connected_only=%d count=%d cached_devices=%zu",
+        cp0_logf("bt", "cache list connected_only=%d count=%d cached_devices=%zu",
                      connected_only ? 1 : 0, count, snapshot_.devices.size());
         return count;
     }
@@ -157,7 +157,7 @@ public:
                 completion(-1, "out of memory");
             return;
         }
-        cp0_zmq_logf("bt", "command queued kind=%s value=%s", request->kind.c_str(), request->value.c_str());
+        cp0_logf("bt", "command queued kind=%s value=%s", request->kind.c_str(), request->value.c_str());
         request->generation = command_generation_.load();
         if (!invoke([request](BluezWorker *self) {
             self->execute(request);
@@ -322,7 +322,7 @@ private:
 
     void run()
     {
-        cp0_zmq_log("bt", "worker starting");
+        cp0_log("bt", "worker starting");
         instance_slot() = this;
         GMainContext *context = g_main_context_new();
         GMainLoop *loop = g_main_loop_new(context, FALSE);
@@ -340,10 +340,10 @@ private:
         } else {
             connection_ = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
             if (!connection_) {
-                cp0_zmq_logf("bt", "system bus connection failed: %s", error ? error->message : "unknown");
+                cp0_logf("bt", "system bus connection failed: %s", error ? error->message : "unknown");
                 g_clear_error(&error);
             } else {
-                cp0_zmq_log("bt", "system bus connected");
+                cp0_log("bt", "system bus connected");
                 bluez_owner_watch_id_ = g_dbus_connection_signal_subscribe(
                     connection_, "org.freedesktop.DBus", "org.freedesktop.DBus",
                     "NameOwnerChanged", "/org/freedesktop/DBus", kBluez,
@@ -380,7 +380,7 @@ private:
         }
         lifecycle_cv_.notify_all();
         instance_slot() = nullptr;
-        cp0_zmq_log("bt", "worker stopped");
+        cp0_log("bt", "worker stopped");
     }
 
     bool setup_manager()
@@ -393,19 +393,19 @@ private:
             connection_, G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE, kBluez, "/", nullptr,
             nullptr, nullptr, nullptr, &error));
         if (!manager_) {
-            cp0_zmq_logf("bt", "bluez object manager failed: %s", error ? error->message : "unknown");
+            cp0_logf("bt", "bluez object manager failed: %s", error ? error->message : "unknown");
             g_clear_error(&error);
             return false;
         }
 
-        cp0_zmq_log("bt", "bluez object manager ready");
+        cp0_log("bt", "bluez object manager ready");
         g_signal_connect(manager_, "interface-added", G_CALLBACK(object_added), this);
         g_signal_connect(manager_, "interface-removed", G_CALLBACK(object_removed), this);
         g_signal_connect(manager_, "object-added", G_CALLBACK(object_object_added), this);
         g_signal_connect(manager_, "object-removed", G_CALLBACK(object_object_removed), this);
         sync_objects();
         register_agent();
-        cp0_zmq_logf("bt", "initial cache adapter=%s devices=%zu",
+        cp0_logf("bt", "initial cache adapter=%s devices=%zu",
                      snapshot_.adapter_path.c_str(), snapshot_.devices.size());
         return true;
     }
@@ -696,7 +696,7 @@ private:
 
     void execute(CommandRequest *request)
     {
-        cp0_zmq_logf("bt", "command execute kind=%s value=%s adapter=%s",
+        cp0_logf("bt", "command execute kind=%s value=%s adapter=%s",
                      request->kind.c_str(), request->value.c_str(), snapshot_.adapter_path.c_str());
         if (request->generation != command_generation_.load()) {
             finish(request, -1, "bluetooth request canceled by reset");
@@ -721,10 +721,10 @@ private:
         } else if (request->kind == "discoverable") {
             set_property("Discoverable", g_variant_new_boolean(request->value == "1"), request);
         } else if (request->kind == "start") {
-            cp0_zmq_log("bt", "StartDiscovery call");
+            cp0_log("bt", "StartDiscovery call");
             call_proxy(snapshot_.adapter, "StartDiscovery", nullptr, request);
         } else if (request->kind == "stop") {
-            cp0_zmq_log("bt", "StopDiscovery call");
+            cp0_log("bt", "StopDiscovery call");
             call_proxy(snapshot_.adapter, "StopDiscovery", nullptr, request);
         } else {
             std::string path;
@@ -792,7 +792,7 @@ private:
         // Cancel agent invocations without triggering RemoveDevice cleanup.
         cancel_agent_requests("bluetooth reset", false);
         pairing_device_path_.clear();
-        cp0_zmq_log("bt", "reset: canceled previous transactions");
+        cp0_log("bt", "reset: canceled previous transactions");
         if (!connection_ || !snapshot_.adapter) {
             resetting_ = false;
             finish(request, -1, "Bluetooth adapter unavailable.");
@@ -811,7 +811,7 @@ private:
             },
             [this, request](int code, std::string message) {
                 resetting_ = false;
-                cp0_zmq_logf("bt", "reset complete code=%d message=%s", code, message.c_str());
+                cp0_logf("bt", "reset complete code=%d message=%s", code, message.c_str());
                 finish(request, code, message.empty() ? "ok" : message.c_str());
             });
     }
@@ -912,7 +912,7 @@ private:
             }
         }
 
-        cp0_zmq_logf("bt", "command complete kind=%s code=%d message=%s",
+        cp0_logf("bt", "command complete kind=%s code=%d message=%s",
                      request->kind.c_str(), code, message.c_str());
         if (request->kind == "pair") {
             if (auto *self = instance()) {
@@ -955,7 +955,7 @@ private:
         agent_registration_id_ = g_dbus_connection_register_object(
             connection_, kAgentPath, const_cast<GDBusInterfaceInfo *>(agent_info()), &agent_vtable(), this, nullptr, &error);
         if (!agent_registration_id_) {
-            cp0_zmq_logf("bt", "agent registration failed: %s", error ? error->message : "unknown");
+            cp0_logf("bt", "agent registration failed: %s", error ? error->message : "unknown");
             g_clear_error(&error);
             return;
         }
@@ -965,7 +965,7 @@ private:
             g_variant_new("(os)", kAgentPath, "KeyboardDisplay"),
             nullptr, G_DBUS_CALL_FLAGS_NONE, kCallTimeoutMs, nullptr, &error);
         if (!reply) {
-            cp0_zmq_logf("bt", "RegisterAgent failed: %s", error ? error->message : "unknown");
+            cp0_logf("bt", "RegisterAgent failed: %s", error ? error->message : "unknown");
             g_clear_error(&error);
             g_dbus_connection_unregister_object(connection_, agent_registration_id_);
             agent_registration_id_ = 0;
@@ -978,7 +978,7 @@ private:
             g_variant_new("(o)", kAgentPath), nullptr, G_DBUS_CALL_FLAGS_NONE,
             kCallTimeoutMs, nullptr, &error);
         if (!reply) {
-            cp0_zmq_logf("bt", "RequestDefaultAgent failed: %s", error ? error->message : "unknown");
+            cp0_logf("bt", "RequestDefaultAgent failed: %s", error ? error->message : "unknown");
             g_clear_error(&error);
             g_dbus_connection_call_sync(
                 connection_, kBluez, "/org/bluez", kAgentManager, "UnregisterAgent",
@@ -1010,7 +1010,7 @@ private:
                 g_variant_new("(o)", kAgentPath), nullptr, G_DBUS_CALL_FLAGS_NONE,
                 kCallTimeoutMs, nullptr, &error);
             if (!reply) {
-                cp0_zmq_logf("bt", "UnregisterAgent failed: %s",
+                cp0_logf("bt", "UnregisterAgent failed: %s",
                              error ? error->message : "unknown");
             } else {
                 g_variant_unref(reply);
@@ -1171,7 +1171,7 @@ private:
             remove_device(path, reason, force);
             return;
         }
-        cp0_zmq_logf("bt", "canceling pairing before device removal path=%s reason=%s",
+        cp0_logf("bt", "canceling pairing before device removal path=%s reason=%s",
                      path.c_str(), cleanup->reason.c_str());
         g_dbus_connection_call(
             connection_, kBluez, path.c_str(), kDevice, "CancelPairing", nullptr,
@@ -1185,7 +1185,7 @@ private:
                 if (error) {
                     // DoesNotExist/NotConnected is expected when BlueZ has
                     // already unwound the transaction; removal is still safe.
-                    cp0_zmq_logf("bt", "CancelPairing during cleanup: %s",
+                    cp0_logf("bt", "CancelPairing during cleanup: %s",
                                  error->message ? error->message : "unknown");
                 }
                 if (reply) g_variant_unref(reply);
@@ -1212,7 +1212,7 @@ private:
                 return;
         }
 
-        cp0_zmq_logf("bt", "removing unpaired device path=%s reason=%s",
+        cp0_logf("bt", "removing unpaired device path=%s reason=%s",
                      path.c_str(), reason ? reason : "unknown");
         g_dbus_connection_call(connection_, kBluez, snapshot_.adapter_path.c_str(), kAdapter,
                                 "RemoveDevice", g_variant_new("(o)", path.c_str()),

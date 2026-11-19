@@ -51,8 +51,7 @@ void test_feature_order()
     assert(position(plan, CP0_INIT_STEP_EVENT) < position(plan, CP0_INIT_STEP_FILESYSTEM));
     assert(position(plan, CP0_INIT_STEP_PTY) < position(plan, CP0_INIT_STEP_DISPLAY));
     assert(position(plan, CP0_INIT_STEP_DISPLAY) < position(plan, CP0_INIT_STEP_INPUT));
-    assert(position(plan, CP0_INIT_STEP_INPUT) < position(plan, CP0_INIT_STEP_RPC));
-    assert(position(plan, CP0_INIT_STEP_RPC) < position(plan, CP0_INIT_STEP_AUDIO));
+    assert(position(plan, CP0_INIT_STEP_INPUT) < position(plan, CP0_INIT_STEP_AUDIO));
     assert(position(plan, CP0_INIT_STEP_SCREENSHOT) < position(plan, CP0_INIT_STEP_WIFI));
     assert(position(plan, CP0_INIT_STEP_BQ27220) < position(plan, CP0_INIT_STEP_SAVED_SETTINGS));
     assert(position(plan, CP0_INIT_STEP_BATTERY) < position(plan, CP0_INIT_STEP_SOUNDCARD));

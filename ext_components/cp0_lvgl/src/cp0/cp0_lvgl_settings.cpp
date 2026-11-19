@@ -466,7 +466,7 @@ private:
 
     void settings_log(const char *topic, const char *message)
     {
-        cp0_zmq_log(topic && topic[0] ? topic : "settings", message ? message : "");
+        cp0_log(topic && topic[0] ? topic : "settings", message ? message : "");
     }
 
     void time_str(char *buf, int buf_size) { fallback_time_str(buf, buf_size); }
@@ -476,8 +476,7 @@ private:
 
 extern "C" void init_settings(void)
 {
-    cp0_zmq_log_init();
-    cp0_zmq_log("settings", "init_settings");
+    cp0_log("settings", "init_settings");
     auto settings = std::make_shared<SettingsSystem>();
     static cp0::SignalRegistration<decltype(cp0_signal_settings_api)> registration;
     registration.replace(cp0_signal_settings_api,

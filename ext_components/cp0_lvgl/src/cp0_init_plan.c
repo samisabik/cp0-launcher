@@ -26,7 +26,6 @@ size_t cp0_build_init_plan(uint64_t features, cp0_init_step_t *steps, size_t cap
         {CP0_INIT_FEATURE_PTY, CP0_INIT_STEP_PTY},
     };
     static const optional_step_t after_input[] = {
-        {CP0_INIT_FEATURE_RPC, CP0_INIT_STEP_RPC},
         {CP0_INIT_FEATURE_AUDIO, CP0_INIT_STEP_AUDIO},
         {CP0_INIT_FEATURE_PROCESS, CP0_INIT_STEP_PROCESS},
         {CP0_INIT_FEATURE_SUDO, CP0_INIT_STEP_SUDO},

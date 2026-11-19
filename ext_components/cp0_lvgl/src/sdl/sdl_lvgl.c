@@ -144,7 +144,6 @@ static int run_init_step(cp0_init_step_t step)
         init_soundcard();
 #endif
         break;
-    case CP0_INIT_STEP_RPC:
     case CP0_INIT_STEP_BLUETOOTH:
         break;
     }

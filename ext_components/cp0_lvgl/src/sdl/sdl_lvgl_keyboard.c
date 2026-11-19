@@ -390,40 +390,6 @@ static void cp0_sdl_enqueue_key(const struct key_item *event)
     (void)cp0_keyboard_queue_push(event);
 }
 
-int cp0_keyboard_inject(uint32_t key_code, int key_state, uint32_t mods)
-{
-    if (key_state != KBD_KEY_RELEASED && key_state != KBD_KEY_PRESSED &&
-        key_state != KBD_KEY_REPEATED)
-        return -1;
-    struct key_item item = {0};
-    item.key_code = key_code;
-    item.key_state = key_state;
-    item.mods = mods;
-    item.input_context = cp0_keyboard_get_input_context();
-    item.semantic_key = cp0_keyboard_semantic_key(key_code, item.input_context);
-    const char *control = cp0_keyboard_control_utf8(key_code);
-    if (control) snprintf(item.utf8, sizeof(item.utf8), "%s", control);
-    snprintf(item.sym_name, sizeof(item.sym_name), "RPC_%u", key_code);
-    return cp0_keyboard_queue_push(&item);
-}
-
-int cp0_keyboard_inject_text(const char *utf8)
-{
-    if (!utf8 || cp0_keyboard_utf8_validate(utf8) != 0) return -1;
-    const char *cursor = utf8;
-    while (*cursor) {
-        struct key_item item = {0};
-        size_t length = 0;
-        if (cp0_keyboard_utf8_decode_one(cursor, &item.codepoint, &length) != 0) return -1;
-        item.key_state = KBD_KEY_RELEASED;
-        memcpy(item.utf8, cursor, length);
-        snprintf(item.sym_name, sizeof(item.sym_name), "RPC_TEXT");
-        if (cp0_keyboard_queue_push(&item) != 0) return -1;
-        cursor += length;
-    }
-    return 0;
-}
-
 static void cp0_sdl_fill_key_meta(cp0_sdl_keyboard_t *kbd, const SDL_KeyboardEvent *event)
 {
     SDL_Keycode sym = event->keysym.sym;

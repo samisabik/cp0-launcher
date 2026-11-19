@@ -20,9 +20,8 @@ int main()
         [&] { order.push_back(4); },
         [&] { order.push_back(5); },
         [&] { order.push_back(6); },
-        [&] { order.push_back(7); },
-        [&] { order.push_back(8); });
-    assert((order == std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8}));
+        [&] { order.push_back(7); });
+    assert((order == std::vector<int>{1, 2, 3, 4, 5, 6, 7}));
 
     order.clear();
     cp0::runner::shutdown_services(
@@ -32,28 +31,24 @@ int main()
         },
         [&] {
             order.push_back(2);
-            throw std::runtime_error("rpc shutdown");
-        },
-        [&] {
-            order.push_back(3);
             throw std::runtime_error("audio shutdown");
         },
         [&] {
-            order.push_back(4);
+            order.push_back(3);
             throw std::runtime_error("pty shutdown");
         },
         [&] {
-            order.push_back(5);
+            order.push_back(4);
             throw std::runtime_error("input shutdown");
         },
         [&] {
-            order.push_back(6);
+            order.push_back(5);
             throw std::runtime_error("wifi shutdown");
         },
         [&] {
-            order.push_back(7);
+            order.push_back(6);
             throw std::runtime_error("battery shutdown");
         },
-        [&] { order.push_back(8); });
-    assert((order == std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8}));
+        [&] { order.push_back(7); });
+    assert((order == std::vector<int>{1, 2, 3, 4, 5, 6, 7}));
 }

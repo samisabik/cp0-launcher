@@ -8,14 +8,6 @@ menuconfig CP0_LVGL_COMPONENT_ENABLED
 
 if CP0_LVGL_COMPONENT_ENABLED
 
-config CP0_LVGL_USE_ZMQ_LOG
-    bool "Enable cp0 lvgl zmq log publisher"
-    default n
-
-config CP0_LVGL_USE_ZMQ_RPC
-    bool "Enable cp0 lvgl local ZMQ automation RPC"
-    default n
-
 menu "Optional runtime services"
 
 config CP0_LVGL_INIT_FILESYSTEM
@@ -26,9 +18,6 @@ config CP0_LVGL_INIT_CONFIG
     default n
 config CP0_LVGL_INIT_PTY
     bool "Initialize PTY service"
-    default n
-config CP0_LVGL_INIT_RPC
-    bool "Initialize RPC service"
     default n
 config CP0_LVGL_INIT_AUDIO
     bool "Initialize audio service"

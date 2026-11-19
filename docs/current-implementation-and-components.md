@@ -87,8 +87,8 @@ audio, process, sudo, OS information, screenshot, Wi-Fi, Bluetooth,
 settings, BQ27220, saved settings, battery, and sound-card services.
 The SConstruct file maps enabled services to compile definitions and links
 Miniaudio for audio. Native builds additionally use
-DBus/GIO/GLib, NetworkManager, BlueZ, udev, xkbcommon, and optional
-ZeroMQ; SDL builds select the SDL platform sources.
+DBus/GIO/GLib, NetworkManager, BlueZ, udev and xkbcommon; SDL builds
+select the SDL platform sources.
 
 ## Documentation maintenance
 
