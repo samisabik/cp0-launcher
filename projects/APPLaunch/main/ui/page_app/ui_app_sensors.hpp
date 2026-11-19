@@ -5,6 +5,7 @@
 #pragma once
 #include "../launcher_ui_app_page.hpp"
 #include "../model/sensors_model.hpp"
+#include "../spectrum_scanner.hpp"
 #include "cp0_theme.hpp"
 
 #include <array>
@@ -18,9 +19,14 @@
 //  rtl_433 decodes: latest temperature, humidity, battery state, a
 //  temperature sparkline and the time since each was last heard.
 //
+//  Two radios can feed it. The CC1101 on the hat is the default: it receives
+//  OOK only, and each packet it captures is decoded by `rtl_433 -r`. An
+//  RTL-SDR dongle, tuned by rtl_433 itself, also hears FSK sensors.
+//
 //  Keys:
 //    UP / DOWN      select sensor (scrolls)
 //    LEFT / RIGHT   switch between 433.92 and 868.30 MHz
+//    R              switch between the CC1101 and the RTL-SDR
 //    S              append the table to ~/sensors/sensors.log
 //    ESC            home
 // ============================================================
@@ -57,6 +63,14 @@ private:
     long out_offset_ = 0;
     std::string pending_;
     uint32_t last_detect_ = 0;
+
+    sensors::Source source_ = sensors::Source::Cc1101;
+    SpectrumScanner scanner_;
+    bool radio_ok_ = false;
+    std::string radio_error_;
+    uint32_t last_radio_try_ = 0;
+    std::vector<std::string> packets_;
+    std::string ook_path_;
     uint32_t last_render_ = 0;
 
     sensors::Table table_;
@@ -82,6 +96,13 @@ private:
     void stop_receiver();
     bool read_lines();
     void set_frequency(int index);
+    void set_source(sensors::Source source);
+    void start_source();
+    void stop_source();
+    void start_radio();
+    void stop_radio();
+    bool poll_radio();
+    uint32_t frequency_hz() const;
     void save_log();
 
     void draw_sparkline(RowView &row, const sensors::Sensor &sensor, bool focused);

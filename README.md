@@ -8,7 +8,7 @@ and a small set of built-in apps sharing one theme. Forked from
 
 ## Apps
 
-The home screen groups the apps by type, one type per page.
+The home screen lists the app types in a rail on the left and shows the apps of the highlighted type beside it.
 
 | | |
 |---|---|
@@ -31,7 +31,7 @@ The home screen groups the apps by type, one type per page.
 - **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker.
 - **ADSB**: aircraft scope and flight list decoded from `rtl_adsb` on 1090 MHz. Range and bearing use the position in `~/.config/cp0/location` (one line, `lat,lon`).
 - **Sat**: pass predictor and sky plot from Celestrak TLEs, for the ISS and Meteor-M by default and anything named in `~/sat/watch.txt`; records a pass as FM audio with `rtl_fm`. The orbit model is a simplified one, not SGP4.
-- **Sensors**: dashboard of the 433 and 868 MHz temperature and humidity sensors that `rtl_433` decodes.
+- **Sensors**: dashboard of the 433 and 868 MHz temperature and humidity sensors that `rtl_433` decodes. `r` picks the radio: the CC1101 (default, OOK sensors) or an RTL-SDR dongle (also FSK sensors).
 - **Spectrum**: sub-GHz scanner and recorder on the CC1101 radio. RX watches the 315, 433 and 868 MHz bands with per-channel level bars and auto-captures any signal over the trigger to `~/spectrum` as Flipper `.sub` and rtl_433 `.ook` files; TX lists the captures and replays one on its own frequency.
 - **Keys**: looks inside the captures Spectrum saves: waveform, pulse-width decode to bits and hex, replay.
 
@@ -47,7 +47,8 @@ The home screen groups the apps by type, one type per page.
 - **IR**: learns an infrared remote button by button (NEC decode, raw timings otherwise) and replays it; four remotes of eight buttons.
 - **Pins**: I2C bus scanner that only reads and skips addresses a kernel driver owns, and a GPIO logic view with I2C decode.
 - **Tailnet**: Tailscale peers with status, path and ping; `s` opens SSH to a peer, `e` sets an exit node.
-- **Air**: 2.4 and 5 GHz Wi-Fi channel map with a network list, and nearby Bluetooth devices.
+- **Air**: 2.4 and 5 GHz Wi-Fi channel map with a network list, and nearby Bluetooth devices. `w` picks the adapter that scans, so a USB adapter on `wlan1` can scan while `wlan0` stays the system Wi-Fi.
+- **Portal**: brings an open test access point up and down on `wlan1` (hostapd, dnsmasq DHCP with wildcard DNS, and a static "hello" page that exercises captive-portal detection). `wlan0` stays the system Wi-Fi. Shows state and connected-client count; it serves one page (`share/images/portal/index.html`) and logs nothing a client sends. Needs `hostapd`, `dnsmasq` and `iptables`.
 - **Slime**: Physarum slime-mould simulation with six species and eight colour palettes, seven of them from the PHOSPHN Game Boy Advance ROM.
 
 | | |

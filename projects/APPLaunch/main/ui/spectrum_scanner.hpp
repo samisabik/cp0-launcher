@@ -146,6 +146,14 @@ public:
     void adjust_threshold(int delta_db);
     CaptureStatus capture_status();
 
+    // Listening holds a capture open on one frequency without writing files
+    // to ~/spectrum; each packet is queued as rtl_433 pulse text instead.
+    // 0 stops it. A capture that cannot be opened clears the request and
+    // posts a message.
+    void listen(uint32_t hz) { listen_hz_.store(hz); }
+    bool listening() const { return listen_hz_.load() != 0; }
+    std::vector<std::string> take_listen_packets();
+
     // Steps the capture receive filter 162 -> 325 -> 650 kHz and re-measures
     // the noise floors. Takes effect on the next capture, not one in progress.
     void cycle_capture_bandwidth();
@@ -211,6 +219,10 @@ private:
     int64_t rate_window_ns_ = 0;
     int rate_passes_ = 0;
     std::string capture_stem_;
+    std::atomic<uint32_t> listen_hz_{0};
+    uint32_t listen_active_hz_ = 0;
+    std::vector<std::string> listen_packets_;
+    void handle_listen();
     void measure_capture_floors();
     void finder_step();
     void check_auto_session();
@@ -218,7 +230,7 @@ private:
     void handle_capture_request();
     // A threshold above kMinDbm skips the noise-floor sampling, so an
     // automatic capture starts listening at once.
-    bool open_capture(uint32_t hz, int threshold_dbm = spectrum::kMinDbm);
+    bool open_capture(uint32_t hz, int threshold_dbm = spectrum::kMinDbm, bool save = true);
     void close_capture(bool report);
     void capture_step();
     void finish_packet(int64_t now_ns);

@@ -186,6 +186,11 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -o "$build_dir/test_sensors_model"
 "$build_dir/test_sensors_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_portal_model.cpp" \
+    "$test_root/../main/ui/model/portal_model.cpp" \
+    -o "$build_dir/test_portal_model"
+"$build_dir/test_portal_model"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_keys_model.cpp" \
     "$test_root/../main/ui/model/keys_model.cpp" \
     -o "$build_dir/test_keys_model"

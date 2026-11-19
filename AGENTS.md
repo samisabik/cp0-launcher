@@ -226,7 +226,8 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Terminal rendering / escape sequences | `main/ui/page_app/ui_app_st_parser.cpp`, `ui_app_st_renderer.cpp` | parsing and rendering are separated |
 | Terminal key encoding | `main/ui/model/st_key_encoder.cpp` + `tests/test_st_key_encoder.cpp` | — |
 | CLI / Python help overlay text | `main/ui/cli_terminal_help.cpp`, `python_terminal_help.cpp` | static text only |
-| Home grid layout, icons and selection | `main/ui/ui_launch_page.cpp` | `create_grid`, `fill_page`, `apply_selection`, `move_selection` (4x2 tiles per page, no animation) |
+| Home grid layout, icons and selection | `main/ui/ui_launch_page.cpp` | `create_grid`, `rebuild_groups`, `fill_page`, `apply_selection`, `apply_rail`, `move_selection` (type rail plus 3x2 tiles, no animation) |
+| Home app types and their order | `main/ui/app_display_order.cpp` | `kHomeOrder`, `launcher_home_category` |
 | Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white Pixelarticons, recoloured at runtime; slugs listed in `kKnown` |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
 | Boot logo / GIF | `main/ui/launcher_ui_runtime.cpp` + `ui_launch_page.cpp` | `start_startup_gif` |

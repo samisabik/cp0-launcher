@@ -172,6 +172,10 @@ static void test_format()
     assert(format_log_line(other.sensors()[0], "") == "LaCrosse-TX141Bv3 id 7 ch 2 -2.4C");
 
     assert(command(433920000u, "/run/x") == "( rtl_433 -f 433920000 -F json 2>/dev/null; echo '#exit' ) >> '/run/x'");
+    assert(decode_command("/run/p.ook", "/run/x") ==
+           "( rtl_433 -r '/run/p.ook' -F json 2>/dev/null; echo '#exit' ) >> '/run/x'");
+    assert(std::string(source_name(Source::Cc1101)) == "cc1101");
+    assert(std::string(source_name(Source::Sdr)) == "sdr");
     // The exit marker is not mistaken for a reading.
     assert(!parse_line(kExitMark).valid);
 }

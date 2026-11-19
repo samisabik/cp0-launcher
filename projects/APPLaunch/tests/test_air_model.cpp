@@ -75,6 +75,13 @@ void test_parse_nmcli()
     assert(parse_nmcli("").empty());
     assert(parse_nmcli("Error: NetworkManager is not running.\n").empty());
     assert(scan_cmd() == "nmcli -t -f SSID,CHAN,SIGNAL,SECURITY device wifi list --rescan auto");
+    assert(scan_cmd("wlan1") == "nmcli -t -f SSID,CHAN,SIGNAL,SECURITY device wifi list ifname wlan1 --rescan auto");
+    assert(scan_cmd("wlan1; reboot") == scan_cmd());
+    assert(next_interface({}, "wlan0").empty());
+    assert(next_interface({"wlan0"}, "wlan0") == "wlan0");
+    assert(next_interface({"wlan0", "wlan1"}, "wlan0") == "wlan1");
+    assert(next_interface({"wlan0", "wlan1"}, "wlan1") == "wlan0");
+    assert(next_interface({"wlan0", "wlan1"}, "wlan7") == "wlan0");
 }
 
 void test_security_label()

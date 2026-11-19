@@ -95,4 +95,14 @@ inline constexpr const char *kExitMark = "#exit";
 // followed by kExitMark once the tool has exited.
 std::string command(uint32_t hz, const std::string &outpath);
 
+// The radio a reading comes from: the CC1101 on the hat, whose captured
+// packets rtl_433 decodes from a pulse file, or an RTL-SDR dongle that
+// rtl_433 tunes itself.
+enum class Source { Cc1101 = 0, Sdr = 1 };
+// "cc1101" or "sdr"
+const char *source_name(Source source);
+// rtl_433 command line that decodes a pulse file (.ook) of captured packets:
+// JSON lines appended to outpath, followed by kExitMark.
+std::string decode_command(const std::string &inpath, const std::string &outpath);
+
 } // namespace sensors

@@ -305,7 +305,7 @@ std::vector<std::string> settings_system_lines()
     if (const passwd *user = getpwuid(getuid())) lines.push_back(std::string("user       ") + user->pw_name);
     const std::string model = read_first_line("/proc/device-tree/model");
     if (!model.empty()) lines.push_back("board      " + model);
-    for (const char *name : {"wlan0", "eth0", "tailscale0"}) {
+    for (const char *name : {"wlan0", "wlan1", "eth0", "tailscale0"}) {
         const std::string ip = interface_ipv4(name);
         if (ip.empty()) continue;
         std::string label = name;

@@ -32,7 +32,12 @@ std::vector<std::string> split_nmcli_line(const std::string &line);
 // Output of `nmcli -t -f SSID,CHAN,SIGNAL,SECURITY device wifi list`.
 // Lines without four fields or without a usable channel are skipped.
 std::vector<Network> parse_nmcli(const std::string &output);
-std::string scan_cmd();
+// With an interface name the scan uses that adapter only; without one nmcli
+// lists what every Wi-Fi adapter sees, so a network shows once per adapter.
+std::string scan_cmd(const std::string &ifname = {});
+// The adapter after `current` in `interfaces`, wrapping; the first one when
+// `current` is not listed, and empty when there are none.
+std::string next_interface(const std::vector<std::string> &interfaces, const std::string &current);
 
 // "WPA2 WPA3" -> "wpa3", "WPA1 WPA2" -> "wpa2", "" or "--" -> "open".
 std::string security_label(const std::string &nmcli_security);
