@@ -4,7 +4,7 @@ run-name: Publish APPLauncher ${{ inputs.version }}
 
 # Reviewed release gate. Merges only build artifacts (launcher-build.yml); this
 # workflow is the single path that publishes a GitHub Release, and it can only be
-# started by hand, on master, after the change has been reviewed and merged.
+# started by hand, on main, after the change has been reviewed and merged.
 #
 # The publish job in launcher-build.yml runs in the `release` environment. Add
 # required reviewers to that environment in the repository settings to make it
@@ -36,20 +36,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-    - name: Require master and explicit confirmation
+    - name: Require main and explicit confirmation
       env:
         CONFIRM: ${{ inputs.confirm }}
       run: |
         set -euo pipefail
-        if [ "${GITHUB_REF}" != "refs/heads/master" ]; then
-          echo "::error::This workflow must be dispatched on master; got ${GITHUB_REF}." >&2
+        if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+          echo "::error::This workflow must be dispatched on main; got ${GITHUB_REF}." >&2
           exit 1
         fi
         if [ "${CONFIRM}" != "true" ]; then
           echo "::error::Tick the confirm input after reviewing the merged change." >&2
           exit 1
         fi
-        echo "Publishing ${GITHUB_SHA} from master"
+        echo "Publishing ${GITHUB_SHA} from main"
 
   release:
     name: Build and publish release
