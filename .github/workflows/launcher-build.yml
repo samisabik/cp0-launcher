@@ -13,6 +13,8 @@ on:
       - 'scripts/build_cardputerzero_release_local.sh'
       - 'scripts/cardputer_adb_hotplug.c'
       - 'scripts/debian_packager.py'
+      - 'scripts/device_install.sh'
+      - 'scripts/package_release.sh'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -208,6 +210,11 @@ jobs:
         export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
         scons -j$(nproc)
 
+    # The published asset. Packed here, from the APPLaunch build alone, so it
+    # matches what scripts/package_release.sh produces after a local build.
+    - name: Package release tarball
+      run: sh scripts/package_release.sh "$GITHUB_WORKSPACE/release"
+
     - name: Build LaunchWizard (cross-compile aarch64)
       run: |
         cd projects/LaunchWizard
@@ -236,6 +243,7 @@ jobs:
         mkdir -p artifacts
         cp projects/APPLaunch/dist/M5CardputerZero-APPLaunch artifacts/
         cp projects/APPLaunch/tools/*.deb artifacts/
+        cp release/cp0-launcher-arm64.tar.gz artifacts/
         package="$(find projects/APPLaunch/tools -maxdepth 1 -type f -name 'applaunch_*_arm64.deb' -print)"
         test "$(printf '%s\n' "${package}" | sed '/^$/d' | wc -l)" -eq 1
         package_version="$(dpkg-deb -f "${package}" Version)"
@@ -374,6 +382,6 @@ jobs:
         generate_release_notes: true
         fail_on_unmatched_files: true
         overwrite_files: true
-        files: |
-          artifacts/*.deb
-          artifacts/M5CardputerZero-APPLaunch
+        # The README installs from releases/latest/download/ by this name.
+        # The .deb stays a CI artifact: install.sh holds the applaunch package.
+        files: artifacts/cp0-launcher-arm64.tar.gz
