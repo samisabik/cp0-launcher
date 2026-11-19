@@ -8,8 +8,6 @@
 
 #include "../assets/cp0_status_time_background.inc"
 #include "../assets/cp0_status_battery_background.inc"
-#include "../assets/setting_cross.inc"
-#include "../assets/setting_ok.inc"
 #include "../assets/settings_icon_screen.inc"
 #include "../assets/settings_icon_sound.inc"
 #include "../assets/settings_icon_wifi.inc"
