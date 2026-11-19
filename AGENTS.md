@@ -45,7 +45,7 @@ Related files (all worth a quick scan):
 ```
 launcher/
 ├── AGENTS.md                  # ← this file
-├── README{,_ZH,_JA}.md        # trilingual READMEs: deps / build / run / packaging
+├── README.md                  # apps, install, build, tests
 ├── SDK/                       # [submodule] M5Stack_Linux_Libs: component libs + SCons toolchain + 3rd-party source cache
 ├── ext_components/            # vendored external components (cp0_lvgl is the core platform layer)
 │   ├── cp0_lvgl/              #   ★ platform adapter: LVGL runner, AppPage bases, cp0_signal_* service bus
@@ -61,7 +61,7 @@ launcher/
 │   │   └── dist/ build/       #   artifacts (git-ignored, wholly replaced on every build)
 │   ├── LaunchWizard/          # OOBE first-boot wizard (SCons for the GUI + CMake for pure-logic tests)
 │   ├── CardputerZero-Emulator/ # desktop/web device emulator (**CMake**, reuses APPLaunch/main at source level)
-├── docs/                      # three parallel 13-part launcher guides (zh/en/ja) + topical docs (see §11)
+├── docs/                      # topical docs (see §11)
 ├── scripts/                   # packaging / release / RPC / logging / hotplug scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
 ├── .github/workflows/         # CI: launcher-build.yml / launcher-release.yml / emulator-build.yml
@@ -230,7 +230,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | CLI / Python help overlay text | `main/ui/cli_terminal_help.cpp`, `python_terminal_help.cpp` | static text only |
 | Home grid layout, icons and selection | `main/ui/ui_launch_page.cpp` | `create_grid`, `rebuild_groups`, `fill_page`, `apply_selection`, `apply_rail`, `move_selection` (type rail plus 3x2 tiles, no animation) |
 | Home app types and their order | `main/ui/app_display_order.cpp` | `kHomeOrder`, `launcher_home_category` |
-| Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white Pixelarticons, recoloured at runtime; slugs listed in `kKnown` |
+| Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white alpha masks, recoloured at runtime; slugs listed in `kKnown`; sources and licences in the `*-LICENSE.txt` / `*-NOTICE.txt` files beside them |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
 | Boot logo / GIF | `main/ui/launcher_ui_runtime.cpp` + `ui_launch_page.cpp` | `start_startup_gif` |
 | Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `kIconSize`, `rebuild`, `find` |
@@ -404,59 +404,18 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 
 | Location | Problem |
 | --- | --- |
-| `docs/launcher工程详细说明/12-*` and the en/ja versions | The `BUILTIN_APPS[]` sample is outdated (actual: Settings/CLI/Python/SSH/IP Panel/Spectrum/Rec); the referenced `ui_app_setup.hpp`, `main/ui/ui_app_page.hpp`, and old `page_app.h` paths do not exist |
-| Several guides | Hardcoded absolute paths such as `/home/nihao/w2T/...` and `/home/pi/launcher` |
-| `docs/.../08-build-and-compilation-guide.md` | Still says `static_lib_v0.0.6` (actual: `v0.0.7`); some FLAGS descriptions do not match the real `config_tmp.mk` |
-| `docs/.../09-packaging-deployment-and-systemd.md` | Claims packaging prefers the source tree (it actually uses `dist/APPLaunch`) |
-| `docs/launcher-project-guide-ja/` parts 02/04/05/12 | **Pre-refactor versions** (they reference `ui_init()`, `LauncherFonts`, `make_photo`, etc., which no longer exist) — do not use them as implementation references |
-| `docs/current-implementation-and-components.md` | The `source-audit/README.md` link is broken |
-| `docs/settings_ui_integration_task_assignment.md` | Outdated historical task sheet (references the deleted `docs/settings_ui_tasks/` and `projects/ui_test`) → **do not link to it** |
 | `projects/APPLaunch/AGENTS.md` | Its `bbear` command cannot run on this machine |
 
 ---
 
 ## 11. Documentation Map
 
-`docs/` contains **three parallel 13-part sets (zh/en/ja)** whose numbering maps 1:1.
-⚠️ **The Chinese set uses Chinese filenames; the English and Japanese sets use English filenames** (they are not identically named):
-
-| No. | Chinese file (`docs/launcher工程详细说明/`) | EN/JA file (`docs/launcher-project-guide{,-ja}/`) | Topic |
-| --- | --- | --- | --- |
-| 00 | `00-总览与阅读路线.md` | `00-overview-and-reading-path.md` | Positioning, reading order, terminology |
-| 01 | `01-工程目录与模块职责.md` | `01-project-layout-and-module-responsibilities.md` | Directories, module dependencies, code style |
-| 02 | `02-运行框架与启动流程.md` | `02-runtime-framework-and-boot-flow.md` | `main()` → `cp0_lvgl_run()` → first frame |
-| 03 | `03-UI框架与首页轮播.md` | `03-ui-framework-and-home-carousel.md` | `UILaunchPage`, slots, switching/recentering |
-| 04 | `04-应用模型与启动机制.md` | `04-application-model-and-launch-mechanism.md` | `app` model, launch paths, `.desktop` |
-| 05 | `05-内置页面框架.md` | `05-built-in-page-framework.md` | `AppPage`, lifecycle, adding a page |
-| 06 | `06-资源与配置系统.md` | `06-resources-and-configuration.md` | Resource tree, path resolution, config keys |
-| 07 | `07-输入系统与按键映射.md` | `07-input-system-and-key-mapping.md` | Keyboard thread, evdev→LVGL, F/X/Z/C |
-| 08 | `08-构建与编译指南.md` | `08-build-and-compilation-guide.md` | Build matrix, environment variables, common errors |
-| 09 | `09-打包部署与systemd.md` | `09-packaging-deployment-and-systemd.md` | `.deb`, systemd, `scons push` |
-| 10 | `10-扩展开发指南.md` | `10-extension-development-guide.md` | Adding pages/apps/resources/toggles |
-| 11 | `11-调试与故障排查.md` | `11-debugging-and-troubleshooting.md` | Blank screen / resources / input / external apps |
-| 12 | `12-常用修改入口速查.md` | `12-common-modification-entry-points.md` | Change→file→verification tables |
-
-```
-docs/launcher工程详细说明/        # Chinese (Chinese filenames) — first choice, closest to the code today
-docs/launcher-project-guide/     # English — second choice; part 12 is a condensed table
-docs/launcher-project-guide-ja/  # Japanese — parts 02/04/05/12 are old; do not use as implementation references
-docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-project-guide-ja.md  # three index pages
-```
-
-**All three guide sets were batch-snapshotted on 2026-09-23**; the code has kept refactoring since (settings pages migrated, apps removed, `launcher_platform::path()` replacing the old API). **Treat them as architecture tours, not API references.**
-
-**Topical docs** (newer than the guides and mostly kept in sync with the code):
-
 | File | Content |
 | --- | --- |
-| `docs/cp0_lvgl.md` / `.en.md` / `.ja.md` | ★ Complete `cp0_signal_*` usage, arguments, return formats, threading rules (required reading before touching the platform layer) |
+| `docs/cp0_lvgl.en.md` | ★ Complete `cp0_signal_*` usage, arguments, return formats, threading rules (required reading before touching the platform layer) |
 | `docs/current-implementation-and-components.md` | Implementation snapshot + component/dependency inventory |
 | `docs/OPEN_SOURCE_COMPONENTS.md` + repo-root `LICENSES/` | Third-party components and license registration |
-| `docs/automation-rpc.md` | Local automation RPC (key injection, screenshots) |
-| `docs/adb-*.md` (4 files) | ADB debugging / shell / capabilities / hotplug |
-| `docs/APPLaunch-App-打包指南.md` / `-ja.md` | App packaging (external apps as `.deb`) |
-| `docs/file-transfer-performance.md` | File transfer performance |
-| `docs/macos-docker-build.md` / `-ja.md` | macOS + Docker builds |
+| `docs/dietpi-migration.md` | Agent guide for moving the device to DietPi |
 
 ---
 
@@ -465,15 +424,15 @@ docs/launcher工程详细说明.md / launcher-project-guide.md / launcher-projec
 | I want to… | Read first | Then work on |
 | --- | --- | --- |
 | Get it running on the host | `README.md` build section + §2 of this file | `projects/APPLaunch` with `linux_x86_sdl2_config_defaults.mk` |
-| Produce device/release artifacts | §4.4 of this file + `docs/.../09-*.md` (mind the outdated parts) | `scripts/build_cardputerzero_release_local.sh` → `scripts/debian_packager.py` |
-| Add a home-screen app (built-in page) | §6.2 of this file + `docs/.../10-extension-development-guide.md` | `main/ui/page_app/` + `builtin_app_registry.cpp` |
+| Produce device/release artifacts | §4.4 of this file + `README.md` | `scripts/build_cardputerzero_release_local.sh` → `scripts/debian_packager.py` |
+| Add a home-screen app (built-in page) | §6.2 of this file | `main/ui/page_app/` + `builtin_app_registry.cpp` |
 | Add an external app (`.desktop`) | §6.3 of this file | `projects/APPLaunch/APPLaunch/applications/` |
-| Change the home UI | `docs/.../03-ui-framework-and-home-carousel.md` (describes the old carousel) | `main/ui/ui_launch_page*.cpp` |
+| Change the home UI | §5.3 of this file, the home rows | `main/ui/ui_launch_page*.cpp` |
 | Change the settings page | §5.3 of this file, "Settings menu structure" | `main/ui/settings/` |
-| Change keys/input | `docs/.../07-input-system-and-key-mapping.md` | `main/ui/ui_launch_page_input.cpp`, `model/global_hint_policy.cpp` |
-| Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.md` | `ext_components/cp0_lvgl/`, syncing the trilingual docs + contracts + tests |
+| Change keys/input | `projects/APPLaunch/AGENTS.md`, "Keyboard input systems" | `main/ui/ui_launch_page_input.cpp`, `model/global_hint_policy.cpp` |
+| Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.en.md` | `ext_components/cp0_lvgl/`, syncing `docs/cp0_lvgl.en.md` + contracts + tests |
 | Change the emulator | `projects/CardputerZero-Emulator/` | CMake, not SCons |
-| Debug a blank screen / boot failure | `docs/.../11-debugging-and-troubleshooting.md` | `journalctl --user -u APPLaunch.service -f` |
+| Debug a blank screen / boot failure | §5.1 of this file (boot chain) | `journalctl --user -u APPLaunch.service -f` |
 | Debug an external app that never returns | §6.1 of this file + `tests/test_external_framebuffer_ownership.py` | `main/ui/launch.cpp` |
 
 ---
@@ -517,6 +476,6 @@ Before handing off, confirm each of the following:
 - [ ] The SDL2 build passes: `cd projects/APPLaunch && CONFIG_DEFAULT_FILE=linux_x86_sdl2_config_defaults.mk scons -j$(nproc)`
 - [ ] New UI text is at least 12px (a LaunchWizard hard rule; applies elsewhere too on a 320×170 screen)
 - [ ] New/modified files carry an SPDX header
-- [ ] If a `cp0_signal_*` signature or return format changed: trilingual docs + `*_contract.*` + C wrappers + all call sites + tests are all updated
+- [ ] If a `cp0_signal_*` signature or return format changed: `docs/cp0_lvgl.en.md` + `*_contract.*` + C wrappers + all call sites + tests are all updated
 - [ ] If resources changed: rebuilt, and `dist/APPLaunch/` actually contains the new files
 - [ ] The commit message follows the §13 format, and no one else's changes were swept into the commit
