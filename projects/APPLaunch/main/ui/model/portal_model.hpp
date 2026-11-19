@@ -44,9 +44,10 @@ std::string index_html();
 // metadata only; nothing the client submits is read or stored.
 std::string serve_py(const std::string &dir);
 
-// Brings kInterface up as the AP: addr, DNAT of 80/443 to the portal, then
-// dnsmasq, the portal server and hostapd. Run as root (the page prefixes
-// `sudo -n`). Files are read from `dir`.
+// Brings kInterface up as the AP: re-enumerates the USB adapter (so its AP
+// receive path works after a cold boot), then addr, DNAT of 80/443 to the
+// portal, then dnsmasq, the portal server and hostapd. Run as root (the page
+// prefixes `sudo -n`). Files are read from `dir`.
 std::string start_script(const std::string &dir);
 // Reverses start_script and returns kInterface to NetworkManager.
 std::string stop_script(const std::string &dir);

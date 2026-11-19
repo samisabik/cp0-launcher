@@ -12,7 +12,6 @@
 #include "cp0_theme.hpp"
 #include "input_keys.h"
 #include "keyboard_input.h"
-#include "launcher_platform.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -34,12 +33,18 @@ bool write_file(const std::string &path, const std::string &contents)
 }
 
 // The page the portal serves: the bundled share/images/portal/index.html,
-// or the model's plain fallback when that resource is missing.
+// or the model's plain fallback when that resource is missing. The launcher's
+// path resolver only maps image/audio/font names, not .html, so read the
+// bundled page from its known locations: the device install first, then the
+// SDL-relative resource tree.
 std::string served_page()
 {
-    const std::string path = launcher_platform::path("portal/index.html");
-    const std::string bundled = path.empty() ? std::string() : app_support::read_file(path);
-    return bundled.empty() ? portal::index_html() : bundled;
+    for (const char *path : {"/usr/share/APPLaunch/share/images/portal/index.html",
+                             "APPLaunch/share/images/portal/index.html"}) {
+        const std::string page = app_support::read_file(path);
+        if (!page.empty()) return page;
+    }
+    return portal::index_html();
 }
 
 // A pid file holds a process that is still alive.

@@ -96,8 +96,10 @@ std::string serve_py(const std::string &dir)
         << "        self.wfile.write(HTML)\n"
         << "    def log_message(self, *a):\n"
         << "        pass\n"
-        << "socketserver.TCPServer.allow_reuse_address = True\n"
-        << "socketserver.TCPServer((\"0.0.0.0\", " << kPortalPort << "), H).serve_forever()\n";
+        << "class S(socketserver.ThreadingMixIn, socketserver.TCPServer):\n"
+        << "    allow_reuse_address = True\n"
+        << "    daemon_threads = True\n"
+        << "S((\"0.0.0.0\", " << kPortalPort << "), H).serve_forever()\n";
     return out.str();
 }
 
@@ -108,6 +110,20 @@ std::string start_script(const std::string &dir)
         << "set -e\n"
         << "IF=" << kInterface << "\n"
         << "DIR=\"" << dir << "\"\n"
+        << "# After a cold boot this USB adapter enumerates with its AP receive\n"
+        << "# path broken: it beacons, but client auth frames never reach it, so\n"
+        << "# nothing can associate. Re-enumerate the USB device backing the\n"
+        << "# interface (deauthorize, then reauthorize); that reloads its\n"
+        << "# firmware and clears the fault, the same as a physical replug.\n"
+        << "USB=$(dirname \"$(readlink -f /sys/class/net/$IF/device 2>/dev/null)\" 2>/dev/null)\n"
+        << "if [ -w \"$USB/authorized\" ]; then\n"
+        << "    echo 0 > \"$USB/authorized\" || true\n"
+        << "    sleep 1\n"
+        << "    echo 1 > \"$USB/authorized\" || true\n"
+        << "    # Wait for the interface and its firmware to come back.\n"
+        << "    for _ in $(seq 1 20); do [ -e \"/sys/class/net/$IF/device/driver\" ] && break; sleep 1; done\n"
+        << "    sleep 4\n"
+        << "fi\n"
         << "rfkill unblock wlan 2>/dev/null || true\n"
         << "nmcli dev set \"$IF\" managed no 2>/dev/null || true\n"
         << "ip addr flush dev \"$IF\" || true\n"

@@ -45,6 +45,8 @@ int main()
     // Scripts act on wlan1 only and the stop script undoes the start.
     const std::string start = start_script("/d");
     assert(start.find("IF=wlan1\n") != std::string::npos);
+    // Re-enumerates the USB adapter so its AP receive path works after boot.
+    assert(start.find("/authorized") != std::string::npos);
     assert(start.find("-A PREROUTING -i \"$IF\" -p tcp --dport $P -j DNAT --to 10.0.0.1:8080") != std::string::npos);
     assert(start.find("hostapd -B -P \"$DIR/hostapd.pid\" \"$DIR/hostapd.conf\"") != std::string::npos);
     const std::string stop = stop_script("/d");
