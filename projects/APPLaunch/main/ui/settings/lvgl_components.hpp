@@ -8469,7 +8469,7 @@ protected:
         hint_ = lv_label_create(ComponensObj);
         if (hint_) {
             lv_label_set_text(hint_, "ent set");
-            lv_obj_set_style_text_color(hint_, lv_color_hex(0x5F7A66), LV_PART_MAIN);
+            lv_obj_set_style_text_color(hint_, lv_color_hex(cp0::theme::kDim), LV_PART_MAIN);
             lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
             lv_obj_update_layout(hint_);
             lv_obj_set_pos(hint_, metric(LayoutMetric::ScreenW) - 6 - lv_obj_get_width(hint_),
