@@ -55,8 +55,8 @@ std::string line_icon_path(const std::string &name)
 {
     static const std::set<std::string> kKnown = {
         "adsb", "air", "audio", "cli", "files", "fox", "ip_panel", "ir", "keys", "micro",
-        "pins", "portal", "python", "rec", "sat", "sdr", "sensors", "settings", "slime", "spectrum",
-        "ssh", "tailnet", "tracker",
+        "pins", "portal", "power", "python", "rec", "sat", "sdr", "sensors", "settings", "slime",
+        "spectrum", "ssh", "tailnet", "tracker",
     };
     const std::string slug = app_slug(name);
     return launcher_platform::path("line/" + (kKnown.count(slug) ? slug : std::string("app")) + ".png");

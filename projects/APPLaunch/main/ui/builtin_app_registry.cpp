@@ -83,6 +83,8 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, false, append_page_app<UISSHPage>},
     {{"IP Panel", "ip_panel_100.png", "app_IP_Panel", true, false},
      nullptr, false, true, false, append_page_app<UIIpPanelPage>},
+    {{"Power", "line/power.png", "app_Power", true, false},
+     nullptr, false, true, false, append_page_app<UIPowerPage>},
     {{"Spectrum", "line/spectrum.png", "app_Spectrum", true, false},
      nullptr, false, true, false, append_page_app<UISpectrumPage>},
     {{"Rec", "line/rec.png", "app_Rec", true, false},
