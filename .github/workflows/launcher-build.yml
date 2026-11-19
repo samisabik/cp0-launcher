@@ -2,7 +2,7 @@ name: Build APPLauncher
 
 on:
   push:
-    branches: [master, ci/**]
+    branches: [main, ci/**]
     paths:
       - 'projects/APPLaunch/**'
       - 'projects/LaunchWizard/**'
@@ -14,7 +14,7 @@ on:
       - 'scripts/cardputer_adb_hotplug.c'
       - 'scripts/debian_packager.py'
   pull_request:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -303,7 +303,7 @@ jobs:
   publish:
     name: Publish release
     needs: [build, unit-tests]
-    if: ${{ inputs.publish == true && github.ref == 'refs/heads/master' }}
+    if: ${{ inputs.publish == true && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Configure required reviewers on this environment to turn the manual
@@ -321,17 +321,17 @@ jobs:
       run: |
         set -euo pipefail
 
-        # The tag is created from github.sha at the end of the build. If master
+        # The tag is created from github.sha at the end of the build. If main
         # moved in the meantime this SHA no longer has a ref, and GitHub requires
         # the unreachable workflows:write scope to create the tag, which the
         # workflow token does not have. Fail before anything is published.
-        if ! head="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/master" --jq .object.sha)"; then
-          echo "Unable to read the master head from GitHub before publishing." >&2
+        if ! head="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"; then
+          echo "Unable to read the main head from GitHub before publishing." >&2
           exit 1
         fi
         if [ "${head}" != "${GITHUB_SHA}" ]; then
-          echo "master advanced to ${head} while this release was building (built ${GITHUB_SHA})." >&2
-          echo "Nothing was published; re-dispatch the release on the current master head." >&2
+          echo "main advanced to ${head} while this release was building (built ${GITHUB_SHA})." >&2
+          echo "Nothing was published; re-dispatch the release on the current main head." >&2
           exit 1
         fi
 
@@ -355,7 +355,7 @@ jobs:
           echo "A newer release (${latest}) appeared while this release was building; refusing to publish ${VERSION}." >&2
           exit 1
         fi
-        echo "Preconditions OK: master=${head}, version=${VERSION}"
+        echo "Preconditions OK: main=${head}, version=${VERSION}"
 
     - uses: actions/download-artifact@v4
       with:
