@@ -85,13 +85,15 @@ cd cp0-launcher && ./install.sh
 
 `install.sh` replaces the launcher binary and its fonts and icons in
 `/usr/share/APPLaunch`, holds the `applaunch` package and masks the stock
-updaters so they do not put the stock launcher back, then restarts the launcher.
+updaters so they do not put the stock launcher back, adds a polkit rule that
+lets the launcher scan and join Wi-Fi, then restarts the launcher.
 
 To go back to the stock launcher:
 
 ```bash
 sudo cp -p /usr/share/APPLaunch/bin/M5CardputerZero-APPLaunch.stock /usr/share/APPLaunch/bin/M5CardputerZero-APPLaunch
 sudo apt-mark unhold applaunch
+sudo rm -f /etc/polkit-1/rules.d/50-cp0-wifi-scan.rules
 sudo systemctl unmask applaunch-updater.service applaunch-apt-update.service applaunch-apps-updater.service
 systemctl --user restart APPLaunch.service
 ```
