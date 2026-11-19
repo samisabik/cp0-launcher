@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
-#include <functional>
 #include <iterator>
 #include <list>
 #include <string>
@@ -45,34 +44,15 @@ inline bool is_timestamp(const std::string &value)
 
 // Maps an allow-listed admin request to the argv that runs through sudo.
 // Returns false for an unknown command or an invalid argument.
-inline bool command_argv(const std::list<std::string> &args,
-                         const std::function<std::string(const char *)> &file_path,
-                         std::list<std::string> &argv)
+inline bool command_argv(const std::list<std::string> &args, std::list<std::string> &argv)
 {
     argv.clear();
     if (args.empty()) return false;
     const std::string command = args.front();
     const std::string value = args.size() > 1 ? *std::next(args.begin()) : std::string();
-    const auto helper = [&file_path](const char *name) { return file_path ? file_path(name) : std::string(name); };
     const bool binary = value == "0" || value == "1";
 
-    if (command == "AdbSet") {
-        if (args.size() != 2 || !binary) return false;
-        argv = {helper("adb_helper"), "set", value};
-    } else if (command == "AdbAuthorize") {
-        if (value.size() < 680 || value.size() > 2048 || value.find('\n') != std::string::npos ||
-            value.find('\r') != std::string::npos)
-            return false;
-        argv = {helper("adb_helper"), "authorize", value};
-    } else if (command == "AdbRevoke") {
-        const bool valid = value.size() == 64 && std::all_of(value.begin(), value.end(), [](unsigned char c) {
-                               return std::isdigit(c) || (c >= 'a' && c <= 'f');
-                           });
-        if (!valid) return false;
-        argv = {helper("adb_helper"), "revoke", value};
-    } else if (command == "AdbClearAuthorizations") {
-        argv = {helper("adb_helper"), "clear-authorizations"};
-    } else if (command == "NtpSet") {
+    if (command == "NtpSet") {
         argv = {"timedatectl", "set-ntp", value == "1" ? "true" : "false"};
     } else if (command == "TimezoneSet") {
         // Zone names are paths under /usr/share/zoneinfo such as Europe/London.

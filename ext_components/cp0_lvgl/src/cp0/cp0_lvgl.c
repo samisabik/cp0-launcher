@@ -23,9 +23,6 @@ static uint64_t enabled_features(void)
 #ifdef CONFIG_CP0_LVGL_INIT_PTY
     features |= CP0_INIT_FEATURE_PTY;
 #endif
-#ifdef CONFIG_CP0_LVGL_INIT_RPC
-    features |= CP0_INIT_FEATURE_RPC;
-#endif
 #ifdef CONFIG_CP0_LVGL_INIT_AUDIO
     features |= CP0_INIT_FEATURE_AUDIO;
 #endif
@@ -89,11 +86,6 @@ static int run_init_step(cp0_init_step_t step)
         init_freambuffer_disp();
         return lv_display_get_default() != NULL;
     case CP0_INIT_STEP_INPUT: init_input(); break;
-    case CP0_INIT_STEP_RPC:
-#ifdef CONFIG_CP0_LVGL_INIT_RPC
-        init_rpc();
-#endif
-        break;
     case CP0_INIT_STEP_AUDIO:
 #ifdef CONFIG_CP0_LVGL_INIT_AUDIO
         init_audio();

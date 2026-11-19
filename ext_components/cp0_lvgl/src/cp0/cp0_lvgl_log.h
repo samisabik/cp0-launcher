@@ -6,6 +6,6 @@
 
 #pragma once
 
-void cp0_zmq_log_init(void);
-void cp0_zmq_log(const char *topic, const char *message);
-void cp0_zmq_logf(const char *topic, const char *fmt, ...);
+// Writes "[topic] message" to stderr, which the service manager journals.
+void cp0_log(const char *topic, const char *message);
+void cp0_logf(const char *topic, const char *fmt, ...);

@@ -1028,8 +1028,7 @@ extern "C" void init_sudo_signals(void)
             return;
         }
         std::list<std::string> argv;
-        if (!cp0::admin::command_argv(args, [](const char *name) { return std::string(cp0_file_path(name)); },
-                                      argv)) {
+        if (!cp0::admin::command_argv(args, argv)) {
             if (started) started(-EINVAL, 0);
             return;
         }

@@ -59,7 +59,7 @@ void cp0_dir_watch_stop(cp0_watcher_t watcher);
 int cp0_file_read_first_line(const char *path, char *out, int out_size);
 ```
 
-`cp0_file_path_c` resolves logical names such as `applications`, `adb_helper`, `launcher_settings`, `oobe_marker`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/`, `share/audio/`, or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. Watch handles are nonzero module-owned values and may only be passed to the matching start/poll/stop functions.
+`cp0_file_path_c` resolves logical names such as `applications`, `launcher_settings`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/`, `share/audio/`, or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. Watch handles are nonzero module-owned values and may only be passed to the matching start/poll/stop functions.
 
 ### Network and Wi-Fi
 
@@ -135,7 +135,7 @@ Session commands are `BtSessionInit` (returns an id), `BtSessionDeinit id`, `BtS
 
 ### Process, OS information, and time
 
-`cp0_signal_process_api` commands are `ExecBlocking executable keep_root`, `Spawn executable keep_root`, `Stop pid`, `CheckLock path`, `Kill pid grace_ms`, `RunArgv background argv...`, `RunSudo password argv...` (legacy only), `CaptureArgv argv...`, `AdbStatus`, `DesktopExecIsSafe executable`, `Shutdown`, `Reboot`, and `DelayMs milliseconds`. `Shutdown` and `Reboot` run `systemctl poweroff|reboot --check-inhibitors=yes`, so a block inhibitor (a package install, an update) refuses them; on refusal the code is the systemctl exit status and data is its first output line. `Spawn` returns a PID; `CaptureArgv` returns stdout; `AdbStatus` returns two status lines.
+`cp0_signal_process_api` commands are `ExecBlocking executable keep_root`, `Spawn executable keep_root`, `Stop pid`, `CheckLock path`, `Kill pid grace_ms`, `RunArgv background argv...`, `RunSudo password argv...` (legacy only), `CaptureArgv argv...`, `DesktopExecIsSafe executable`, `Shutdown`, `Reboot`, and `DelayMs milliseconds`. `Shutdown` and `Reboot` run `systemctl poweroff|reboot --check-inhibitors=yes`, so a block inhibitor (a package install, an update) refuses them; on refusal the code is the systemctl exit status and data is its first output line. `Spawn` returns a PID; `CaptureArgv` returns stdout.
 
 `cp0_signal_osinfo_api` and `cp0_signal_timedate_api` share one service. Commands are `NetworkDefaultInfoRead`, `EthInfoRead` (three lines: IPv4, gateway, MAC), `NetworkList` (tab-separated interface records), `AccountInfoRead` (user and hostname), `TimeSet timestamp`, `LocalTime` (`year,month,day,hour,minute,second`), `RandomU32`, `NtpGet`, and `NtpSet 0|1`.
 
@@ -150,7 +150,7 @@ Session commands are `BtSessionInit` (returns an id), `BtSessionDeinit id`, `BtS
 
 `cp0_signal_sudo_argv_async` takes `(argv, auth_timeout_ms, exec_timeout_ms, complete, started)`. `started(ret, request_id)` arrives first; on success `ret == 0` and the id is nonzero. `complete(result_code, exit_code)` then arrives once. Cancel with `cp0_signal_sudo_cancel(request_id, done)`; `done(0)` means cancellation was accepted.
 
-`cp0_signal_system_admin_async` has the same signature but only accepts `AdbSet 0|1`, `AdbAuthorize public_key` (680..2048 bytes, no CR/LF), `AdbRevoke fingerprint` (64 lowercase hexadecimal characters), `AdbClearAuthorizations`, `NtpSet 0|1`, `TimezoneSet zone`, `TailscaleSet 0|1`, `SshSet 0|1` (`systemctl enable|disable --now ssh`), `HostnameSet name` (1..63 of `A-Za-z0-9-`, no leading or trailing `-`; also rewrites the `127.0.1.1` line of `/etc/hosts`), `MicGainSet 0..14`, and `TimeSet YYYY-MM-DD HH:MM:SS`. The allow-list lives in `src/cp0_admin_command.hpp`. Invalid arguments call only `started(-EINVAL, 0)` and do not produce a completion callback. Keep request ids and cancel them when a UI workflow leaves or times out.
+`cp0_signal_system_admin_async` has the same signature but only accepts `NtpSet 0|1`, `TimezoneSet zone`, `TailscaleSet 0|1`, `SshSet 0|1` (`systemctl enable|disable --now ssh`), `HostnameSet name` (1..63 of `A-Za-z0-9-`, no leading or trailing `-`; also rewrites the `127.0.1.1` line of `/etc/hosts`), `MicGainSet 0..14`, and `TimeSet YYYY-MM-DD HH:MM:SS`. The allow-list lives in `src/cp0_admin_command.hpp`. Invalid arguments call only `started(-EINVAL, 0)` and do not produce a completion callback. Keep request ids and cancel them when a UI workflow leaves or times out.
 
 `cp0_signal_network()` and `cp0_signal_forkexec()` are reserved plan declarations. The current `cp0_lvgl` sources do not register them, so confirm an implementation before calling.
 

@@ -2,7 +2,7 @@
 
 ## Read First
 
-- Public interfaces, all `cp0_signal_*` commands, arguments, callback results, and thread rules: read [`docs/cp0_lvgl.en.md`](../../docs/cp0_lvgl.en.md).
+- Public interfaces, all `cp0_signal_*` commands, arguments, callback results, and thread rules: read [`docs/cp0_lvgl.md`](../../docs/cp0_lvgl.md).
 - Authoritative signal signatures: `include/signal_register_plan.h`.
 - C ABI: `include/cp0_lvgl_app.h`; LVGL pages and runner: `include/cp0_lvgl_app_runner.hpp` and `include/ui_app_page.hpp`.
 - The README files are call-site references. When fixing a bug, changing behavior, or checking a platform difference, inspect the relevant implementation under `src/` and its `*_contract.*` files, then compare the device and SDL backends.
@@ -22,7 +22,7 @@ Request signals normally take `std::list<std::string>` with the command name at 
 - Async-specialized signals: `cp0_signal_bt_agent(uint64_t, method, device, value, reply)`, `cp0_signal_sudo_argv_async(args, auth_timeout_ms, exec_timeout_ms, complete, started)`, `cp0_signal_sudo_cancel(request_id, done)`, and `cp0_signal_system_admin_async(args, auth_timeout_ms, exec_timeout_ms, complete, started)`.
 - `cp0_signal_network` and `cp0_signal_forkexec` currently have only plan declarations and no `cp0_lvgl` registration. Confirm an implementation exists before calling them. Bluetooth Agent requests originate on a worker thread; sudo calls `started` before `complete`; neither callback may directly manipulate LVGL objects.
 
-For command details, argument counts, return encoding, and platform differences, use the “Complete `cp0_signal_*` Usage” section in [`docs/cp0_lvgl.en.md`](../../docs/cp0_lvgl.en.md).
+For command details, argument counts, return encoding, and platform differences, use the “Complete `cp0_signal_*` Usage” section in [`docs/cp0_lvgl.md`](../../docs/cp0_lvgl.md).
 
 ## Modification Rules
 
@@ -30,6 +30,6 @@ For command details, argument counts, return encoding, and platform differences,
 
   `def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_xxx_api)`
 
-- When changing an argument or return format, update `docs/cp0_lvgl.en.md`, the corresponding contract, C wrappers, all call sites, and tests.
+- When changing an argument or return format, update `docs/cp0_lvgl.md`, the corresponding contract, C wrappers, all call sites, and tests.
 - Do not add new uses of deprecated `cp0_process_run_sudo` or `cp0_signal_process_api` `RunSudo`; use the asynchronous sudo signals.
 - Run `ext_components/cp0_lvgl/tests/run_tests.sh` for module regression. Changes involving Linux commands, BlueZ, framebuffer, or sudo also require target-platform validation.

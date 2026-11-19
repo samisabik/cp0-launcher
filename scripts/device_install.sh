@@ -40,4 +40,4 @@ sudo install -m 755 "$HERE/M5CardputerZero-APPLaunch" "$BIN"
 sudo cp -R "$HERE/share/." "$ROOT/share/"
 
 systemctl --user restart APPLaunch.service
-echo "installed; the previous launcher is saved as $BIN.stock"
+echo "installed; the stock launcher is kept as $BIN.stock"

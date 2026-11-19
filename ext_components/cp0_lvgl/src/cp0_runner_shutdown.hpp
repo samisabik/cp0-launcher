@@ -12,17 +12,16 @@ extern "C" void deinit_battery(void);
 extern "C" void deinit_audio(void) noexcept;
 extern "C" void deinit_input(void);
 extern "C" void deinit_pty(void) noexcept;
-extern "C" void deinit_rpc(void) noexcept;
 extern "C" void deinit_sudo(void) noexcept;
 extern "C" void deinit_wifi(void);
 
 namespace cp0::runner {
 
-template <typename StopSudo, typename StopRpc,
+template <typename StopSudo,
           typename StopAudio, typename StopPty, typename StopInput, typename StopWifi,
           typename StopBattery,
           typename DeinitializeLvgl>
-void shutdown_services(StopSudo &&stop_sudo, StopRpc &&stop_rpc,
+void shutdown_services(StopSudo &&stop_sudo,
                        StopAudio &&stop_audio,
                        StopPty &&stop_pty,
                        StopInput &&stop_input, StopWifi &&stop_wifi,
@@ -31,10 +30,6 @@ void shutdown_services(StopSudo &&stop_sudo, StopRpc &&stop_rpc,
 {
     try {
         std::forward<StopSudo>(stop_sudo)();
-    } catch (...) {
-    }
-    try {
-        std::forward<StopRpc>(stop_rpc)();
     } catch (...) {
     }
     try {

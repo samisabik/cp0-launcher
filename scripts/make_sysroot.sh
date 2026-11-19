@@ -45,14 +45,20 @@ else
     # shellcheck disable=SC2087
     ssh "$HOST" sh -s -- $PACKAGES <<'REMOTE' | tar -C "$STAGE" -xf -
 set -eu
-work=$(mktemp -d)
+# On disk: /tmp is a RAM disk on the device and too small for the packages.
+work=$(mktemp -d -p /var/tmp)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
 # The -dev packages these headers depend on, at the versions apt would install.
 apt-cache depends --recurse --no-recommends --no-suggests --no-conflicts \
     --no-breaks --no-replaces --no-enhances "$@" 2>/dev/null |
     grep -E '^[a-z0-9]' | sed 's/:.*//' | grep -E -- '-dev$' | sort -u > list
-apt-get download $(cat list) >/dev/null 2>&1
+# One at a time: a name in the list can be a virtual package, and a single
+# failure would otherwise leave the sysroot without any headers.
+for package in $(cat list); do
+    apt-get download "$package" >/dev/null 2>&1 || echo "skipped $package (not downloadable)" >&2
+done
+ls ./*.deb >/dev/null 2>&1 || { echo "no development package could be downloaded" >&2; exit 1; }
 mkdir root
 for deb in *.deb; do dpkg-deb -x "$deb" root; done
 tar -C root -cf - usr
@@ -61,6 +67,11 @@ REMOTE
     echo "copying runtime libraries from $HOST"
     ssh "$HOST" 'tar -C / -cf - usr/lib/aarch64-linux-gnu usr/lib/ld-linux-aarch64.so.1 2>/dev/null' |
         tar -C "$STAGE" -xf -
+fi
+
+if [ ! -d "$STAGE/usr/include" ]; then
+    echo "the sysroot has no headers: fetching the development packages failed" >&2
+    exit 1
 fi
 
 ln -s usr/lib "$STAGE/lib"

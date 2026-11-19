@@ -58,8 +58,6 @@ extern volatile int LVGL_RUN_FLAGE;
 extern volatile uint32_t LV_EVENT_KEYBOARD;
 
 void *keyboard_read_thread(void *argv);
-int cp0_keyboard_inject(uint32_t key_code, int key_state, uint32_t mods);
-int cp0_keyboard_inject_text(const char *utf8);
 void cp0_keyboard_set_global_key_handler(cp0_keyboard_key_handler_t handler);
 /* LVGL thread only. After the screensaver filter, a nonzero result consumes the
  * key before custom events, global shortcuts, and native keypad delivery.

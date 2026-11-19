@@ -54,13 +54,13 @@ launcher/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
 │   │   ├── SConstruct         #   project entry: pick config → invoke SDK build
 │   │   ├── *_config_defaults.mk  # 5 build profiles (see §4.1)
-│   │   ├── main/              #   main/{src,ui,ui/{animation,model,page_app,settings},include}/ + main/SConstruct
+│   │   ├── main/              #   main/{src,ui,ui/{model,page_app,settings},include}/ + main/SConstruct
 │   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share
-│   │   ├── tests/             #   42 .cpp unit tests + 12 Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
+│   │   ├── tests/             #   C++ unit tests + Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
 │   │   └── dist/ build/       #   artifacts (git-ignored, wholly replaced on every build)
 │   ├── CardputerZero-Emulator/ # desktop/web device emulator (**CMake**, reuses APPLaunch/main at source level)
 ├── docs/                      # topical docs (see §11)
-├── scripts/                   # sysroot, packaging, install, RPC and logging scripts
+├── scripts/                   # sysroot, packaging and install scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
 ├── .github/workflows/         # CI: launcher-build.yml / launcher-release.yml / emulator-build.yml
 └── .clang-format              # Google-derived, see §8
@@ -87,8 +87,8 @@ scons distclean && scons -j$(nproc)
 file dist/M5CardputerZero-APPLaunch            # expect ARM aarch64
 
 # 3. Run tests after changing code (run both; CI only runs the second)
-sh projects/APPLaunch/tests/run_tests.sh          # 41 C++ + 12 Python contracts
-sh ext_components/cp0_lvgl/tests/run_tests.sh     # 79 C++
+sh projects/APPLaunch/tests/run_tests.sh          # C++ unit tests + Python contracts
+sh ext_components/cp0_lvgl/tests/run_tests.sh     # C++ unit tests
 
 # 4. Pack the install tarball (**does not compile anything**; packs the existing dist/)
 sh scripts/package_release.sh
@@ -336,16 +336,16 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
 
 ## 9. Tests
 
-| Scope | Command | Size (driven by that runner) | CI |
+| Scope | Command | Contents | CI |
 | --- | --- | --- | --- |
-| APPLaunch | `sh projects/APPLaunch/tests/run_tests.sh` | 41 `.cpp` + 12 Python contract tests | ❌ not run |
+| APPLaunch | `sh projects/APPLaunch/tests/run_tests.sh` | C++ unit tests and Python contract tests | ❌ not run, except `test_release_workflow.py` |
 | APPLaunch (LVGL UI) | `sh projects/APPLaunch/tests/low_battery_ui/run_tests.sh` | 1 `.cpp` (needs an LVGL build) | ❌ |
-| cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | 79 `.cpp` | ✅ run |
+| cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | C++ unit tests | ✅ run |
 | cp0_lvgl (Bluetooth, on-device) | `run_bluetooth_reset_test.sh`, `build_bluetooth_backend_smoke.sh` | 2 `.cpp` (need real hardware) | ❌ |
 
-On-disk file counts are 42 (APPLaunch) and 81 (cp0_lvgl); the difference is exactly the 1 + 2 hardware/LVGL-dependent tests that have their own dedicated runners above.
+Each runner lists the tests it builds; the three hardware or LVGL-dependent tests have the dedicated runners above.
 
-**Key insight**: `projects/APPLaunch/tests/` contains **12 Python "source contract" tests** that `read_text()` the `.cpp`/`.h` sources directly and assert on **textual structure, call ordering, and specific strings**. Therefore:
+**Key insight**: `projects/APPLaunch/tests/` contains **Python "source contract" tests** that `read_text()` the `.cpp`/`.h` sources directly and assert on **textual structure, call ordering, and specific strings**. Therefore:
 
 - changing UI source code can break a test **without a single compile error**;
 - before refactoring, `grep projects/APPLaunch/tests/` for assertions covering the code you are about to touch;
@@ -393,7 +393,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 
 | File | Content |
 | --- | --- |
-| `docs/cp0_lvgl.en.md` | ★ Complete `cp0_signal_*` usage, arguments, return formats, threading rules (required reading before touching the platform layer) |
+| `docs/cp0_lvgl.md` | ★ Complete `cp0_signal_*` usage, arguments, return formats, threading rules (required reading before touching the platform layer) |
 | `docs/current-implementation-and-components.md` | Implementation snapshot + component/dependency inventory |
 | `docs/OPEN_SOURCE_COMPONENTS.md` + repo-root `LICENSES/` | Third-party components and license registration |
 | `docs/dietpi-migration.md` | Agent guide for moving the device to DietPi |
@@ -411,7 +411,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 | Change the home UI | §5.3 of this file, the home rows | `main/ui/ui_launch_page*.cpp` |
 | Change the settings page | §5.3 of this file, "Settings menu structure" | `main/ui/settings/` |
 | Change keys/input | `projects/APPLaunch/AGENTS.md`, "Keyboard input systems" | `main/ui/ui_launch_page_input.cpp`, `model/global_hint_policy.cpp` |
-| Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.en.md` | `ext_components/cp0_lvgl/`, syncing `docs/cp0_lvgl.en.md` + contracts + tests |
+| Change platform capabilities (audio/network/process/config…) | `ext_components/cp0_lvgl/AGENTS.md` + `docs/cp0_lvgl.md` | `ext_components/cp0_lvgl/`, syncing `docs/cp0_lvgl.md` + contracts + tests |
 | Change the emulator | `projects/CardputerZero-Emulator/` | CMake, not SCons |
 | Debug a blank screen / boot failure | §5.1 of this file (boot chain) | `journalctl --user -u APPLaunch.service -f` |
 | Debug an external app that never returns | §6.1 of this file + `tests/test_external_framebuffer_ownership.py` | `main/ui/launch.cpp` |
@@ -457,6 +457,6 @@ Before handing off, confirm each of the following:
 - [ ] The SDL2 build passes: `cd projects/APPLaunch && CONFIG_DEFAULT_FILE=linux_x86_sdl2_config_defaults.mk scons -j$(nproc)`
 - [ ] New UI text is at least 11px, the size of the chrome font (`cp0::theme::kFontPx`)
 - [ ] New/modified files carry an SPDX header
-- [ ] If a `cp0_signal_*` signature or return format changed: `docs/cp0_lvgl.en.md` + `*_contract.*` + C wrappers + all call sites + tests are all updated
+- [ ] If a `cp0_signal_*` signature or return format changed: `docs/cp0_lvgl.md` + `*_contract.*` + C wrappers + all call sites + tests are all updated
 - [ ] If resources changed: rebuilt, and `dist/APPLaunch/` actually contains the new files
 - [ ] The commit message follows the §13 format, and no one else's changes were swept into the commit

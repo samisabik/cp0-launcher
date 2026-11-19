@@ -205,10 +205,10 @@ void api_call(std::list<std::string> args, std::function<void(int, std::string)>
     std::ostringstream raw_request;
     for (const auto &arg : args)
         raw_request << '[' << arg << ']';
-    cp0_zmq_logf("bt", "api request=%s", raw_request.str().c_str());
+    cp0_logf("bt", "api request=%s", raw_request.str().c_str());
     cp0::bluetooth::Request request;
     if (!cp0::bluetooth::parse_request(args, request)) {
-        cp0_zmq_log("bt", "api request rejected by parser");
+        cp0_log("bt", "api request rejected by parser");
         report(callback, -1, "invalid bt api request");
         return;
     }
@@ -305,7 +305,7 @@ void api_call(std::list<std::string> args, std::function<void(int, std::string)>
     }
 
     auto completion = [callback](int code, const std::string &message) {
-        cp0_zmq_logf("bt", "api async completion code=%d message=%s", code, message.c_str());
+        cp0_logf("bt", "api async completion code=%d message=%s", code, message.c_str());
         report(callback, code, message == "ok" ? std::string() : message);
     };
     if (request.command == Command::Reset) {
@@ -367,7 +367,7 @@ extern "C" void init_bluetooth(void)
                 const bool authorization = request.method == "RequestAuthorization" ||
                                             request.method == "AuthorizeService";
                 const bool accepted = authorization && request.paired;
-                cp0_zmq_logf("bt", "agent request without UI method=%s device=%s accepted=%d",
+                cp0_logf("bt", "agent request without UI method=%s device=%s accepted=%d",
                              request.method.c_str(), request.device.c_str(), accepted ? 1 : 0);
                 cp0_bluez_dbus::agent_reply(request.id, accepted, {});
                 return;

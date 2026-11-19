@@ -296,10 +296,6 @@ fi
     -I"$root/src" "$root/tests/test_runner_service_shutdown.cpp" -o "$binary"
 "$binary"
 
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src" "$root/tests/test_rpc_runtime_contract.cpp" -o "$binary"
-"$binary"
-
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
     -I"$root/src" "$root/tests/test_dispatch_shutdown_gate.cpp" -o "$binary"
 "$binary"

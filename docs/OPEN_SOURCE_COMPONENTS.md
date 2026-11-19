@@ -45,7 +45,6 @@ Component SConstruct files and application SConstruct/CMake files resolve these 
 | libpulse.so.0; pipewire-pulse daemon | Speaker volume/mute through the PulseAudio-compatible server (`dlopen`, no build-time dependency) | libpulse LGPL-2.1-or-later; PipeWire MIT (Expat) with LGPL-2.1+ parts |
 | libnm; NetworkManager daemon | Wi-Fi | libnm LGPL-2.1-or-later; NetworkManager GPL-2.0-or-later |
 | libinput, xkbcommon, udev | Native input/device discovery | MIT for libinput/xkbcommon; udev LGPL terms |
-| ZeroMQ | Optional log publisher and automation RPC | MPL-2.0 for current libzmq; verify selected package |
 | libcrypt, libc, libstdc++ | Account setup and runtime | Package-specific LGPL/GPL with runtime exceptions |
 
 Packaging must preserve notices for the selected configuration, including static libraries, fonts and audio. tree.hh GPL terms must be checked against the shipped artifact; this source inventory does not resolve those release-specific questions.

@@ -31,12 +31,6 @@ void deinit_pty(void);
 void init_config(void);
 void init_process(void);
 void init_screenshot(void);
-void init_rpc(void);
-#ifdef __cplusplus
-void deinit_rpc(void) noexcept;
-#else
-void deinit_rpc(void);
-#endif
 void init_wifi();
 void init_bluetooth(void);
 void init_settings(void);
