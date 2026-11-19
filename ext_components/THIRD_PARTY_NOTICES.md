@@ -11,11 +11,8 @@ the MIT license used for M5Stack-authored wrapper code.
 
 The full notice is also retained in `Miniaudio/LICENSE`. SDK dependencies used by these components include
 LVGL (MIT), eventpp (Apache-2.0), and platform libraries selected by
-SConstruct. `../LICENSES/` records fmt (MIT), cJSON, C-Thread-Pool and
-cpp-httplib (MIT). The repository
+SConstruct. `../LICENSES/` records fmt (MIT), cJSON and C-Thread-Pool. The repository
 inventory distinguishes optional cached sources from linked dependencies.
-In particular, the cached SimpleBLE checkout uses BUSL-1.1; cp0 Bluetooth
-uses BlueZ/DBus, and the SimpleBLE cache must not be described as MIT.
 
 See [`../docs/OPEN_SOURCE_COMPONENTS.md`](../docs/OPEN_SOURCE_COMPONENTS.md)
 for the complete repository inventory, including SDK, LVGL, and system

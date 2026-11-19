@@ -32,8 +32,6 @@ These source trees exist locally; cache presence does not establish that APPLaun
 | --- | --- | --- |
 | cJSON | Optional `SDK/components/cjson/SConstruct` | [MIT](../LICENSES/cJSON-MIT.txt) |
 | C-Thread-Pool | `SDK/github_source/C-Thread-Pool`; no direct launcher wrapper found | [MIT](../LICENSES/C-Thread-Pool-MIT.txt) |
-| cpp-httplib | `SDK/github_source/cpp-httplib`; no direct launcher wrapper found | [MIT](../LICENSES/cpp-httplib-MIT.txt) |
-| SimpleBLE | `SDK/github_source/SimpleBLE`; cp0 Bluetooth uses BlueZ/DBus | [BUSL-1.1](../LICENSES/SimpleBLE-BUSL-1.1.md): source-available with usage restrictions and version-dependent GPL v3 change date; not a permissive open-source dependency |
 
 ## Platform dependencies
 
@@ -50,4 +48,4 @@ Component SConstruct files and application SConstruct/CMake files resolve these 
 | ZeroMQ | Optional log publisher and automation RPC | MPL-2.0 for current libzmq; verify selected package |
 | libcrypt, libc, libstdc++ | Account setup and runtime | Package-specific LGPL/GPL with runtime exceptions |
 
-Packaging must preserve notices for the selected configuration, including static libraries, fonts and audio. tree.hh GPL terms and SimpleBLE restrictions must be checked against the shipped artifact; this source inventory does not resolve those release-specific questions.
+Packaging must preserve notices for the selected configuration, including static libraries, fonts and audio. tree.hh GPL terms must be checked against the shipped artifact; this source inventory does not resolve those release-specific questions.
