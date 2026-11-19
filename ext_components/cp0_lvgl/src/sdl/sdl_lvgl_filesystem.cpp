@@ -156,12 +156,8 @@ private:
             return "";
         if (file == "applications")
             return hal_path_applications_dir();
-        if (file == "adb_helper")
-            return join_path(hal_path_data_dir(), "adb/cardputer-adb");
         if (file == "launcher_settings")
             return join_path(hal_path_data_dir(), "settings");
-        if (file == "oobe_marker")
-            return join_path(hal_path_data_dir(), "run-oobe");
         if (file == "home_dir") {
             const char *home = std::getenv("HOME");
             return home && home[0] ? home : ".";

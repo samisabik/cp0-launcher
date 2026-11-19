@@ -15,8 +15,7 @@ namespace {
 std::list<std::string> argv_for(std::list<std::string> args)
 {
     std::list<std::string> argv;
-    const bool ok = cp0::admin::command_argv(
-        args, [](const char *name) { return std::string("/usr/share/APPLaunch/bin/") + name; }, argv);
+    const bool ok = cp0::admin::command_argv(args, argv);
     return ok ? argv : std::list<std::string>{"<rejected>"};
 }
 
@@ -48,8 +47,6 @@ int main()
     assert(rejected({"HostnameSet", std::string(64, 'a')}));
     assert(!rejected({"HostnameSet", std::string(63, 'a')}));
 
-    assert((argv_for({"AdbSet", "1"}) ==
-            std::list<std::string>{"/usr/share/APPLaunch/bin/adb_helper", "set", "1"}));
     assert((argv_for({"NtpSet", "0"}) == std::list<std::string>{"timedatectl", "set-ntp", "false"}));
     assert((argv_for({"TimezoneSet", "Europe/London"}) ==
             std::list<std::string>{"timedatectl", "set-timezone", "Europe/London"}));
