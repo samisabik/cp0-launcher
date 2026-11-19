@@ -81,8 +81,8 @@ assert '"50-cp0-wifi-scan.rules"' in Path(packager.__file__).read_text()
 workflow = (repo / ".github" / "workflows" / "launcher-build.yml").read_text(
     encoding="utf-8"
 )
-assert "branches: [master, ci/**]" in workflow
-assert "if: ${{ inputs.publish == true && github.ref == 'refs/heads/master' }}" in workflow
+assert "branches: [main, ci/**]" in workflow
+assert "if: ${{ inputs.publish == true && github.ref == 'refs/heads/main' }}" in workflow
 assert "startsWith(github.ref, 'refs/heads/ci/')" not in workflow
 assert "scripts/build_cardputerzero_release_local.sh" in workflow
 assert "python3 scripts/debian_packager.py --version" not in workflow
@@ -119,7 +119,7 @@ assert "uses: ./.github/workflows/launcher-build.yml" in release_workflow
 assert "publish: true" in release_workflow
 assert "version: ${{ inputs.version }}" in release_workflow
 assert "needs: guard" in release_workflow
-assert "refs/heads/master" in release_workflow
+assert "refs/heads/main" in release_workflow
 assert "CONFIRM" in release_workflow
 assert "timeout-minutes:" in release_workflow
 
