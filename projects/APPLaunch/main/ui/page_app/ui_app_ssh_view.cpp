@@ -16,11 +16,11 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = cp0::theme::kAccent;
-constexpr uint32_t kColorText = cp0::theme::kText;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorError = cp0::theme::kDanger;
+static const uint32_t &kColorAccent = cp0::theme::kAccent;
+static const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorError = cp0::theme::kDanger;
 constexpr int kScreenH = cp0::theme::kScreenH;
 constexpr int kValueX = 52;
 

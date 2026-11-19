@@ -1,0 +1,13 @@
+// Let members of netdev scan, join and forget Wi-Fi networks from the
+// launcher.  APPLaunch runs as a systemd user service without an active seat
+// session, so NetworkManager's default policy refuses `nmcli dev wifi rescan`.
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
+         action.id == "org.freedesktop.NetworkManager.network-control" ||
+         action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+         action.id == "org.freedesktop.NetworkManager.settings.modify.own" ||
+         action.id == "org.freedesktop.NetworkManager.settings.modify.system") &&
+        subject.isInGroup("netdev")) {
+        return polkit.Result.YES;
+    }
+});

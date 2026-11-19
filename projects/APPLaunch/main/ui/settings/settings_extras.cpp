@@ -4,6 +4,7 @@
 
 #include "settings_extras.hpp"
 
+#include "cp0_theme.hpp"
 #include "hal_lvgl_bsp.h"
 #include "settings_choice_page.hpp"
 #include "settings_prefs.hpp"
@@ -328,6 +329,32 @@ std::unique_ptr<DComponens::LvglComponensBase> settings_mic_gain_page_factory(lv
     return std::make_unique<LvSettingChoicePage3>(
         parent, page_node, std::move(on_back), [] { return current_mic_gain_index(); },
         [](int index) { return settings_run_admin({"MicGainSet", std::to_string(index)}); });
+}
+
+void append_accent_options(Tree &tree, const NodeIter &parent)
+{
+    for (const cp0::theme::AccentPreset &preset : cp0::theme::kAccentPresets)
+        tree.append_child(parent, SettingEntry{preset.name});
+}
+
+std::unique_ptr<DComponens::LvglComponensBase> settings_accent_page_factory(lv_obj_t *parent,
+                                                                            const NodeIter &page_node,
+                                                                            std::function<void()> on_back)
+{
+    return std::make_unique<LvSettingChoicePage3>(
+        parent, page_node, std::move(on_back),
+        [] { return cp0::theme::accent_index(settings_prefs::get_int(cp0::theme::kAccentConfigKey, 0)); },
+        [](int index) {
+            if (index != cp0::theme::accent_index(index)) return std::string("unknown colour");
+            return settings_prefs::set_int(cp0::theme::kAccentConfigKey, index) ? std::string()
+                                                                                : std::string("save failed");
+        },
+        LvSettingChoicePage3::Applied{},
+        // The accent shows on the whole screen as the highlight moves; Enter
+        // saves it and leaving without Enter restores the saved one.
+        [](int index) {
+            cp0::ui::apply_accent(cp0::theme::kAccentPresets[static_cast<std::size_t>(cp0::theme::accent_index(index))].color);
+        });
 }
 
 void append_time_zone_options(Tree &tree, const NodeIter &parent)

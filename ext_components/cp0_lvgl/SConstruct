@@ -31,7 +31,7 @@ def configure_target_gio(requirements, definitions, linker_flags):
     requirements += pkg_config_ldflags('gio-2.0')
 
 
-if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ or "CONFIG_SIGSLOT_COMPONENT_ENABLED" in os.environ:
+if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ:
     SRCS = []
     INCLUDE = [ADir('include')]
     PRIVATE_INCLUDE = []

@@ -1,7 +1,5 @@
 # cp0_lvgl Interface Reference
 
-Languages: [中文](cp0_lvgl.md) | English (this page) | [日本語](cp0_lvgl.ja.md)
-
 This document is the public contract for `ext_components/cp0_lvgl`. New pages and extension modules can use it as their first reference. When fixing a bug, changing behavior, or checking a platform difference, inspect the actual implementation under `src/` and the matching `*_contract.*` files. Device and SDL backends share signal names and argument formats, but their underlying capabilities can differ.
 
 ## Quick Start

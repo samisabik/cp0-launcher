@@ -21,13 +21,13 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = cp0::theme::kAccent;
-constexpr uint32_t kColorText = cp0::theme::kText;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorGrid = cp0::theme::kLine;
-constexpr uint32_t kColorRed = cp0::theme::kDanger;
-constexpr uint32_t kColorAmber = cp0::theme::kWarn;
+static const uint32_t &kColorAccent = cp0::theme::kAccent;
+static const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorGrid = cp0::theme::kLine;
+static const uint32_t &kColorRed = cp0::theme::kDanger;
+static const uint32_t &kColorAmber = cp0::theme::kWarn;
 constexpr const char *kBandConfigKey = "spectrum_band";
 constexpr uint32_t kRefreshMs = 50;
 constexpr uint32_t kMessageMs = 2500;

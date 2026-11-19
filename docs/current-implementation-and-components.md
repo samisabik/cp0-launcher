@@ -44,10 +44,8 @@ and injects the launcher version, channel, build date, and Git commit into the
 compile. APPLaunch uses the local FreeType override in `main/lvgl/` while the
 remaining LVGL implementation comes from the SDK.
 
-The build configurations include device framebuffer, Linux and Windows SDL2,
-and Linux AArch64 cross-builds. macOS instructions use the documented Docker
-build flow. LaunchWizard reuses the same component graph, with its
-SConstruct selecting the services it needs.
+The build profiles cover the device framebuffer, Linux and macOS SDL2 hosts,
+and AArch64 cross-builds from Linux and macOS. `AGENTS.md` lists them.
 
 ## Current module boundaries
 
@@ -61,8 +59,7 @@ SConstruct selecting the services it needs.
 | Settings | `projects/APPLaunch/main/ui/settings` with policy/model/page files and generated UI component data |
 | Built-in pages | `projects/APPLaunch/main/ui/page_app` for Audio, Files, IP Panel, Rec, SDR, Spectrum, SSH, and ST terminal pages |
 | External applications | `.desktop` discovery in `desktop_app_loader.*`, process policy in cp0, and process-group cleanup in `cp0_external_app_runner.*` |
-| Bluetooth | `ext_components/bluectl` provides the C DBus API; cp0 contains the C++ BlueZ bridge |
-| Wi-Fi | `ext_components/nmtui` implements the NetworkManager signal adapter for the cp0 Wi-Fi contract |
+| Bluetooth and Wi-Fi | BlueZ and NetworkManager bridges inside `ext_components/cp0_lvgl/src/cp0` |
 
 ## Input delivery contract
 
@@ -96,9 +93,5 @@ ZeroMQ; SDL builds select the SDL platform sources.
 ## Documentation maintenance
 
 When a module, service, event contract, or build dependency changes, update
-this snapshot and the matching detailed chapter under `docs/launcher-project-guide/`.
-The component license inventory is maintained separately in
+this snapshot. The component license inventory is maintained separately in
 `docs/OPEN_SOURCE_COMPONENTS.md`.
-
-See [source audit status](source-audit/README.md) for the exact scanned file
-list, outstanding independent-agent coverage, and verification limits.

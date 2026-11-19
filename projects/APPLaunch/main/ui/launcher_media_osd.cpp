@@ -15,10 +15,10 @@ namespace {
 
 constexpr lv_coord_t kWidth = 190;
 constexpr lv_coord_t kHeight = 82;
-constexpr uint32_t kBackgroundColor = 0x000000;
-constexpr uint32_t kBarBackgroundColor = 0x1E2B23;
-constexpr uint32_t kAccentColor = 0x3DDC84;
-constexpr uint32_t kTextColor = 0xE6E6E6;
+const uint32_t &kBackgroundColor = cp0::theme::kBg;
+const uint32_t &kBarBackgroundColor = cp0::theme::kLine;
+const uint32_t &kAccentColor = cp0::theme::kAccent;
+const uint32_t &kTextColor = cp0::theme::kText;
 
 void center_osd(lv_obj_t *obj)
 {

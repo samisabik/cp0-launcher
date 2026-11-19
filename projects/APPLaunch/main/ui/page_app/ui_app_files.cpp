@@ -21,13 +21,13 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = cp0::theme::kAccent;
-constexpr uint32_t kColorText = cp0::theme::kText;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorSelect = cp0::theme::kSelect;
-constexpr uint32_t kColorDanger = cp0::theme::kDanger;
-constexpr uint32_t kColorWarn = cp0::theme::kWarn;
+static const uint32_t &kColorAccent = cp0::theme::kAccent;
+static const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorSelect = cp0::theme::kSelect;
+static const uint32_t &kColorDanger = cp0::theme::kDanger;
+static const uint32_t &kColorWarn = cp0::theme::kWarn;
 
 constexpr uint32_t kRefreshMs = 250;
 constexpr uint32_t kMessageMs = 3000;

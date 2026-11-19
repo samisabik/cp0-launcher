@@ -47,8 +47,9 @@ class UISTPage : public AppPage
         return static_cast<int>(size);
     }
 
+    // The terminal has no title row or footer, so it takes the whole 320x170 screen.
     static constexpr int TERM_W = 320;
-    static constexpr int TERM_H = 150;
+    static constexpr int TERM_H = 170;
     // Departure Mono at 11px has a 7px advance; every glyph's ink sits in rows 2-13
     // of its 14px line, so a 13px cell shifted up 1px keeps a 1px gap between rows.
     static constexpr int CHAR_W = 7;

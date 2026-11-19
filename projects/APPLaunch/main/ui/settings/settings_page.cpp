@@ -405,6 +405,10 @@ void UISettingTreePage::create_page_detail()
             mode_tree.append_child(dark_time, SettingEntry{"1 min"});
             mode_tree.append_child(dark_time, SettingEntry{"5 min"});
         }
+        {
+            NodeIter accent = mode_tree.append_child(screen, SettingEntry{"accent", settings_accent_page_factory});
+            append_accent_options(mode_tree, accent);
+        }
     }
 
     {

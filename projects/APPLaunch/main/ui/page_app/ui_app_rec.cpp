@@ -25,13 +25,13 @@
 
 namespace {
 
-constexpr uint32_t kColorAccent = cp0::theme::kAccent;
-constexpr uint32_t kColorText = cp0::theme::kText;
-constexpr uint32_t kColorIdle = cp0::theme::kIdle;
-constexpr uint32_t kColorDim = cp0::theme::kDim;
-constexpr uint32_t kColorTrack = cp0::theme::kLine;
-constexpr uint32_t kColorSelect = cp0::theme::kSelect;
-constexpr uint32_t kColorRecord = cp0::theme::kDanger;
+static const uint32_t &kColorAccent = cp0::theme::kAccent;
+static const uint32_t &kColorText = cp0::theme::kText;
+static const uint32_t &kColorIdle = cp0::theme::kIdle;
+static const uint32_t &kColorDim = cp0::theme::kDim;
+static const uint32_t &kColorTrack = cp0::theme::kLine;
+static const uint32_t &kColorSelect = cp0::theme::kSelect;
+static const uint32_t &kColorRecord = cp0::theme::kDanger;
 
 constexpr const char *kArecord = "/usr/bin/arecord";
 constexpr const char *kFfmpeg = "/usr/bin/ffmpeg";

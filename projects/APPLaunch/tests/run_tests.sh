@@ -32,7 +32,7 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$test_root/test_page_timer_lifecycle.cpp" \
     -o "$build_dir/test_page_timer_lifecycle"
 "$build_dir/test_page_timer_lifecycle"
-python3 "$test_root/test_updater_packaging.py"
+python3 "$test_root/test_release_workflow.py"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../main/include" \
     -I"$test_root/../../../ext_components/cp0_lvgl/include" \
@@ -85,6 +85,10 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/keyboard_text_input.cpp" \
     -o "$build_dir/test_keyboard_text_input"
 "$build_dir/test_keyboard_text_input"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_accent.cpp" \
+    -o "$build_dir/test_accent"
+"$build_dir/test_accent"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_setup_value_policy.cpp" \
     "$test_root/../main/ui/model/setup_value_policy.cpp" \

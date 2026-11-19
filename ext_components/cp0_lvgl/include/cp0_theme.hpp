@@ -6,13 +6,20 @@
 
 #pragma once
 
+#include "cp0_accent.hpp"
 #include "cp0_font_service.hpp"
 #include "cp0_lvgl_app.h"
+
+#include "lvgl/src/core/lv_obj_private.h"
+#include "lvgl/src/core/lv_obj_style_private.h"
+#include "lvgl/src/display/lv_display_private.h"
+#include "lvgl/src/misc/cache/instance/lv_image_cache.h"
 
 #include <array>
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,19 +30,23 @@
 namespace cp0::theme {
 
 inline constexpr uint32_t kBg = 0x000000;
-inline constexpr uint32_t kAccent = 0x3DDC84;
 inline constexpr uint32_t kText = 0xE6E6E6;
 inline constexpr uint32_t kIdle = 0x8A8A8A;
-inline constexpr uint32_t kDim = 0x5F7A66;
-inline constexpr uint32_t kSelect = 0x13261B;
-inline constexpr uint32_t kLine = 0x1E2B23;
 inline constexpr uint32_t kWarn = 0xE0A84E;
 inline constexpr uint32_t kDanger = 0xFF5F56;
+// The accent and the neutrals tinted by it follow Settings > screen > accent
+// (see cp0_accent.hpp and cp0::ui::apply_accent), so they are not constants.
+inline uint32_t kAccent = kDefaultPalette.accent;
+inline uint32_t kDim = kDefaultPalette.dim;
+inline uint32_t kSelect = kDefaultPalette.select;
+inline uint32_t kLine = kDefaultPalette.line;
 // Panels: dark filled boxes with corner brackets over a faint dot grid.
-inline constexpr uint32_t kPanel = 0x0B110E;
-inline constexpr uint32_t kBracket = 0x2E4A38;
-inline constexpr uint32_t kTrack = 0x16211B;
-inline constexpr uint32_t kGrid = 0x0C1611;
+inline uint32_t kPanel = kDefaultPalette.panel;
+inline uint32_t kBracket = kDefaultPalette.bracket;
+inline uint32_t kTrack = kDefaultPalette.track;
+inline uint32_t kGrid = kDefaultPalette.grid;
+// The fill under a scope trace.
+inline uint32_t kFill = kDefaultPalette.fill;
 
 inline constexpr uint16_t kFontPx = 11;
 inline constexpr uint16_t kFontLargePx = 22;
@@ -108,11 +119,15 @@ inline void paint_background(lv_obj_t *obj)
 
 // Tiled one-pixel patterns: a dot every 6 px for the grid, every 2 px for rules,
 // and a 1 px gap every 3 px that cuts a bar into segments.
+struct PatternSlot { int w, h; uint32_t rgb; bool invert; std::array<uint32_t, 36> px; lv_image_dsc_t dsc; };
+inline std::array<PatternSlot, 6> pattern_slots{};
+inline int pattern_slots_used = 0;
+
 inline const lv_image_dsc_t *pattern(int w, int h, uint32_t rgb, bool invert = false)
 {
-    struct Slot { int w, h; uint32_t rgb; bool invert; std::array<uint32_t, 36> px; lv_image_dsc_t dsc; };
-    static std::array<Slot, 6> slots{};
-    static int used = 0;
+    using Slot = PatternSlot;
+    std::array<Slot, 6> &slots = pattern_slots;
+    int &used = pattern_slots_used;
     for (int i = 0; i < used; ++i)
         if (slots[i].w == w && slots[i].h == h && slots[i].rgb == rgb && slots[i].invert == invert) return &slots[i].dsc;
     if (used >= static_cast<int>(slots.size()) || w * h > 36) return nullptr;
@@ -429,6 +444,103 @@ inline void set_footer(lv_obj_t *obj, const std::vector<Chip> &chips)
     }
     set_text_color(obj, theme::kDim);
     if (std::string(lv_label_get_text(obj)) != text) lv_label_set_text(obj, text.c_str());
+}
+
+// Accent switching. The theme colours are read when a widget is built, so a
+// new accent has to reach the widgets that already exist: every colour a
+// style holds, the "#RRGGBB" spans in recoloured labels, and the tiled
+// patterns are rewritten from the old palette to the new one.
+struct ColorSwap {
+    uint32_t from;
+    uint32_t to;
+};
+using ColorSwaps = std::array<ColorSwap, 9>;
+
+inline void restyle_object(lv_obj_t *obj, const ColorSwaps &swaps)
+{
+    static constexpr lv_style_prop_t kColorProps[] = {
+        LV_STYLE_TEXT_COLOR,    LV_STYLE_BG_COLOR,   LV_STYLE_BG_GRAD_COLOR, LV_STYLE_BORDER_COLOR,
+        LV_STYLE_OUTLINE_COLOR, LV_STYLE_LINE_COLOR, LV_STYLE_ARC_COLOR,     LV_STYLE_IMAGE_RECOLOR,
+        LV_STYLE_SHADOW_COLOR,
+    };
+    for (uint32_t i = 0; i < obj->style_cnt; ++i) {
+        const lv_obj_style_t &entry = obj->styles[i];
+        if (!entry.style || entry.is_theme || entry.is_trans || lv_style_is_const(entry.style)) continue;
+        auto *style = const_cast<lv_style_t *>(entry.style);
+        for (lv_style_prop_t prop : kColorProps) {
+            lv_style_value_t value;
+            if (lv_style_get_prop(style, prop, &value) != LV_STYLE_RES_FOUND) continue;
+            for (const ColorSwap &swap : swaps) {
+                if (swap.from == swap.to || !lv_color_eq(value.color, lv_color_hex(swap.from))) continue;
+                value.color = lv_color_hex(swap.to);
+                lv_style_set_prop(style, prop, value);
+                break;
+            }
+        }
+    }
+    if (lv_obj_check_type(obj, &lv_label_class) && lv_label_get_recolor(obj)) {
+        std::string text = lv_label_get_text(obj);
+        bool changed = false;
+        for (const ColorSwap &swap : swaps) {
+            if (swap.from == swap.to) continue;
+            char from[8], to[8];
+            std::snprintf(from, sizeof(from), "#%06X", static_cast<unsigned>(swap.from));
+            std::snprintf(to, sizeof(to), "#%06X", static_cast<unsigned>(swap.to));
+            for (std::size_t at = text.find(from); at != std::string::npos; at = text.find(from, at + 7)) {
+                text.replace(at, 7, to);
+                changed = true;
+            }
+        }
+        if (changed) lv_label_set_text(obj, text.c_str());
+    }
+    const uint32_t children = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < children; ++i)
+        if (lv_obj_t *child = lv_obj_get_child(obj, static_cast<int32_t>(i))) restyle_object(child, swaps);
+}
+
+// Sets the theme colours without touching widgets; for start-up, before any
+// widget exists.
+inline void set_palette(const theme::Palette &p)
+{
+    theme::kAccent = p.accent;
+    theme::kDim = p.dim;
+    theme::kSelect = p.select;
+    theme::kLine = p.line;
+    theme::kPanel = p.panel;
+    theme::kBracket = p.bracket;
+    theme::kTrack = p.track;
+    theme::kGrid = p.grid;
+    theme::kFill = p.fill;
+}
+
+// Switches the accent and restyles everything already on screen. LVGL thread only.
+inline void apply_accent(uint32_t accent)
+{
+    const theme::Palette next = theme::accent_palette(accent);
+    const ColorSwaps swaps = {{
+        {theme::kAccent, next.accent}, {theme::kDim, next.dim},         {theme::kSelect, next.select},
+        {theme::kLine, next.line},     {theme::kPanel, next.panel},     {theme::kBracket, next.bracket},
+        {theme::kTrack, next.track},   {theme::kGrid, next.grid},       {theme::kFill, next.fill},
+    }};
+    set_palette(next);
+    for (int i = 0; i < pattern_slots_used; ++i) {
+        PatternSlot &slot = pattern_slots[static_cast<std::size_t>(i)];
+        for (const ColorSwap &swap : swaps) {
+            if (slot.rgb != swap.from || swap.from == swap.to) continue;
+            slot.rgb = swap.to;
+            for (uint32_t &px : slot.px)
+                if (px != 0) px = 0xFF000000u | swap.to;
+            lv_image_cache_drop(&slot.dsc);
+            break;
+        }
+    }
+    for (lv_display_t *display = lv_display_get_next(nullptr); display; display = lv_display_get_next(display)) {
+        for (uint32_t i = 0; i < display->screen_cnt; ++i)
+            if (display->screens[i]) restyle_object(display->screens[i], swaps);
+        for (lv_obj_t *layer : {display->top_layer, display->sys_layer, display->bottom_layer})
+            if (layer) restyle_object(layer, swaps);
+    }
+    lv_obj_report_style_change(nullptr);
 }
 
 // A transient line in the footer slot, e.g. "sent 433.92" or an error.

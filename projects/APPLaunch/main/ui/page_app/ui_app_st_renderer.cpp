@@ -5,6 +5,7 @@
  */
 
 #define APP_PAGE_IMPLEMENTATION_UNIT
+#include "cp0_theme.hpp"
 #include "ui_app_st.hpp"
 #include "../model/st_key_encoder.hpp"
 
@@ -85,7 +86,7 @@ void UISTPage::create_ui()
             lv_obj_set_pos(bottom_indicators_[slot], index * SLOT_WIDTH, TERM_H - 4);
             lv_obj_set_size(bottom_indicators_[slot], SLOT_WIDTH, 4);
             lv_obj_set_style_text_font(bottom_indicators_[slot], launcher_fonts().get_chrome(11), 0);
-            lv_obj_set_style_text_color(bottom_indicators_[slot], lv_color_hex(0x5F7A66), 0);
+            lv_obj_set_style_text_color(bottom_indicators_[slot], lv_color_hex(cp0::theme::kDim), 0);
             lv_obj_set_style_text_align(bottom_indicators_[slot], LV_TEXT_ALIGN_CENTER, 0);
             lv_label_set_text(bottom_indicators_[slot], "|");
             lv_obj_add_flag(bottom_indicators_[slot], LV_OBJ_FLAG_HIDDEN);

@@ -21,7 +21,6 @@
 #include "../assets/settings_icon_apps.inc"
 #include "../assets/settings_icon_time.inc"
 #include "../assets/settings_icon_system.inc"
-#include "../assets/setting_right_arrow.inc"
 
 const lv_image_dsc_t cp0_status_time_background = {
     .header = {
