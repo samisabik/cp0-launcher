@@ -7,8 +7,6 @@
 #include "desktop_app_loader.hpp"
 
 #include "builtin_app_registry.hpp"
-#include "app_registry.h"
-#include "app_display_order.hpp"
 #include "cp0_lvgl_app.h"
 #include "desktop_entry.h"
 #include "launch.h"
@@ -16,10 +14,7 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <cctype>
-#include <cstdint>
 #include <filesystem>
-#include <iomanip>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -31,9 +26,7 @@ namespace {
 
 struct DesktopAppCandidate
 {
-    std::string filename;
     DesktopEntry entry;
-    std::string icon_path;
     std::filesystem::file_time_type::rep modified_time{};
     bool has_modified_time = false;
     std::size_t directory_sequence = 0;
@@ -67,31 +60,11 @@ bool read_modified_time(const std::string &path,
     return true;
 }
 
-std::string desktop_config_key(const std::string &filename)
-{
-    std::string key = "app_desktop_";
-    for (const unsigned char character : filename) {
-        if (std::isalnum(character)) key.push_back(static_cast<char>(character));
-        else key.push_back('_');
-    }
-
-    uint32_t hash = 2166136261u;
-    for (const unsigned char character : filename) {
-        hash ^= character;
-        hash *= 16777619u;
-    }
-    std::ostringstream suffix;
-    suffix << '_' << std::hex << std::setw(8) << std::setfill('0') << hash;
-    key += suffix.str();
-    return key;
-}
-
 } // namespace
 
 void launcher_append_desktop_apps(std::list<app> &apps)
 {
     const std::size_t initial_size = apps.size();
-    bool refresh_started = false;
     try {
         const std::string app_dir = launcher_platform::path("applications");
         if (app_dir.empty()) return;
@@ -102,9 +75,6 @@ void launcher_append_desktop_apps(std::list<app> &apps)
             listing = std::move(data);
         });
         if (list_code != 0) return;
-
-        launcher_app_registry_begin_dynamic_refresh();
-        refresh_started = true;
 
         std::istringstream lines(listing);
         std::string line;
@@ -156,16 +126,8 @@ void launcher_append_desktop_apps(std::list<app> &apps)
                 continue;
             }
 
-            const std::string icon_path = launcher_platform::path(entry->icon);
-            if (!entry->icon.empty() && icon_path.empty()) {
-                std::fprintf(stderr, "applications_load: skip %s (invalid Icon)\n", path.c_str());
-                continue;
-            }
-
             DesktopAppCandidate candidate;
-            candidate.filename = std::move(name);
             candidate.entry = std::move(*entry);
-            candidate.icon_path = icon_path;
             // Package installs rewrite the desktop file, so its last-write
             // time is the install/update order for custom apps.
             candidate.has_modified_time = read_modified_time(path, candidate.modified_time);
@@ -188,30 +150,13 @@ void launcher_append_desktop_apps(std::list<app> &apps)
                 continue;
             }
 
-            const LauncherAppOrigin origin = LauncherAppOrigin::External;
-            const std::string config_key = desktop_config_key(candidate.filename);
-            if (!launcher_app_registry_register_dynamic(
-                    candidate.entry.name, candidate.icon_path, config_key, origin))
-                continue;
-            const AppDescriptor descriptor{
-                candidate.entry.name.c_str(), candidate.icon_path.c_str(),
-                config_key.c_str(), false, true, origin};
-            bool enabled = true;
-            try {
-                enabled = launcher_app_registry_is_enabled(descriptor);
-            } catch (...) {
-                enabled = true;
-            }
-            if (!enabled || appended >= LAUNCHER_MAX_DESKTOP_APPS) continue;
+            if (appended >= LAUNCHER_MAX_DESKTOP_APPS) continue;
 
-            apps.emplace_back(candidate.entry.name, candidate.icon_path, candidate.entry.exec,
+            apps.emplace_back(candidate.entry.name, candidate.entry.exec,
                               candidate.entry.terminal, candidate.entry.sysplause);
             ++appended;
         }
-        launcher_app_registry_commit_dynamic_refresh();
-        refresh_started = false;
     } catch (...) {
         while (apps.size() > initial_size) apps.pop_back();
-        if (refresh_started) launcher_app_registry_cancel_dynamic_refresh();
     }
 }

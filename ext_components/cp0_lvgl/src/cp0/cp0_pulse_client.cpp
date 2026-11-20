@@ -366,11 +366,6 @@ std::uint32_t volume_scale_from_percent(int percent)
     return static_cast<std::uint32_t>(static_cast<std::uint64_t>(clamped) * kPaVolumeNorm / 100);
 }
 
-bool preload()
-{
-    return pulse_api() != nullptr;
-}
-
 bool default_sink_name(std::string &name)
 {
     Session session;

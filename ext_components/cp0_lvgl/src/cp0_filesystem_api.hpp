@@ -24,7 +24,6 @@ struct Operations {
     std::function<cp0_watcher_t(const char *)> watch_start;
     std::function<int(cp0_watcher_t)> watch_poll;
     std::function<int(cp0_watcher_t)> watch_stop;
-    bool detail_errno_on_open_failure = true;
 };
 
 class WatcherRegistry {

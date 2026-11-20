@@ -12,7 +12,6 @@
 
 namespace cp0_process_commands {
 
-int run_argv(const std::vector<std::string> &argv, bool background);
 int capture_argv(const std::vector<std::string> &argv, std::string &output);
 int capture_argv_with_timeout(const std::vector<std::string> &argv,
                               std::string &output, int timeout_ms,

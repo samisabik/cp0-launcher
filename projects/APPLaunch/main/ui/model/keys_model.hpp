@@ -38,7 +38,6 @@ struct Analysis {
     uint32_t total_us = 0;
     // The first packet that carries the decoded code, gap excluded.
     uint32_t packet_start_us = 0;
-    uint32_t packet_us = 0;
     // bit_count + 1 offsets from the capture start: where each bit begins and
     // where the last one ends.
     std::vector<uint32_t> bit_edges_us;

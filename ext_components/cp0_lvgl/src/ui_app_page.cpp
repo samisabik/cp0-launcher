@@ -157,45 +157,10 @@ void AppPageRoot::release_root_screen()
 
 void AppPageRoot::enable_top_bar() { top_bar_region_->enable(); }
 void AppPageRoot::disable_top_bar() { top_bar_region_->disable(); }
-bool AppPageRoot::top_bar_enabled() const { return top_bar_region_->enabled(); }
 void AppPageRoot::set_page_title(const std::string &title)
 {
     page_title_ = title;
     top_bar_region_->set_page_title(title);
-}
-void AppPageRoot::update_time() { top_bar_region_->update_time(); }
-void AppPageRoot::update_status() { top_bar_region_->update_status(); }
-void AppPageRoot::update_battery(const cp0_battery_info_t &battery)
-{
-    top_bar_region_->update_battery(battery);
-}
-AppTopBarComponent *AppPageRoot::add_top_bar_component(
-    std::unique_ptr<AppTopBarComponent> component)
-{
-    return top_bar_region_->add_component(std::move(component));
-}
-bool AppPageRoot::remove_top_bar_component(const std::string &id)
-{
-    return top_bar_region_->remove_component(id);
-}
-AppTopBarComponent *AppPageRoot::top_bar_component(const std::string &id) const
-{
-    return top_bar_region_->component(id);
-}
-
-void AppPageRoot::clear_content()
-{
-    if (!root_screen_) return;
-    lv_obj_t *top_bar = top_bar_region_ ? top_bar_region_->container() : nullptr;
-    uint32_t index = 0;
-    while (index < lv_obj_get_child_count(root_screen_)) {
-        lv_obj_t *child = lv_obj_get_child(root_screen_, index);
-        if (child == top_bar) {
-            ++index;
-        } else {
-            lv_obj_delete(child);
-        }
-    }
 }
 
 void AppPageRoot::create_base_ui()
@@ -252,10 +217,10 @@ void AppContentRegion::container_delete_cb(lv_event_t *event)
 
 void AppContentRegion::refresh()
 {
-    app_container_.set_height(cp0::app_content_height(has_bottom_bar_));
+    app_container_.set_height(cp0::kAppContentHeight);
     if (ui_APP_Container || !root_screen_) return;
 
-    ui_APP_Container = add_bar(app_container_);
+    ui_APP_Container = app_container_.create(root_screen_);
     if (ui_APP_Container)
         lv_obj_add_event_cb(ui_APP_Container, container_delete_cb,
                             LV_EVENT_DELETE, this);
@@ -268,7 +233,7 @@ void AppContentRegion::reclaim_top_bar()
     if (!ui_APP_Container) return;
     lv_obj_set_pos(ui_APP_Container, 0, 0);
     lv_obj_set_height(ui_APP_Container,
-                      cp0::app_content_height(has_bottom_bar_) + AppPageRoot::kTopBarHeightPx);
+                      cp0::kAppContentHeight + AppPageRoot::kTopBarHeightPx);
 }
 
 AppTopBarComponent::AppTopBarComponent(std::string id, int recommended_width, int height)
@@ -330,11 +295,6 @@ void AppTopBarComponent::set_visible(bool visible)
     if (!obj_) return;
     if (visible) lv_obj_remove_flag(obj_, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(obj_, LV_OBJ_FLAG_HIDDEN);
-}
-
-bool AppTopBarComponent::visible() const
-{
-    return obj_ && !lv_obj_has_flag(obj_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void AppTopBarComponent::set_width(int width)
@@ -743,18 +703,9 @@ UIAppTopBar::UIAppTopBar()
 
 UIAppTopBar::~UIAppTopBar()
 {
-    for (auto &entry : components_) {
-        AppTopBarComponent *component = entry.second.get();
-        cp0::status::release_before_destroy(
-            [component] { component->deactivate(); },
-            [component] { component->unmount(); });
-    }
-    components_.clear();
     set_active(false);
     if (container_)
         lv_obj_remove_event_cb_with_user_data(container_, container_delete_cb, this);
-    if (custom_container_)
-        lv_obj_remove_event_cb_with_user_data(custom_container_, custom_container_delete_cb, this);
 }
 
 lv_obj_t *UIAppTopBar::create(lv_obj_t *parent)
@@ -780,22 +731,6 @@ lv_obj_t *UIAppTopBar::create(lv_obj_t *parent)
     lv_obj_set_width(title_->obj(), 0);
     lv_obj_set_flex_grow(title_->obj(), 1);
 
-    custom_container_ = lv_obj_create(container_);
-    if (!custom_container_) {
-        lv_obj_delete(container_);
-        return nullptr;
-    }
-    lv_obj_add_event_cb(custom_container_, custom_container_delete_cb, LV_EVENT_DELETE, this);
-    lv_obj_remove_style_all(custom_container_);
-    lv_obj_set_size(custom_container_, LV_SIZE_CONTENT, height_);
-    lv_obj_set_flex_flow(custom_container_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(custom_container_, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(custom_container_, 4, 0);
-    lv_obj_clear_flag(custom_container_, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE |
-                                                                    LV_OBJ_FLAG_SCROLLABLE));
-    lv_obj_add_flag(custom_container_, LV_OBJ_FLAG_HIDDEN);
-
     if (!network_->mount(container_) || !time_->mount(container_) ||
         !battery_->mount(container_)) {
         lv_obj_delete(container_);
@@ -816,19 +751,6 @@ void UIAppTopBar::container_delete_cb(lv_event_t *event)
     }
 }
 
-void UIAppTopBar::custom_container_delete_cb(lv_event_t *event)
-{
-    if (!cp0::is_direct_event_target(
-            lv_event_get_target(event), lv_event_get_current_target(event))) return;
-    auto *self = static_cast<UIAppTopBar *>(lv_event_get_user_data(event));
-    if (!self) return;
-    for (auto &entry : self->components_) {
-        entry.second->deactivate();
-        entry.second->detach_from_deleted_parent();
-    }
-    self->custom_container_ = nullptr;
-}
-
 void UIAppTopBar::detach_from_deleted_parent()
 {
     auto detach = [](AppTopBarComponent *component) {
@@ -840,9 +762,7 @@ void UIAppTopBar::detach_from_deleted_parent()
     detach(network_.get());
     detach(time_.get());
     detach(battery_.get());
-    for (auto &entry : components_) detach(entry.second.get());
     container_ = nullptr;
-    custom_container_ = nullptr;
     active_ = false;
 }
 
@@ -853,11 +773,6 @@ void UIAppTopBar::set_visible(bool visible)
     else lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
 }
 
-bool UIAppTopBar::visible() const
-{
-    return container_ && !lv_obj_has_flag(container_, LV_OBJ_FLAG_HIDDEN);
-}
-
 void UIAppTopBar::set_active(bool active)
 {
     if (active_ == active) return;
@@ -865,7 +780,6 @@ void UIAppTopBar::set_active(bool active)
     auto apply = [active](AppTopBarComponent *component) {
         if (active) {
             if (!component->obj()) return;
-            component->activate();
             component->refresh();
         } else {
             component->deactivate();
@@ -875,50 +789,6 @@ void UIAppTopBar::set_active(bool active)
     apply(network_.get());
     apply(time_.get());
     apply(battery_.get());
-    for (auto &entry : components_) apply(entry.second.get());
-}
-
-AppTopBarComponent *UIAppTopBar::add_component(
-    std::unique_ptr<AppTopBarComponent> component)
-{
-    if (!component || component->id().empty() || !custom_container_) return nullptr;
-    const std::string id = component->id();
-    if (id == title_->id() || id == network_->id() ||
-        id == time_->id() || id == battery_->id()) return nullptr;
-    remove_component(id);
-    if (!component->mount(custom_container_)) return nullptr;
-    AppTopBarComponent *result = component.get();
-    components_[id] = std::move(component);
-    if (active_) {
-        result->activate();
-        result->refresh();
-    }
-    lv_obj_remove_flag(custom_container_, LV_OBJ_FLAG_HIDDEN);
-    return result;
-}
-
-bool UIAppTopBar::remove_component(const std::string &id)
-{
-    const auto found = components_.find(id);
-    if (found == components_.end()) return false;
-    AppTopBarComponent *component = found->second.get();
-    cp0::status::release_before_destroy(
-        [component] { component->deactivate(); },
-        [component] { component->unmount(); });
-    components_.erase(found);
-    if (components_.empty() && custom_container_)
-        lv_obj_add_flag(custom_container_, LV_OBJ_FLAG_HIDDEN);
-    return true;
-}
-
-AppTopBarComponent *UIAppTopBar::component(const std::string &id) const
-{
-    if (id == title_->id()) return title_.get();
-    if (id == network_->id()) return network_.get();
-    if (id == time_->id()) return time_.get();
-    if (id == battery_->id()) return battery_.get();
-    const auto found = components_.find(id);
-    return found == components_.end() ? nullptr : found->second.get();
 }
 
 void UIAppTopBar::set_title(const std::string &title)
@@ -1037,22 +907,6 @@ void AppTopBarRegion::update_battery(const cp0_battery_info_t &battery)
     top_bar_.update_battery(battery);
 }
 
-AppTopBarComponent *AppTopBarRegion::add_component(
-    std::unique_ptr<AppTopBarComponent> component)
-{
-    return top_bar_.add_component(std::move(component));
-}
-
-bool AppTopBarRegion::remove_component(const std::string &id)
-{
-    return top_bar_.remove_component(id);
-}
-
-AppTopBarComponent *AppTopBarRegion::component(const std::string &id) const
-{
-    return top_bar_.component(id);
-}
-
 void AppTopBarRegion::battery_event_cb(lv_event_t *event)
 {
     auto *self = static_cast<AppTopBarRegion *>(lv_event_get_user_data(event));
@@ -1076,55 +930,8 @@ void AppTopBarRegion::status_timer_cb(lv_timer_t *timer)
         self, [](AppTopBarRegion &region) { region.update_status(); });
 }
 
-AppBottomBarRegion::AppBottomBarRegion()
-{
-    has_bottom_bar_ = true;
-    refresh();
-    if (!root_screen_) {
-        has_bottom_bar_ = false;
-        refresh();
-        return;
-    }
-    ui_BOTTOM_Container = lv_obj_create(root_screen_);
-    if (!ui_BOTTOM_Container) {
-        has_bottom_bar_ = false;
-        refresh();
-        return;
-    }
-    lv_obj_add_event_cb(ui_BOTTOM_Container, container_delete_cb, LV_EVENT_DELETE, this);
-    lv_obj_remove_style_all(ui_BOTTOM_Container);
-    lv_obj_set_size(ui_BOTTOM_Container, 320, 20);
-    lv_obj_set_pos(ui_BOTTOM_Container, 0, 150);
-    lv_obj_clear_flag(ui_BOTTOM_Container,
-                      static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE |
-                                                 LV_OBJ_FLAG_SCROLLABLE));
-}
-
-AppBottomBarRegion::~AppBottomBarRegion()
-{
-    if (ui_BOTTOM_Container)
-        lv_obj_remove_event_cb_with_user_data(ui_BOTTOM_Container, container_delete_cb, this);
-}
-
-void AppBottomBarRegion::container_delete_cb(lv_event_t *event)
-{
-    if (!cp0::is_direct_event_target(
-            lv_event_get_target(event), lv_event_get_current_target(event))) return;
-    auto *self = static_cast<AppBottomBarRegion *>(lv_event_get_user_data(event));
-    if (!self) return;
-    self->ui_BOTTOM_Container = nullptr;
-    self->has_bottom_bar_ = false;
-    if (self->root_screen_) self->refresh();
-}
-
 AppPageLayout::AppPageLayout()
     : AppPageRoot(), AppContentRegion()
-{
-    enable_top_bar();
-}
-
-AppPageWithBottomBarLayout::AppPageWithBottomBarLayout()
-    : AppPageRoot(), AppContentRegion(), AppBottomBarRegion()
 {
     enable_top_bar();
 }

@@ -16,7 +16,7 @@ namespace {
 
 std::vector<cp0_init_step_t> build(std::uint64_t features)
 {
-    std::array<cp0_init_step_t, CP0_INIT_STEP_SOUNDCARD + 1> storage{};
+    std::array<cp0_init_step_t, CP0_INIT_STEP_BATTERY + 1> storage{};
     const std::size_t count = cp0_build_init_plan(features, storage.data(), storage.size());
     assert(count <= storage.size());
     return {storage.begin(), storage.begin() + static_cast<std::ptrdiff_t>(count)};
@@ -43,18 +43,18 @@ void test_core_plan()
 void test_feature_order()
 {
     const std::uint64_t all_features =
-        (CP0_INIT_FEATURE_SOUNDCARD << 1) - 1;
+        (CP0_INIT_FEATURE_BATTERY << 1) - 1;
     const auto plan = build(all_features);
-    assert(plan.size() == static_cast<std::size_t>(CP0_INIT_STEP_SOUNDCARD + 1));
+    assert(plan.size() == static_cast<std::size_t>(CP0_INIT_STEP_BATTERY + 1));
     assert(plan.front() == CP0_INIT_STEP_ENV);
-    assert(plan.back() == CP0_INIT_STEP_SOUNDCARD);
+    assert(plan.back() == CP0_INIT_STEP_BATTERY);
     assert(position(plan, CP0_INIT_STEP_EVENT) < position(plan, CP0_INIT_STEP_FILESYSTEM));
     assert(position(plan, CP0_INIT_STEP_PTY) < position(plan, CP0_INIT_STEP_DISPLAY));
     assert(position(plan, CP0_INIT_STEP_DISPLAY) < position(plan, CP0_INIT_STEP_INPUT));
     assert(position(plan, CP0_INIT_STEP_INPUT) < position(plan, CP0_INIT_STEP_AUDIO));
     assert(position(plan, CP0_INIT_STEP_SCREENSHOT) < position(plan, CP0_INIT_STEP_WIFI));
     assert(position(plan, CP0_INIT_STEP_BQ27220) < position(plan, CP0_INIT_STEP_SAVED_SETTINGS));
-    assert(position(plan, CP0_INIT_STEP_BATTERY) < position(plan, CP0_INIT_STEP_SOUNDCARD));
+    assert(position(plan, CP0_INIT_STEP_SAVED_SETTINGS) < position(plan, CP0_INIT_STEP_BATTERY));
 }
 
 void test_selected_features_and_capacity()

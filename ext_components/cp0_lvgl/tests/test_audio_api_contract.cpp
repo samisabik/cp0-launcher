@@ -14,32 +14,17 @@ namespace {
 
 using cp0::audio::ApiCommand;
 using cp0::audio::ApiRequest;
-using cp0::audio::SetupCommand;
-using cp0::audio::SetupRequest;
 
-void test_path_and_no_argument_commands()
+void test_no_argument_commands()
 {
     ApiRequest request;
     assert(!cp0::audio::parse_api_request({}, request));
     assert(!cp0::audio::parse_api_request({"Unknown"}, request));
-    assert(!cp0::audio::parse_api_request({"Play"}, request));
-    assert(!cp0::audio::parse_api_request({"Play", ""}, request));
-    assert(!cp0::audio::parse_api_request({"Play", "tone.wav", "junk"}, request));
-    assert(cp0::audio::parse_api_request({"Play", "tone.wav"}, request));
-    assert(request.command == ApiCommand::Play && request.path == "tone.wav");
-    assert(cp0::audio::parse_api_request({"PlayFile", "/tmp/tone.wav"}, request));
-    assert(request.command == ApiCommand::PlayFile && request.path == "/tmp/tone.wav");
-    assert(cp0::audio::parse_api_request({"CapFileSave", "/tmp/cap.wav"}, request));
-    assert(request.command == ApiCommand::CapFileSave);
-
-    assert(cp0::audio::parse_api_request({"PlayPause"}, request));
-    assert(request.command == ApiCommand::PlayPause);
-    assert(!cp0::audio::parse_api_request({"PlayPause", "junk"}, request));
-    assert(cp0::audio::parse_api_request({"Preload"}, request));
-    assert(request.command == ApiCommand::Preload);
-    assert(!cp0::audio::parse_api_request({"Preload", "junk"}, request));
-    assert(cp0::audio::parse_api_request({"CapEnd"}, request));
-    assert(request.command == ApiCommand::CapEnd);
+    assert(cp0::audio::parse_api_request({"VolumeRead"}, request));
+    assert(request.command == ApiCommand::VolumeRead);
+    assert(!cp0::audio::parse_api_request({"VolumeRead", "junk"}, request));
+    assert(cp0::audio::parse_api_request({"MuteRead"}, request));
+    assert(request.command == ApiCommand::MuteRead);
     assert(cp0::audio::parse_api_request({"MuteToggle"}, request));
     assert(request.command == ApiCommand::MuteToggle);
     assert(cp0::audio::parse_api_request({"DefaultSink"}, request));
@@ -61,35 +46,6 @@ void test_numeric_commands()
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "101"}, request));
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "99999999999999999999"}, request));
     assert(!cp0::audio::parse_api_request({"VolumeWrite", "50", "junk"}, request));
-}
-
-void test_removed_system_sound_commands()
-{
-    ApiRequest request;
-    assert(!cp0::audio::parse_api_request({"SystemSoundPlay", "0"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundEnable"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundSuspend"}, request));
-    assert(!cp0::audio::parse_api_request({"SystemSoundPrepare"}, request));
-    assert(!cp0::audio::parse_api_request({"SetSystemSoundNames"}, request));
-    assert(!cp0::audio::parse_api_request({"RegisterSystemSounds", "lock.wav"}, request));
-}
-
-void test_setup_commands()
-{
-    SetupRequest setup;
-    assert(!cp0::audio::parse_setup_request({}, setup));
-    assert(!cp0::audio::parse_setup_request({"unknown"}, setup));
-    assert(cp0::audio::parse_setup_request({"set_callback"}, setup));
-    assert(setup.command == SetupCommand::SetCallback);
-    assert(!cp0::audio::parse_setup_request({"set_callback", "junk"}, setup));
-    assert(cp0::audio::parse_setup_request({"waveform"}, setup));
-    assert(setup.command == SetupCommand::SetWaveform && setup.waveform_enabled);
-    assert(cp0::audio::parse_setup_request({"set_waveform", "off"}, setup));
-    assert(!setup.waveform_enabled);
-    assert(!cp0::audio::parse_setup_request({"waveform", "junk"}, setup));
-    assert(!cp0::audio::parse_setup_request({"waveform", "on", "junk"}, setup));
-    assert(cp0::audio::parse_setup_request({"stop_play"}, setup));
-    assert(setup.command == SetupCommand::StopPlay);
     assert(std::string(cp0::audio::invalid_api_request_message()) ==
         "invalid audio api request\n");
 }
@@ -112,9 +68,7 @@ void test_callback_exception_boundary()
 
 int main()
 {
-    test_path_and_no_argument_commands();
+    test_no_argument_commands();
     test_numeric_commands();
-    test_removed_system_sound_commands();
-    test_setup_commands();
     test_callback_exception_boundary();
 }

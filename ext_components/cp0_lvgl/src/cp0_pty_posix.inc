@@ -185,24 +185,6 @@ public:
 #endif
     }
 
-    int resize(pty_handle_t pty, int cols, int rows)
-    {
-#if defined(CP0_HAS_POSIX_PTY)
-        std::lock_guard<std::mutex> lock(handles_mutex_);
-        cp0_pty_handle *h = resolve(pty);
-        if (!h) return -1;
-        struct winsize ws = {};
-        ws.ws_col = static_cast<unsigned short>(cols);
-        ws.ws_row = static_cast<unsigned short>(rows);
-        return ioctl(h->master_fd, TIOCSWINSZ, &ws);
-#else
-        (void)pty;
-        (void)cols;
-        (void)rows;
-        return -1;
-#endif
-    }
-
     bool close(pty_handle_t pty)
     {
 #if defined(CP0_HAS_POSIX_PTY)
@@ -246,11 +228,6 @@ public:
         case cp0::pty::Command::open: api_open(request, callback); break;
         case cp0::pty::Command::read: api_read(request, callback); break;
         case cp0::pty::Command::write: api_write(request, callback); break;
-        case cp0::pty::Command::resize: {
-            const int result = resize(to_handle(request.handle), request.columns, request.rows);
-            report(callback, result, result < 0 ? "resize pty failed\n" : "");
-            break;
-        }
         case cp0::pty::Command::check_child: api_check_child(request, callback); break;
         case cp0::pty::Command::close: {
             const bool closed = close(to_handle(request.handle));

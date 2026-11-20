@@ -192,13 +192,6 @@ public:
             report(callback, val < 0 ? -1 : 0, std::to_string(val));
             break;
         }
-        case cp0::settings::Command::Log: {
-            const std::string topic = cp0::settings::argument_at(arg, 1);
-            const std::string message = cp0::settings::argument_at(arg, 2);
-            settings_log(topic.c_str(), message.c_str());
-            report(callback, 0, "");
-            break;
-        }
         case cp0::settings::Command::TimeStr: {
             char buf[32] = {};
             time_str(buf, sizeof(buf));
@@ -464,11 +457,6 @@ private:
         return written > 0 && close_result == 0 ? val : -1;
     }
 
-    void settings_log(const char *topic, const char *message)
-    {
-        cp0_log(topic && topic[0] ? topic : "settings", message ? message : "");
-    }
-
     void time_str(char *buf, int buf_size) { fallback_time_str(buf, buf_size); }
 };
 
@@ -484,18 +472,6 @@ extern "C" void init_settings(void)
                                     std::function<void(int, std::string)> callback) {
                              settings->api_call(std::move(arg), std::move(callback));
                          });
-}
-
-extern "C" int cp0_backlight_read(void)
-{
-    return SettingsSystem::api_int(
-        {"BacklightRead"}, -1, 0, std::numeric_limits<int>::max());
-}
-
-extern "C" int cp0_backlight_max(void)
-{
-    return SettingsSystem::api_int(
-        {"BacklightMax"}, 100, 1, std::numeric_limits<int>::max());
 }
 
 extern "C" int cp0_backlight_write(int val)

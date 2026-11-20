@@ -192,8 +192,7 @@ public:
         lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
         lv_obj_update_layout(label);
 
-        const bool focused      = distance == 0;
-        const int natural_width = lv_obj_get_width(label);
+        const bool focused = distance == 0;
         if (left_aligned) {
             // Top-level entries on the left side of a second-level page use a fixed width and left alignment.
             lv_obj_set_width(label, metric(LayoutMetric::LabelBoxW));

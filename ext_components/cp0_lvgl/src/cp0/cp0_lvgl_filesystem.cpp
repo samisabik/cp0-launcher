@@ -44,7 +44,6 @@ public:
         operations.watch_start = [this](const char *path) { return dir_watch_start(path); };
         operations.watch_poll = [this](cp0_watcher_t watcher) { return dir_watch_poll(watcher); };
         operations.watch_stop = [this](cp0_watcher_t watcher) { return dir_watch_stop(watcher); };
-        operations.detail_errno_on_open_failure = false;
         cp0_filesystem_api::dispatch(arg, operations, std::move(callback));
     }
 
@@ -54,15 +53,6 @@ public:
         std::string data;
         invoke({"Path", std::move(file)}, code, data);
         return code == 0 ? data : std::string();
-    }
-
-    int dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        int code = -1;
-        std::string data;
-        invoke({"DirList", path ? path : ""}, code, data);
-        if (code != 0) return code;
-        return decode_dir_entries(data, entries, max_entries, out_count);
     }
 
     cp0_watcher_t dir_watch_start(const char *path)
@@ -184,67 +174,11 @@ private:
             cp0::filesystem::has_parent_component(file))
             return "";
         if (kind == cp0::filesystem::ResourceKind::image) return resolve_lvgl_image_path(file);
-        if (kind == cp0::filesystem::ResourceKind::audio)
-            return resolve_native_resource_path(
-                std::string(kAppRoot) + "/share/audio", "share/audio", file);
         if (kind == cp0::filesystem::ResourceKind::font)
             return resolve_native_resource_path(
                 std::string(kAppRoot) + "/share/font", "share/font", file);
 
         return file;
-    }
-
-    static int list_dir(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        return cp0_posix_filesystem::list_directory(path, entries, max_entries, out_count, false);
-    }
-
-    static int decode_dir_entries(const std::string &data, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        if (out_count) *out_count = 0;
-        if (!entries || max_entries <= 0 || !out_count) return 0;
-
-        size_t start = 0;
-        while (start < data.size() && *out_count < max_entries) {
-            size_t end = data.find('\n', start);
-            std::string line = data.substr(start, end == std::string::npos ? std::string::npos : end - start);
-            if (line.size() >= 3 && line[1] == '\t') {
-                entries[*out_count].is_dir = (line[0] == 'D') ? 1 : 0;
-                std::string name;
-                if (!decode_field(line.substr(2), name)) {
-                    if (end == std::string::npos) break;
-                    start = end + 1;
-                    continue;
-                }
-                std::strncpy(entries[*out_count].name, name.c_str(), sizeof(entries[*out_count].name) - 1);
-                entries[*out_count].name[sizeof(entries[*out_count].name) - 1] = '\0';
-                (*out_count)++;
-            }
-            if (end == std::string::npos) break;
-            start = end + 1;
-        }
-        return 0;
-    }
-
-    static bool decode_field(const std::string &encoded, std::string &decoded)
-    {
-        auto hex_value = [](char c) -> int {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            return -1;
-        };
-        decoded.clear();
-        for (size_t i = 0; i < encoded.size(); ++i) {
-            if (encoded[i] != '%') { decoded.push_back(encoded[i]); continue; }
-            if (i + 2 >= encoded.size()) return false;
-            const int high = hex_value(encoded[i + 1]);
-            const int low = hex_value(encoded[i + 2]);
-            if (high < 0 || low < 0) return false;
-            decoded.push_back(static_cast<char>((high << 4) | low));
-            i += 2;
-        }
-        return true;
     }
 
     static cp0_watcher_t native_watch_start(const char *path)
@@ -314,26 +248,6 @@ extern "C" const char *cp0_file_path_c(const char *file)
         if (it == paths.end()) it = paths.emplace(key, cp0_file_path(key)).first;
         return it->second.c_str();
     });
-}
-
-extern "C" int cp0_dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-{
-    return filesystem().dir_list(path, entries, max_entries, out_count);
-}
-
-extern "C" cp0_watcher_t cp0_dir_watch_start(const char *path)
-{
-    return filesystem().dir_watch_start(path);
-}
-
-extern "C" int cp0_dir_watch_poll(cp0_watcher_t watcher)
-{
-    return filesystem().dir_watch_poll(watcher);
-}
-
-extern "C" void cp0_dir_watch_stop(cp0_watcher_t watcher)
-{
-    (void)filesystem().dir_watch_stop(watcher);
 }
 
 extern "C" void init_filesystem(void)

@@ -41,9 +41,6 @@ inline void invoke_c_api_void(Operation &&operation) noexcept
     }
 }
 
-inline constexpr int MAX_GRACE_MS = 300000;
-inline constexpr int MAX_DELAY_MS = 300000;
-
 inline bool has_exact_arguments(const std::list<std::string> &args, std::size_t count)
 {
     return args.size() == count;
@@ -103,31 +100,6 @@ inline bool parse_bool(std::string_view text, bool &value)
 inline bool parse_pid(std::string_view text, int &value)
 {
     return parse_integer(text, 1, std::numeric_limits<int>::max(), value);
-}
-
-inline bool parse_grace_ms(std::string_view text, int &value)
-{
-    return parse_integer(text, 0, MAX_GRACE_MS, value);
-}
-
-inline bool parse_delay_ms(std::string_view text, int &value)
-{
-    return parse_integer(text, 0, MAX_DELAY_MS, value);
-}
-
-inline bool parse_pointer(std::string_view text, uintptr_t &value)
-{
-    return parse_integer(text, uintptr_t{0}, std::numeric_limits<uintptr_t>::max(), value);
-}
-
-inline bool parse_spawn_response(std::string_view text, int &pid)
-{
-    return parse_pid(text, pid);
-}
-
-inline bool parse_lock_holder_response(std::string_view text, int &pid)
-{
-    return parse_integer(text, 0, std::numeric_limits<int>::max(), pid);
 }
 
 inline void invoke_callback_safely(

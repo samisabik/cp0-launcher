@@ -125,11 +125,6 @@ void stop_sudo() noexcept
 
 } // namespace
 
-void cp0_lvgl_wake()
-{
-    post_lvgl_semaphore();
-}
-
 extern "C" void cp0_lvgl_wake_from_c(void)
 {
     post_lvgl_semaphore();
@@ -193,9 +188,6 @@ int cp0_lvgl_run(Cp0LvglRunOptions options)
 
     bool setup_attempted = false;
     try {
-        if (options.after_lvgl_init)
-            options.after_lvgl_init();
-
         cp0_lvgl_init();
         if (options.after_resource_init)
             options.after_resource_init();

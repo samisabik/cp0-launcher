@@ -63,7 +63,6 @@ class UISTPage : public AppPage
     static constexpr int BIG_VIEW_ROWS = (TERM_H - BIG_BOTTOM_H) / CHAR_H;
     static constexpr int MAX_COLS = BIG_COLS;
     static constexpr int MAX_ROWS = BIG_ROWS;
-    static constexpr int COLS = NORMAL_COLS;
     static constexpr int ROWS = NORMAL_ROWS;
     static constexpr int SCROLLBACK_MAX_ROWS = 200;
     static constexpr int SCROLLBAR_W = 3;
@@ -72,7 +71,7 @@ class UISTPage : public AppPage
     static constexpr uint32_t DEFAULT_FG = 7;
     static constexpr uint32_t DEFAULT_BG = 0;
 
-    enum GlyphAttr : uint16_t {
+    enum : uint16_t {
         ATTR_NULL      = 0,
         ATTR_BOLD      = 1 << 0,
         ATTR_FAINT     = 1 << 1,
@@ -82,7 +81,7 @@ class UISTPage : public AppPage
         ATTR_INVISIBLE = 1 << 5,
     };
 
-    enum TermMode : uint16_t {
+    enum : uint16_t {
         MODE_WRAP      = 1 << 0,
         MODE_INSERT    = 1 << 1,
         MODE_APPCURSOR = 1 << 2,

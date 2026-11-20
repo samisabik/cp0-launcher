@@ -41,16 +41,6 @@ int main()
     assert(built.request->queue_timeout_ms == cp0_sudo::kDefaultQueueTimeoutMs);
     assert(!built.request->use_login_shell);
 
-    auto shell = factory.create_shell("printf ok", CP0_SUDO_CALLBACK_LVGL,
-        nullptr, nullptr, nullptr);
-    assert(shell.error == 0);
-    assert(shell.request->id == 42);
-    assert(shell.request->argv == std::vector<std::string>{"printf ok"});
-    assert(shell.request->use_login_shell);
-    assert(shell.request->auth_timeout_ms == cp0_sudo::kDefaultAuthTimeoutMs);
-    assert(shell.request->exec_timeout_ms == cp0_sudo::kDefaultExecTimeoutMs);
-    assert(shell.request->queue_timeout_ms == cp0_sudo::kDefaultQueueTimeoutMs);
-
     auto defaults = factory.create_argv(argv, CP0_SUDO_CALLBACK_LVGL,
         nullptr, nullptr, nullptr, 0, 0);
     assert(defaults.request->auth_timeout_ms == cp0_sudo::kDefaultAuthTimeoutMs);
@@ -63,14 +53,8 @@ int main()
         nullptr, nullptr, 0, 0).error == -EINVAL);
     assert(factory.create_argv(argv, static_cast<cp0_sudo_callback_thread_t>(99),
         nullptr, nullptr, nullptr, 0, 0).error == -EINVAL);
-    assert(factory.create_shell(nullptr, CP0_SUDO_CALLBACK_LVGL, nullptr,
-        nullptr, nullptr).error == -EINVAL);
-    assert(factory.create_shell("", CP0_SUDO_CALLBACK_LVGL, nullptr,
-        nullptr, nullptr).error == -EINVAL);
-    assert(factory.create_shell("true", static_cast<cp0_sudo_callback_thread_t>(99),
-        nullptr, nullptr, nullptr).error == -EINVAL);
 
-    auto next = factory.create_shell("true", CP0_SUDO_CALLBACK_LVGL,
-        nullptr, nullptr, nullptr);
-    assert(next.request->id == 44);
+    auto next = factory.create_argv(argv, CP0_SUDO_CALLBACK_LVGL,
+        nullptr, nullptr, nullptr, 0, 0);
+    assert(next.request->id == 43);
 }

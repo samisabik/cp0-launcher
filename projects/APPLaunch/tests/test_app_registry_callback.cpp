@@ -67,12 +67,12 @@ void replace_self(void *user_data)
 int main()
 {
     const AppDescriptor unique_descriptors[] = {
-        {"One", "one.png", "app_One", true, false},
-        {"Two", "two.png", "app_Two", true, false},
+        {"One", "app_One", true, false},
+        {"Two", "app_Two", true, false},
     };
     const AppDescriptor duplicate_descriptors[] = {
-        {"One", "one.png", "app_Duplicate", true, false},
-        {"Two", "two.png", "app_Duplicate", true, false},
+        {"One", "app_Duplicate", true, false},
+        {"Two", "app_Duplicate", true, false},
     };
     assert(app_registry_descriptor_ids_unique(unique_descriptors, 2));
     assert(!app_registry_descriptor_ids_unique(duplicate_descriptors, 2));

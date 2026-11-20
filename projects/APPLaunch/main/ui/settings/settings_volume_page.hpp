@@ -52,7 +52,6 @@ public:
     };
 
     bool ready() const;
-    const std::string &last_error() const;
 
 protected:
     int initial_selection() const override;
@@ -97,7 +96,6 @@ private:
     std::uint64_t generation_ = 1;
     bool destroying_ = false;
     bool ready_ = false;
-    bool preview_touched_ = false;
     bool commit_requested_ = false;
     bool commit_leave_requested_ = false;
     bool back_requested_ = false;
@@ -105,7 +103,4 @@ private:
     int original_volume_ = metric(LayoutMetric::MaxVolume);
     int backend_volume_ = metric(LayoutMetric::MaxVolume);
     int locked_selection_ = 0;
-    int last_preview_requested_ = metric(LayoutMetric::MaxVolume);
-    int last_preview_actual_ = metric(LayoutMetric::MaxVolume);
-    std::string last_error_;
 };

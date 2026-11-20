@@ -5,7 +5,6 @@
  */
 
 #include "cp0_lvgl_app.h"
-#include "cp0_lvgl_filesystem.hpp"
 #include "hal/hal_paths.h"
 #include "hal_lvgl_bsp.h"
 #include "../cp0_filesystem_api.hpp"
@@ -38,7 +37,6 @@ static char s_applications_dir[512] = "./applications";
 static char s_lock_file[512] = "/tmp/M5CardputerZero-APPLaunch_fcntl.lock";
 static char s_font_dir[512] = "./APPLaunch/share/font";
 static char s_images_dir[512] = "./APPLaunch/share/images";
-static char s_audio_dir[512] = "./APPLaunch/share/audio";
 
 extern "C" void hal_paths_init(const char *exe_dir)
 {
@@ -48,7 +46,6 @@ extern "C" void hal_paths_init(const char *exe_dir)
     std::snprintf(s_applications_dir, sizeof(s_applications_dir), "%s/applications", exe_dir);
     std::snprintf(s_images_dir, sizeof(s_images_dir), "%s/APPLaunch/share/images", exe_dir);
     std::snprintf(s_font_dir, sizeof(s_font_dir), "%s/APPLaunch/share/font", exe_dir);
-    std::snprintf(s_audio_dir, sizeof(s_audio_dir), "%s/APPLaunch/share/audio", exe_dir);
 }
 
 extern "C" const char *hal_path_data_dir(void) { return s_data_dir; }
@@ -58,7 +55,6 @@ extern "C" const char *hal_path_font_dir(void) { return s_font_dir; }
 extern "C" const char *hal_path_keyboard_device(void) { return nullptr; }
 extern "C" const char *hal_path_keyboard_map(void) { return nullptr; }
 extern "C" const char *hal_path_images_dir(void) { return s_images_dir; }
-extern "C" const char *hal_path_audio_dir(void) { return s_audio_dir; }
 
 namespace {
 
@@ -121,11 +117,6 @@ public:
 
     std::string path(std::string file) { return resolve_path(file); }
 
-    int dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        return list_dir(path, entries, max_entries, out_count);
-    }
-
     cp0_watcher_t dir_watch_start(const char *path)
     {
         return watchers_.add(native_watch_start(path));
@@ -175,8 +166,6 @@ private:
             return "";
         if (kind == cp0::filesystem::ResourceKind::image)
             return resource_path(hal_path_images_dir(), "share/images", file);
-        if (kind == cp0::filesystem::ResourceKind::audio)
-            return resource_path(hal_path_audio_dir(), "share/audio", file);
         if (kind == cp0::filesystem::ResourceKind::font)
             return resource_path(hal_path_font_dir(), "share/font", file);
         if (cp0::filesystem::has_lvgl_drive(file)) {
@@ -186,11 +175,6 @@ private:
             return rel;
         }
         return file;
-    }
-
-    static int list_dir(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        return cp0_posix_filesystem::list_directory(path, entries, max_entries, out_count, true);
     }
 
     static void snapshot(SdlWatcher *watcher)
@@ -263,26 +247,6 @@ extern "C" const char *cp0_file_path_c(const char *file)
             it = paths.emplace(key, cp0_file_path(key)).first;
         return it->second.c_str();
     });
-}
-
-extern "C" int cp0_dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-{
-    return filesystem().dir_list(path, entries, max_entries, out_count);
-}
-
-extern "C" cp0_watcher_t cp0_dir_watch_start(const char *path)
-{
-    return filesystem().dir_watch_start(path);
-}
-
-extern "C" int cp0_dir_watch_poll(cp0_watcher_t watcher)
-{
-    return filesystem().dir_watch_poll(watcher);
-}
-
-extern "C" void cp0_dir_watch_stop(cp0_watcher_t watcher)
-{
-    (void)filesystem().dir_watch_stop(watcher);
 }
 
 extern "C" void init_filesystem(void)

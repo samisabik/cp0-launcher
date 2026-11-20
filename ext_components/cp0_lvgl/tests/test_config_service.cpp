@@ -88,14 +88,14 @@ int main()
     assert(call(service, {"Unknown"}).first == -1);
 
     persisted = {{"reloaded", "yes"}};
-    assert(call(service, {"Init"}).first == 0);
-    assert(call(service, {"Init"}).first == 0);
+    service.init();
+    service.init();
     assert(call(service, {"GetStr", "reloaded", "no"}).second == "yes");
     assert(call(service, {"GetStr", "label", "gone"}).second == "gone");
 
     bool load_ok = false;
     persisted = {{"must", "survive"}};
-    assert(call(service, {"Init"}).first == 0);
+    service.init();
     cp0cfg::ConfigService *transactional_ptr = nullptr;
     cp0cfg::ConfigService transactional(
         [&](cp0cfg::Entries &entries) {
@@ -112,18 +112,16 @@ int main()
         });
     transactional_ptr = &transactional;
     assert(call(transactional, {"SetStr", "retained", "yes"}).first == 0);
-    assert(call(transactional, {"Init"}) ==
-           std::make_pair(-1, std::string("load failed")));
+    transactional.init();
     assert(call(transactional, {"GetStr", "retained", "no"}).second == "yes");
     load_ok = true;
-    assert(call(transactional, {"Init"}).first == 0);
+    transactional.init();
     assert(call(transactional, {"GetStr", "replacement", "no"}).second == "yes");
     assert(call(transactional, {"Save"}).first == 0);
 
     cp0cfg::ConfigService throwing(
         [](cp0cfg::Entries &) -> bool { throw std::runtime_error("load"); },
         [](const cp0cfg::Entries &) -> int { throw std::runtime_error("save"); });
-    assert(call(throwing, {"Init"}).first == -1);
     assert(call(throwing, {"Save"}).first == -1);
     throwing.api_call({"GetStr", "missing", "ok"},
                       [](int, std::string) { throw std::runtime_error("callback"); });

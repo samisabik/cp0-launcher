@@ -9,7 +9,6 @@
 #include "hal_lvgl_bsp.h"
 
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 namespace launcher_platform {
@@ -42,14 +41,6 @@ inline std::string path(std::string name)
         if (code == 0) resolved = std::move(data);
     });
     return resolved;
-}
-
-inline const char *path_c(const std::string &name)
-{
-    static thread_local std::unordered_map<std::string, std::string> cache;
-    auto it = cache.find(name);
-    if (it == cache.end()) it = cache.emplace(name, path(name)).first;
-    return it->second.c_str();
 }
 
 } // namespace launcher_platform

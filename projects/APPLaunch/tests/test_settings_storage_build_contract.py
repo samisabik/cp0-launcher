@@ -6,7 +6,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KCONFIG = (ROOT / "main/Kconfig").read_text(encoding="utf-8")
-SCONSTRUCT = (ROOT / "main/SConstruct").read_text(encoding="utf-8")
 MODEL = (ROOT / "main/ui/settings/settings_storage_model.cpp").read_text(
     encoding="utf-8"
 )
@@ -39,16 +38,10 @@ def test_storage_probe_macro_is_device_only():
     assert "APPLAUNCH_LINUX_X86_SDL2" not in block
 
 
-def test_storage_macro_is_not_defined_independently_by_sconstruct():
-    assert "APPLAUNCH_TARGET_SD_MMC_STORAGE" not in SCONSTRUCT
-    assert "Only CP0 target builds may probe Linux MMC mounts" not in SCONSTRUCT
-
-
 def test_native_probe_requires_linux_and_sd_sysfs_type():
     assert MODEL.count(
         "defined(CONFIG_APPLAUNCH_TARGET_SD_MMC_STORAGE) && defined(__linux__)"
     ) == 2
-    assert "defined(APPLAUNCH_TARGET_SD_MMC_STORAGE)" not in MODEL
     assert 'std::ifstream mounts("/proc/self/mounts")' in MODEL
     assert 'std::filesystem::path("/sys/class/block")' in MODEL
     assert 'if (type == "SD")' in MODEL
@@ -63,6 +56,5 @@ def test_storage_page_labels_available_capacity_as_available():
 
 if __name__ == "__main__":
     test_storage_probe_macro_is_device_only()
-    test_storage_macro_is_not_defined_independently_by_sconstruct()
     test_native_probe_requires_linux_and_sd_sysfs_type()
     test_storage_page_labels_available_capacity_as_available()

@@ -441,13 +441,3 @@ void UILaunchPage::show_home_screen()
     lv_disp_load_scr(screen());
     bind_home_input_group();
 }
-
-void UILaunchPage::load_home_screen()
-{
-    show_home_screen();
-}
-
-void UILaunchPage::start_startup_gif()
-{
-    show_home_screen();
-}

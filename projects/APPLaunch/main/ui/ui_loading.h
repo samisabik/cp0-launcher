@@ -21,8 +21,8 @@
  *   lv_refr_now(NULL);   // force the overlay to paint *before* the
  *                        //   (possibly slow) page construction below
  *   auto p = std::make_shared<PageT>();
- *   lv_disp_load_scr(p->get_ui());
  *   ui_loading::hide();
+ *   cp0_lvgl_start_app_page(*p);
  */
 #ifndef UI_LOADING_H
 #define UI_LOADING_H

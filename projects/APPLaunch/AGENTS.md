@@ -33,9 +33,8 @@ any C++ file that uses the conversion macro:
 
 Use the general `CP0_ENUM_CAST(target_type, enum_value)` for an explicit
 conversion from an `enum class` value. Convenience macros are available for
-common targets, including `CP0_ENUM_CAST_INT`, `CP0_ENUM_CAST_SIZE_T`,
-`CP0_ENUM_CAST_UINT8`, `CP0_ENUM_CAST_UINT16`, `CP0_ENUM_CAST_UINT32`, and
-`CP0_ENUM_CAST_UINT64`:
+common targets: `CP0_ENUM_CAST_INT`, `CP0_ENUM_CAST_SIZE_T` and
+`CP0_ENUM_CAST_UINT32`:
 
 ```cpp
 enum class LayoutMetric : int { Width = 320 };

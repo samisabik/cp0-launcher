@@ -17,7 +17,6 @@ namespace sdr {
 constexpr uint32_t kMinHz = 100000;
 constexpr uint32_t kMaxHz = 1750000000u;
 // One tuner bandwidth, so rtl_power sweeps the span without retuning.
-constexpr uint32_t kMaxSpanHz = 2400000u;
 
 enum class Demod { WFM, NFM, AM };
 const char *demod_label(Demod demod);

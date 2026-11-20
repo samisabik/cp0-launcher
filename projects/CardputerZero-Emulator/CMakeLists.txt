@@ -36,34 +36,31 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
-# SDL2 + Freetype (skip for Emscripten — uses its own ports)
+# SDL2 + Freetype
 # ---------------------------------------------------------------------------
-if(NOT EMSCRIPTEN)
-    if(APPLE)
-        if(EXISTS "/opt/homebrew/opt/sdl2")
-            list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/sdl2")
-        elseif(EXISTS "/usr/local/opt/sdl2")
-            list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/sdl2")
-        endif()
+if(APPLE)
+    if(EXISTS "/opt/homebrew/opt/sdl2")
+        list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/sdl2")
+    elseif(EXISTS "/usr/local/opt/sdl2")
+        list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/sdl2")
     endif()
+endif()
 
-    find_package(SDL2 QUIET)
-    if(NOT SDL2_FOUND)
-        find_package(PkgConfig REQUIRED)
-        pkg_check_modules(SDL2 REQUIRED sdl2)
-    endif()
+find_package(SDL2 QUIET)
+if(NOT SDL2_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED sdl2)
+endif()
 
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(FREETYPE freetype2)
-        pkg_check_modules(SDL2_MIXER SDL2_mixer)
-    endif()
-    if(NOT FREETYPE_FOUND)
-        find_package(Freetype QUIET)
-        if(Freetype_FOUND)
-            set(FREETYPE_INCLUDE_DIRS ${FREETYPE_INCLUDE_DIRS})
-            set(FREETYPE_LIBRARIES Freetype::Freetype)
-        endif()
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(FREETYPE freetype2)
+endif()
+if(NOT FREETYPE_FOUND)
+    find_package(Freetype QUIET)
+    if(Freetype_FOUND)
+        set(FREETYPE_INCLUDE_DIRS ${FREETYPE_INCLUDE_DIRS})
+        set(FREETYPE_LIBRARIES Freetype::Freetype)
     endif()
 endif()
 
@@ -75,30 +72,24 @@ set(LV_CONF_BUILD_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(LV_CONF_BUILD_DISABLE_THORVG OFF CACHE BOOL "" FORCE)
 set(LV_BUILD_CONF_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "" FORCE)
 add_definitions(-DLV_CONF_INCLUDE_SIMPLE)
-if(EMSCRIPTEN)
-    add_definitions(-DLV_USE_FREETYPE=0)
-    add_compile_options(-sUSE_SDL=2 -pthread)
-endif()
 
 # SDL2 parent include for <SDL2/SDL.h>
-if(NOT EMSCRIPTEN)
-    if(SDL2_FOUND AND TARGET SDL2::SDL2)
-        get_target_property(_sdl2_inc SDL2::SDL2 INTERFACE_INCLUDE_DIRECTORIES)
-        if(_sdl2_inc)
-            foreach(_dir ${_sdl2_inc})
-                get_filename_component(_parent "${_dir}" DIRECTORY)
-                include_directories("${_parent}")
-            endforeach()
-        endif()
-    else()
-        foreach(_dir ${SDL2_INCLUDE_DIRS})
+if(SDL2_FOUND AND TARGET SDL2::SDL2)
+    get_target_property(_sdl2_inc SDL2::SDL2 INTERFACE_INCLUDE_DIRECTORIES)
+    if(_sdl2_inc)
+        foreach(_dir ${_sdl2_inc})
             get_filename_component(_parent "${_dir}" DIRECTORY)
             include_directories("${_parent}")
         endforeach()
     endif()
-    if(FREETYPE_INCLUDE_DIRS)
-        include_directories(${FREETYPE_INCLUDE_DIRS})
-    endif()
+else()
+    foreach(_dir ${SDL2_INCLUDE_DIRS})
+        get_filename_component(_parent "${_dir}" DIRECTORY)
+        include_directories("${_parent}")
+    endforeach()
+endif()
+if(FREETYPE_INCLUDE_DIRS)
+    include_directories(${FREETYPE_INCLUDE_DIRS})
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -121,55 +112,14 @@ if(APPLAUNCH_LVGL_FREETYPE_SRCS)
     )
 endif()
 
-# ---------------------------------------------------------------------------
-# Helper: common link libraries for app targets
-# ---------------------------------------------------------------------------
-macro(emu_link_deps target)
-    target_link_libraries(${target} PRIVATE lvgl)
-    if(TARGET SDL2::SDL2)
-        target_link_libraries(${target} PRIVATE SDL2::SDL2)
-    else()
-        target_link_libraries(${target} PRIVATE ${SDL2_LIBRARIES})
-    endif()
-    if(FREETYPE_FOUND AND FREETYPE_LINK_LIBRARIES)
-        target_link_libraries(${target} PRIVATE ${FREETYPE_LINK_LIBRARIES})
-        target_link_directories(${target} PRIVATE ${FREETYPE_LIBRARY_DIRS})
-    elseif(FREETYPE_LIBRARIES)
-        target_link_libraries(${target} PRIVATE ${FREETYPE_LIBRARIES})
-    else()
-        target_link_directories(${target} PRIVATE /opt/homebrew/lib)
-        target_link_libraries(${target} PRIVATE freetype)
-    endif()
-    find_package(Threads REQUIRED)
-    target_link_libraries(${target} PRIVATE Threads::Threads)
-endmacro()
-
 # ===========================================================================
-# Native-only targets (skipped for Emscripten)
+# Targets
 # ===========================================================================
-set(CP0_LVGL_APP_COMMON_SRCS
-    ${CP0_LVGL}/src/commount.c
-    ${CP0_LVGL}/src/commount.cpp
-    ${CP0_LVGL}/src/cp0_esc_state.c
-    ${CP0_LVGL}/src/cp0_font_service.cpp
-    ${CP0_LVGL}/src/cp0_lvgl_app_page_assets.c
-    ${CP0_LVGL}/src/cp0_network_api_contract.cpp
-    ${CP0_LVGL}/src/cp0_status_ethernet.c
-    ${CP0_LVGL}/src/cp0_status_lifecycle.cpp
-    ${CP0_LVGL}/src/ui_app_page.cpp
-)
-
-if(NOT EMSCRIPTEN)
 
 option(EMU_SKIP_APPLAUNCH "Skip APPLaunch" OFF)
 
 file(GLOB_RECURSE APPLAUNCH_UI_C CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.c)
 file(GLOB_RECURSE APPLAUNCH_UI_CPP CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.cpp)
-list(FILTER APPLAUNCH_UI_C EXCLUDE REGEX ".*/ui/lvgl/.*")
-list(FILTER APPLAUNCH_UI_CPP EXCLUDE REGEX ".*/ui/lvgl/.*")
-file(GLOB APPLAUNCH_KBD CONFIGURE_DEPENDS ${APPLAUNCH}/hal/keyboard_input.c)
-file(GLOB APPLAUNCH_HAL_SDL_C CONFIGURE_DEPENDS ${APPLAUNCH}/hal/sdl/*.c)
-file(GLOB APPLAUNCH_HAL_SDL_CPP CONFIGURE_DEPENDS ${APPLAUNCH}/hal/sdl/*.cpp)
 file(GLOB CP0_LVGL_COMMON_SRCS CONFIGURE_DEPENDS
     ${CP0_LVGL}/src/*.c
     ${CP0_LVGL}/src/*.cpp
@@ -191,37 +141,22 @@ if(NOT EMU_SKIP_APPLAUNCH)
 add_library(APPLaunch SHARED
     ${APPLAUNCH_UI_C}
     ${APPLAUNCH_UI_CPP}
-    ${APPLAUNCH_KBD}
-    ${APPLAUNCH_HAL_SDL_C}
-    ${APPLAUNCH_HAL_SDL_CPP}
     ${APPLAUNCH_EMU_ENTRY}
 )
 target_include_directories(APPLaunch PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/vendor
     ${CMAKE_CURRENT_SOURCE_DIR}/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/lvgl
     ${REPO_ROOT}/ext_components/cp0_lvgl/include
     ${REPO_ROOT}/SDK/github_source/eventpp/include
     ${REPO_ROOT}/SDK/components/utilities/include
-    ${REPO_ROOT}/ext_components/Miniaudio/include
     ${APPLAUNCH_GENERATED_INCLUDE}
     ${APPLAUNCH}/ui
     ${APPLAUNCH}/include
     ${APPLAUNCH}
-    ${APPLAUNCH}/hal
 )
-target_include_directories(APPLaunch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/compat_stubs)
 target_compile_definitions(APPLaunch PRIVATE HAL_PLATFORM_SDL=1)
-if(SDL2_MIXER_FOUND)
-    target_compile_definitions(APPLaunch PRIVATE EMU_HAS_AUDIO=1)
-    target_include_directories(APPLaunch PRIVATE ${SDL2_MIXER_INCLUDE_DIRS})
-    target_link_libraries(APPLaunch PRIVATE ${SDL2_MIXER_LINK_LIBRARIES})
-    target_link_directories(APPLaunch PRIVATE ${SDL2_MIXER_LIBRARY_DIRS})
-endif()
-target_compile_options(APPLaunch PRIVATE
-    "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat.h"
-    -Wno-c++11-narrowing)
+target_compile_options(APPLaunch PRIVATE -Wno-c++11-narrowing)
 if(APPLE)
     target_link_options(APPLaunch PRIVATE -undefined dynamic_lookup)
 else()
@@ -232,12 +167,12 @@ endif() # NOT EMU_SKIP_APPLAUNCH
 # ---------------------------------------------------------------------------
 # Emulator executable
 # ---------------------------------------------------------------------------
-add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp)
+add_executable(cardputer-zero-emu src/main.cpp)
 add_dependencies(cardputer-zero-emu lvgl lvgl_thorvg)
 if(TARGET APPLaunch)
     add_dependencies(cardputer-zero-emu APPLaunch)
 endif()
-if(APPLE OR (UNIX AND NOT EMSCRIPTEN))
+if(APPLE OR UNIX)
     set_target_properties(cardputer-zero-emu PROPERTIES ENABLE_EXPORTS ON)
 endif()
 if(APPLE)
@@ -258,7 +193,6 @@ target_include_directories(cardputer-zero-emu PRIVATE
     ${CP0_LVGL}/include
     ${CP0_LVGL}/src/sdl
     ${REPO_ROOT}/SDK/github_source/eventpp/include
-    ${REPO_ROOT}/ext_components/Miniaudio/include
 )
 target_compile_options(cardputer-zero-emu PRIVATE -Wno-c++11-narrowing)
 
@@ -309,20 +243,6 @@ else()
     target_link_libraries(cardputer-zero-emu PRIVATE freetype)
 endif()
 
-# SDL2_mixer (optional)
-if(SDL2_MIXER_FOUND)
-    target_include_directories(cardputer-zero-emu PRIVATE ${SDL2_MIXER_INCLUDE_DIRS})
-    target_link_libraries(cardputer-zero-emu PRIVATE ${SDL2_MIXER_LINK_LIBRARIES})
-    target_link_directories(cardputer-zero-emu PRIVATE ${SDL2_MIXER_LIBRARY_DIRS})
-    target_compile_definitions(cardputer-zero-emu PRIVATE EMU_HAS_AUDIO=1)
-else()
-    find_library(SDL2_MIXER_LIB SDL2_mixer)
-    if(SDL2_MIXER_LIB)
-        target_link_libraries(cardputer-zero-emu PRIVATE ${SDL2_MIXER_LIB})
-        target_compile_definitions(cardputer-zero-emu PRIVATE EMU_HAS_AUDIO=1)
-    endif()
-endif()
-
 # dl + threads
 target_link_libraries(cardputer-zero-emu PRIVATE ${CMAKE_DL_LIBS})
 find_package(Threads REQUIRED)
@@ -347,82 +267,5 @@ if(TARGET APPLaunch)
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/apps
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:APPLaunch> ${CMAKE_CURRENT_BINARY_DIR}/apps/
         COMMENT "Copying APPLaunch"
-    )
-endif()
-
-endif() # NOT EMSCRIPTEN
-
-# ---------------------------------------------------------------------------
-# Web (Emscripten) target
-# ---------------------------------------------------------------------------
-if(EMSCRIPTEN)
-    file(GLOB_RECURSE APPLAUNCH_UI_C_WEB   ${APPLAUNCH}/ui/*.c)
-    file(GLOB_RECURSE APPLAUNCH_UI_CPP_WEB ${APPLAUNCH}/ui/*.cpp)
-    file(GLOB         APPLAUNCH_KBD_WEB    ${APPLAUNCH}/hal/keyboard_input.c)
-    file(GLOB         APPLAUNCH_HAL_SDL_C_WEB   ${APPLAUNCH}/hal/sdl/*.c)
-    file(GLOB         APPLAUNCH_HAL_SDL_CPP_WEB ${APPLAUNCH}/hal/sdl/*.cpp)
-    set(CP0_LVGL_WEB_SRCS
-        src/cp0_web_runtime.cpp
-        ${CP0_LVGL_APP_COMMON_SRCS}
-        ${CP0_LVGL}/src/web/cp0_hal_stubs_web.c
-    )
-
-    add_executable(cardputer-zero-emu-web
-        src/main_web.cpp
-        src/device_skin.cpp
-        src/keyboard_map.cpp
-        ${APPLAUNCH_UI_C_WEB}
-        ${APPLAUNCH_UI_CPP_WEB}
-        ${APPLAUNCH_KBD_WEB}
-        ${APPLAUNCH_HAL_SDL_C_WEB}
-        ${APPLAUNCH_HAL_SDL_CPP_WEB}
-        ${APPLAUNCH_EMU_ENTRY}
-        ${CP0_LVGL_WEB_SRCS}
-    )
-
-    target_include_directories(cardputer-zero-emu-web PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/compat_queue
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/compat_stubs
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendor
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/lvgl
-        ${CP0_LVGL}/include
-        ${REPO_ROOT}/SDK/github_source/eventpp/include
-        ${REPO_ROOT}/SDK/components/utilities/include
-        ${REPO_ROOT}/ext_components/Miniaudio/include
-        ${APPLAUNCH_GENERATED_INCLUDE}
-        ${APPLAUNCH}/ui
-        ${APPLAUNCH}/include
-        ${APPLAUNCH}
-        ${APPLAUNCH}/hal
-    )
-
-    target_compile_options(cardputer-zero-emu-web PRIVATE
-        -include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat.h
-        -Wno-c++11-narrowing
-        -DLV_USE_FREETYPE=0
-        -DHAL_PLATFORM_SDL=1
-    )
-
-    target_link_libraries(cardputer-zero-emu-web PRIVATE lvgl)
-
-    target_compile_options(cardputer-zero-emu-web PRIVATE -sUSE_SDL=2 -sUSE_SDL_IMAGE=2 -pthread)
-    target_link_options(cardputer-zero-emu-web PRIVATE
-        -sUSE_SDL=2
-        -sUSE_SDL_IMAGE=2
-        -pthread -sPROXY_TO_PTHREAD=0
-        -sSDL2_IMAGE_FORMATS=["png"]
-        -sALLOW_MEMORY_GROWTH=1
-        -sINITIAL_MEMORY=67108864
-        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/assets/device_skin.png@/assets/device_skin.png"
-        "--preload-file=${REPO_ROOT}/projects/APPLaunch/APPLaunch/share/images@/images"
-        --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html
-    )
-
-    set_target_properties(cardputer-zero-emu-web PROPERTIES
-        SUFFIX ".html"
-        OUTPUT_NAME "index"
     )
 endif()

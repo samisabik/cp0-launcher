@@ -84,13 +84,6 @@ LvSettingRollerPage2::~LvSettingRollerPage2()
     }
     roller3_.reset();
     stop_page3_animations();
-    // Run after roller3_ is gone so any in-flight write it owns has already
-    // been cancelled and released the workflow.
-    if (on_destroy_) {
-        auto callback = std::move(on_destroy_);
-        on_destroy_ = nullptr;
-        callback();
-    }
     if (ComponensObj) {
         lv_obj_delete(ComponensObj);
         ComponensObj = nullptr;
@@ -213,12 +206,6 @@ void LvSettingRollerPage2::SetSelfUiMode(PageType mode)
         const int distance = std::abs(static_cast<int32_t>(index) - selected_index);
         style_label(label, distance, enabled);
     }
-}
-
-std::string LvSettingRollerPage2::selected_entry_label() const
-{
-    if (selected_index < 0 || selected_index >= static_cast<int32_t>(item_count_)) return {};
-    return std::next(parent_node_.begin(), selected_index)->label;
 }
 
 void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const char *message_text)

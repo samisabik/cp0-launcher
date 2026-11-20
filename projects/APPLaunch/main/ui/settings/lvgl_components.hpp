@@ -151,7 +151,6 @@ public:
 
     using AsyncDispatch = SettingsAsync::Dispatch;
     using AsyncToken = AsyncDispatch::Token;
-    using LifetimeToken = AsyncToken;
     using AsyncTaskRegistry = SettingsAsync::SettingsAsyncTaskRegistry;
 
     lv_obj_t *ComponensObj = nullptr;
@@ -170,26 +169,10 @@ public:
     {
         return 0;
     }
-    void SetPos(int32_t x, int32_t y) const
-    {
-        lv_obj_set_pos(ComponensObj, x, y);
-    }
-    void SetSize(int32_t w, int32_t h) const
-    {
-        lv_obj_set_size(ComponensObj, w, h);
-    }
     void OnEvent(lv_event_code_t event_code, std::function<void(lv_event_t *)> &&fun, void *user_data) const
     {
         DComponens::lvgl_bind_event(ComponensObj, event_code, user_data,
                                     std::forward<std::function<void(lv_event_t *)>>(fun));
-    }
-    void SetWidth(int32_t w) const
-    {
-        lv_obj_set_width(ComponensObj, w);
-    }
-    void SetHeight(int32_t h) const
-    {
-        lv_obj_set_height(ComponensObj, h);
     }
 
     virtual void AnimateNextIn(std::function<void()> AnimateOverFunc)
@@ -235,11 +218,6 @@ public:
         return async_dispatch_.token();
     }
 
-    LifetimeToken lifetime_token() const noexcept
-    {
-        return async_token();
-    }
-
     bool enqueue_async(AsyncToken token, std::function<void()> callback) noexcept
     {
         if (!async_dispatch_ready_.load(std::memory_order_acquire)) return false;
@@ -281,11 +259,6 @@ public:
     void join_all() noexcept
     {
         async_task_registry_.join_all();
-    }
-
-    AsyncTaskRegistry &async_tasks() noexcept
-    {
-        return async_task_registry_;
     }
 
     template <typename Result>
@@ -496,7 +469,6 @@ public:
         TitleBoxW       = 96,
         ValueListX      = 112,
         ValueListW      = 156,
-        ValueCenterX    = ValueListW / 2,
         ValueBoxX       = 8,
         ValueBoxW       = 148,
     };
@@ -509,37 +481,6 @@ public:
     int32_t selected_index = 0;
 
     LvSettingValuePage3Base() = default;
-
-    bool activation_pending() const noexcept
-    {
-        return activation_pending_;
-    }
-
-    SettingComponentState activation_state() const noexcept
-    {
-        auto state = activation_state_.lock();
-        return state ? state->state() : SettingComponentState::Read;
-    }
-
-    ActivationSink activation_sink() const noexcept
-    {
-        return activation_sink_;
-    }
-
-    static bool enqueue_activation_result(const ActivationSink &sink, SettingApiResult result) noexcept
-    {
-        if (!sink.valid()) return false;
-
-        return SettingsAsync::Dispatch::enqueue_from_callback(
-            sink.dispatch_token,
-            [sink, result] {
-                auto state = sink.request_state.lock();
-                if (!state || !sink.owner || !state->is_current(sink.generation) ||
-                    !state->pending() || sink.owner->activation_index_ != sink.index)
-                    return;
-                sink.owner->finish_activation(sink, result);
-            });
-    }
 
     void AnimateNextIn(std::function<void()> animate_over_func) override
     {
@@ -674,21 +615,6 @@ public:
         update_value_styles();
     }
 
-    // Reserve a fixed footer below the scrollable value list for page-specific
-    // status content without changing the selection bar position.
-    void reserve_footer(int height)
-    {
-        if (!value_list_) return;
-        const int footer_height = std::clamp(height, 0, metric(LayoutMetric::ScreenH));
-        const int footer_start = metric(LayoutMetric::ScreenH) - footer_height;
-        const int bar_center = metric(LayoutMetric::BarY) + metric(LayoutMetric::BarH) / 2;
-        const int list_y = std::clamp(2 * bar_center - footer_start, 0, footer_start);
-        lv_obj_set_y(value_list_, list_y);
-        lv_obj_set_height(value_list_, footer_start - list_y);
-        lv_obj_update_layout(value_list_);
-        scroll_to_selected(false);
-    }
-
     void select(int index)
     {
         if (item_count_ == 0) return;
@@ -710,33 +636,10 @@ public:
         if (group) lv_group_focus_obj(ComponensObj);
     }
 
-    void finish_activation(const ActivationSink &sink, SettingApiResult result)
-    {
-        if (sink.owner != this || sink.index != activation_index_) return;
-        auto state = activation_state_.lock();
-        if (!state || state != sink.request_state.lock() || !state->is_current(sink.generation) ||
-            !state->pending())
-            return;
-        apply_activation_result(sink, result);
-    }
-
     void apply_activation_result(const ActivationSink &sink, SettingApiResult result)
     {
         auto state = activation_state_.lock();
         if (!state || state != sink.request_state.lock() || !state->is_current(sink.generation)) return;
-
-        if (result == SettingApiResult::Pending) {
-            if (state->mark_pending(sink.generation)) {
-                activation_pending_ = true;
-            } else {
-                state->mark_failure(sink.generation);
-                activation_pending_    = false;
-                activation_index_       = -1;
-                activation_generation_  = 0;
-                restore_activation_focus();
-            }
-            return;
-        }
 
         if (result == SettingApiResult::Success) {
             if (!state->mark_success(sink.generation)) return;
@@ -836,13 +739,9 @@ protected:
 
         SettingApiResult result = SettingApiResult::NotHandled;
         try {
-            if (selected_node->Async_api) {
-                result = selected_node->Async_api(SettingApiActivate, this);
-            } else if (selected_node->Componens_api) {
+            if (selected_node->Componens_api) {
                 selected_node->Componens_api(SettingApiActivate, this);
-                result = selected_node->activation_policy == SettingActivationPolicy::WaitForResult
-                             ? SettingApiResult::Pending
-                             : SettingApiResult::Success;
+                result = SettingApiResult::Success;
             }
         } catch (...) {
             result = SettingApiResult::Failure;

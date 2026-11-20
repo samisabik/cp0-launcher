@@ -56,53 +56,17 @@ std::string encode_field(const char *value)
     return encoded;
 }
 
-int open_failure(bool errno_on_open_failure)
-{
-    return errno_on_open_failure ? -errno : -1;
-}
-
 } // namespace
 
-int list_directory(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count,
-                   bool errno_on_open_failure)
-{
-    if (out_count) *out_count = 0;
-    if (!path || !out_count) return -1;
-    if (!entries || max_entries <= 0) return 0;
-
-    DIR *directory = opendir(path);
-    if (!directory) return open_failure(errno_on_open_failure);
-    while (dirent *entry = readdir(directory)) {
-        if (is_dot_entry(entry->d_name)) continue;
-        if (*out_count >= max_entries) break;
-        cp0_dirent_t &output = entries[*out_count];
-        std::strncpy(output.name, entry->d_name, sizeof(output.name) - 1);
-        output.name[sizeof(output.name) - 1] = '\0';
-        output.is_dir = directory_entry_is_dir(path, *entry) ? 1 : 0;
-        ++(*out_count);
-    }
-    closedir(directory);
-    return 0;
-}
-
-int encode_directory(const char *path, bool include_size, bool errno_on_open_failure,
-                     std::string &output)
+int encode_directory(const char *path, std::string &output)
 {
     DIR *directory = opendir(path);
-    if (!directory) return open_failure(errno_on_open_failure);
+    if (!directory) return -errno;
     try {
         std::ostringstream encoded;
         while (dirent *entry = readdir(directory)) {
             if (is_dot_entry(entry->d_name)) continue;
-            const std::string full_path = join_path(path, entry->d_name);
-            struct stat status{};
-            if (include_size) {
-                if (stat(full_path.c_str(), &status) != 0) continue;
-            } else {
-                status.st_mode = directory_entry_is_dir(path, *entry) ? S_IFDIR : S_IFREG;
-            }
-            encoded << (S_ISDIR(status.st_mode) ? 'D' : 'F') << '\t';
-            if (include_size) encoded << static_cast<long long>(status.st_size) << '\t';
+            encoded << (directory_entry_is_dir(path, *entry) ? 'D' : 'F') << '\t';
             encoded << encode_field(entry->d_name) << '\n';
         }
         output = encoded.str();

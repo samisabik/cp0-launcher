@@ -31,7 +31,7 @@
 void Launch::bind_ui()
 {
     if (bound_) {
-        refresh_home_carousel();
+        refresh_home();
         return;
     }
     bound_ = true;
@@ -142,9 +142,9 @@ void Launch::launch_Exec_in_terminal(const std::string &exec, bool sysplause,
     p->exec(exec);
 }
 
-void Launch::launch_Exec(const std::string &exec, bool keep_root)
+void Launch::launch_Exec(const std::string &exec)
 {
-    SLOGI("Launching external app: %s (keep_root=%d)", exec.c_str(), keep_root);
+    SLOGI("Launching external app: %s", exec.c_str());
     ui_loading::show("Loading...");
     lv_disp_t *disp = lv_disp_get_default();
     lv_indev_t *indev = lv_indev_get_next(nullptr);
@@ -159,7 +159,7 @@ void Launch::launch_Exec(const std::string &exec, bool keep_root)
     int result = -1;
     try {
         cp0_signal_process_api(
-            {"ExecBlocking", exec, keep_root ? "1" : "0"},
+            {"ExecBlocking", exec, "0"},
             [&](int code, std::string) { result = code; });
     } catch (...) {
         result = -1;
@@ -204,7 +204,7 @@ void Launch::applications_load()
     launcher_sort_app_display_order(app_list);
 }
 
-void Launch::refresh_home_carousel()
+void Launch::refresh_home()
 {
     int normalized = normalized_app_index(current_app);
     if (normalized < 0) return;
@@ -286,7 +286,6 @@ void Launch::rebuild_builtin_apps()
 
     launcher_append_enabled_builtin_apps(app_list);
 
-    fixed_count = app_list.size();
     current_app = normalized_app_index(current_app);
 }
 

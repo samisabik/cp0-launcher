@@ -336,11 +336,4 @@ using SettingsAsyncTaskRegistry = TaskRegistry;
 
 }  // namespace SettingsAsync
 
-using SettingsAsyncDispatch    = SettingsAsync::Dispatch;
 using SettingsAsyncTaskRegistry = SettingsAsync::TaskRegistry;
-using SettingsAsyncToken       = SettingsAsyncDispatch::Token;
-
-inline bool settings_async_post(SettingsAsyncToken token, std::function<void()> callback) noexcept
-{
-    return SettingsAsyncDispatch::enqueue_from_callback(std::move(token), std::move(callback));
-}

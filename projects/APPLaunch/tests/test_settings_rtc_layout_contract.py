@@ -365,9 +365,6 @@ def test_page3_completion_snaps_hint_after_stale_animation_frames():
 
 
 def test_set_manually_is_one_editor_page():
-    assert "rtc_page3_factory" not in PAGE_CPP
-    assert '"write rtc?"' not in PAGE_CPP
-    assert "settings_rtc_info_page_factory" not in RTC_CPP + RTC_HPP + PAGE_CPP
     assert "class LvSettingTimeEditorPage3" in RTC_CPP
     assert "settings_rtc_editor_page_factory(" in RTC_HPP
 

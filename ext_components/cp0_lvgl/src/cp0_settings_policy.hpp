@@ -20,7 +20,6 @@ enum class Command {
     BacklightRead,
     BacklightMax,
     BacklightWrite,
-    Log,
     TimeStr,
     GpioSet,
     GpioGet,

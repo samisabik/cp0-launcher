@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -145,12 +144,6 @@ public:
         accepting_ = true;
     }
 
-    void wait_for_drain()
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        drained_.wait(lock, [this] { return pending_ == 0; });
-    }
-
     bool accepting() const noexcept
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -175,11 +168,9 @@ private:
         std::lock_guard<std::mutex> lock(mutex_);
         if (pending_ == 0) return;
         --pending_;
-        if (pending_ == 0) drained_.notify_all();
     }
 
     mutable std::mutex mutex_;
-    std::condition_variable drained_;
     bool accepting_ = true;
     uint64_t generation_ = 1;
     std::size_t pending_ = 0;

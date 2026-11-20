@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "cp0_lvgl_app.h"
 #include "hal/hal_settings.h"
 
 #include <algorithm>
@@ -12,8 +11,6 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-
-extern "C" time_t cp0_sdl_time_now(void);
 
 namespace {
 
@@ -28,25 +25,6 @@ extern "C" int hal_backlight_write(int value)
 {
     return std::max(0, std::min(hal_backlight_max(), value));
 }
-
-extern "C" hal_battery_info_t hal_battery_read(void)
-{
-    const cp0_battery_info_t source = cp0_battery_read();
-    hal_battery_info_t result{};
-    result.voltage_mv = source.voltage_mv;
-    result.current_ma = source.current_ma;
-    result.temperature_c10 = source.temperature_c10;
-    result.soc = source.soc;
-    result.remain_mah = source.remain_mah;
-    result.full_mah = source.full_mah;
-    result.flags = source.flags;
-    result.avg_current_ma = source.avg_current_ma;
-    result.valid = source.valid;
-    return result;
-}
-
-extern "C" int hal_volume_read(void) { return 39; }
-extern "C" int hal_volume_write(int value) { return std::max(0, std::min(63, value)); }
 
 extern "C" hal_wifi_status_t hal_wifi_get_status(void)
 {
@@ -117,7 +95,7 @@ extern "C" int hal_bt_scan(hal_bt_device_t *output, int max_devices)
 extern "C" void hal_time_str(char *buffer, int buffer_size)
 {
     if (!buffer || buffer_size <= 0) return;
-    const std::time_t now = cp0_sdl_time_now();
+    const std::time_t now = std::time(nullptr);
     const std::tm *time = std::localtime(&now);
     if (!time) {
         buffer[0] = '\0';

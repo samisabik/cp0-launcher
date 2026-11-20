@@ -36,7 +36,6 @@ public:
         EdgePadding  = (PanelH - RowH) / 2,
         BarH         = 26,
         BarY         = EdgePadding,
-        LabelCenterX = 40,
         LabelBoxX    = 8,
         LabelBoxW    = 170,
         CompactBoxW  = 84,
@@ -77,16 +76,6 @@ public:
     // A nested roller page keeps its rows in the right-hand column, so the
     // page-3 slide must come to rest at PanelX rather than the left edge.
     int panel_x() const override;
-
-    // Optional cleanup run when this page is torn down, after the third-level
-    // page has been destroyed.  Pages that own cross-page session state (such
-    // as Date & Time) use it to abandon that state together with the page.
-    void set_on_destroy(std::function<void()> callback)
-    {
-        on_destroy_ = std::move(callback);
-    }
-
-    std::string selected_entry_label() const;
 
     // Modal that refuses activation and explains why.  While it is up it owns
     // every key, so the page underneath cannot be used.
@@ -171,5 +160,4 @@ private:
     lv_obj_t *hint_                             = nullptr;
     lv_obj_t *utility_obj_                      = nullptr;
     lv_obj_t *power_warning_              = nullptr;
-    std::function<void()> on_destroy_;
 };

@@ -71,22 +71,6 @@ typedef struct {
     int is_up;
 } cp0_netif_info_t;
 
-typedef struct {
-    char name[256];
-    int is_dir;
-} cp0_dirent_t;
-
-typedef struct {
-    char ipv4[48];
-    char gateway[48];
-    char mac[32];
-} cp0_eth_info_t;
-
-typedef struct {
-    char user[64];
-    char hostname[128];
-} cp0_account_info_t;
-
 typedef void *cp0_watcher_t;
 typedef int cp0_pid_t;
 typedef enum {
@@ -109,11 +93,6 @@ typedef void (*cp0_sudo_complete_cb_t)(cp0_sudo_result_t result, int exit_code, 
 
 const char *cp0_file_path_c(const char *file);
 
-int cp0_dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count);
-cp0_watcher_t cp0_dir_watch_start(const char *path);
-int cp0_dir_watch_poll(cp0_watcher_t watcher);
-void cp0_dir_watch_stop(cp0_watcher_t watcher);
-
 int cp0_network_list(cp0_netif_info_t *entries, int max_entries, int *out_count);
 typedef enum {
     CP0_WIFI_ERROR_INVALID = -1,
@@ -134,26 +113,8 @@ int cp0_wifi_disconnect_active(void);
 int cp0_wifi_radio_enabled(void);
 int cp0_wifi_radio_set_enabled(int enabled);
 
-int cp0_process_exec_blocking(const char *exec_path, int keep_root);
-cp0_pid_t cp0_process_spawn(const char *exec_path, int keep_root);
-void cp0_process_stop(cp0_pid_t pid);
-int cp0_process_check_lock(const char *lock_path, int *holder_pid);
-void cp0_process_kill(int pid, int grace_ms);
 void cp0_system_shutdown(void);
-void cp0_system_reboot(void);
 
-int cp0_process_run_argv(const char *const *argv, int background);
-int cp0_process_capture_argv(const char *const *argv, char *out, int out_size);
-int cp0_sudo_run_argv_async(const char *const *argv,
-                            cp0_sudo_callback_thread_t callback_thread,
-                            cp0_sudo_output_cb_t output_cb,
-                            cp0_sudo_complete_cb_t complete_cb,
-                            void *user);
-int cp0_sudo_run_shell_async(const char *command,
-                             cp0_sudo_callback_thread_t callback_thread,
-                             cp0_sudo_output_cb_t output_cb,
-                             cp0_sudo_complete_cb_t complete_cb,
-                             void *user);
 int cp0_sudo_run_argv_async_ex(const char *const *argv,
                                cp0_sudo_callback_thread_t callback_thread,
                                cp0_sudo_output_cb_t output_cb,
@@ -167,22 +128,9 @@ int cp0_sudo_run_argv_async_ex(const char *const *argv,
 /* Cancellation is idempotent while a request ID remains in the bounded recent
  * completion history. Returns -ENOENT only for an unknown or expired ID. */
 int cp0_sudo_cancel(uint64_t request_id);
-int cp0_sudo_queue_password(const char *password);
-int cp0_file_read_first_line(const char *path, char *out, int out_size);
 int cp0_desktop_exec_is_safe(const char *exec, char *reason, int reason_size);
-int cp0_network_default_info_read(cp0_eth_info_t *info);
-int cp0_eth_info_read(cp0_eth_info_t *info);
-int cp0_account_info_read(cp0_account_info_t *info);
-int cp0_time_set(const char *timestamp);
-/* NTP auto time-sync control. get returns 1 when enabled, 0 when disabled,
- * negative on error. Manual RTC time can only persist while NTP is disabled. */
-int cp0_time_ntp_get(void);
-int cp0_time_ntp_set(int enable);
-int cp0_bq27220_calibrate(int command_index);
 /* Returns the latest background battery snapshot; never performs hardware I/O. */
 cp0_battery_info_t cp0_battery_read(void);
-int cp0_backlight_read(void);
-int cp0_backlight_max(void);
 int cp0_backlight_write(int val);
 void cp0_time_str(char *buf, int buf_size);
 

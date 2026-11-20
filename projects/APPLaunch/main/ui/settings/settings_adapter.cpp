@@ -21,7 +21,6 @@
 namespace settings_t12b {
 namespace {
 
-#ifdef LAUNCHER_BUILD
 void mark_operation_started(void *data)
 {
     if (!data) return;
@@ -29,13 +28,11 @@ void mark_operation_started(void *data)
     if (std::get<1>(*result))
         std::get<1>(*result)->store(true, std::memory_order_release);
 }
-#endif
 
 } // namespace
 
 bool populate_launcher_children(Tree &tree, const NodeIter &parent)
 {
-#ifdef LAUNCHER_BUILD
     tree.erase_children(parent);
     std::size_t count = 0;
     const AppDescriptor *entries = launcher_app_registry_entries(&count);
@@ -44,23 +41,14 @@ bool populate_launcher_children(Tree &tree, const NodeIter &parent)
     for (std::size_t index = 0; index < count; ++index) {
         const AppDescriptor &descriptor = entries[index];
         if (!descriptor.configurable || !descriptor.label || !descriptor.label[0] ||
-            !descriptor.config_key || !descriptor.config_key[0] ||
-            !launcher::is_launcher_settings_origin(descriptor.origin) ||
-            launcher::is_protected_launcher_app(descriptor.config_key))
+            !descriptor.config_key || !descriptor.config_key[0])
             continue;
         tree.append_child(
             parent,
             SettingEntry{descriptor.label, make_launcher_toggle_api(descriptor), true});
     }
     return true;
-#else
-    (void)tree;
-    (void)parent;
-    return false;
-#endif
 }
-
-#ifdef LAUNCHER_BUILD
 
 namespace {
 
@@ -79,15 +67,12 @@ SettingApiCallBackFunc make_launcher_toggle_api(const AppDescriptor &descriptor)
     const std::string config_key = descriptor.config_key ? descriptor.config_key : "";
     const bool configurable = descriptor.configurable;
     const bool always_on = descriptor.always_on;
-    const LauncherAppOrigin origin = descriptor.origin;
     auto state = std::make_shared<LauncherToggleState>();
-    return [state, config_key, configurable, always_on, origin](int command, void *data) {
+    return [state, config_key, configurable, always_on](int command, void *data) {
         const AppDescriptor current_descriptor{nullptr,
-                                               nullptr,
                                                config_key.c_str(),
                                                configurable,
-                                               always_on,
-                                               origin};
+                                               always_on};
         if (command == SettingApiReadFlag && data) {
             bool registry_value = false;
             bool registry_read = false;
@@ -172,7 +157,5 @@ SettingApiCallBackFunc make_launcher_toggle_api(const AppDescriptor &descriptor)
         if (succeeded) launcher_app_registry_notify_changed();
     };
 }
-
-#endif
 
 } // namespace settings_t12b

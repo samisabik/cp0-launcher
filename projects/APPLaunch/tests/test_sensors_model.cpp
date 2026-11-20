@@ -89,7 +89,7 @@ static void test_table()
     assert(table.add_line("{\"model\" : \"Nexus-TH\", \"id\" : 42, \"channel\" : 1, \"temperature_C\" : 21.5}", 15.0));
     assert(table.sensors().size() == 4);
     const Sensor &nexus = table.sensors()[0];
-    assert(nexus.count == 2 && near(nexus.last_seen, 15.0) && near(nexus.first_seen, 10.0));
+    assert(nexus.count == 2 && near(nexus.last_seen, 15.0));
     assert(nexus.history().size() == 1 && near(nexus.history()[0], 21.5, 1e-4));
     // Fields the repeat lacked are kept.
     assert(nexus.latest.has_humidity && nexus.latest.humidity == 55 && nexus.latest.battery_ok == 1);

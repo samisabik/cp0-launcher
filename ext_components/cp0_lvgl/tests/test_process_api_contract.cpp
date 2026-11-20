@@ -27,7 +27,7 @@ int main()
         []() -> int { throw 1; }) == -EIO);
     cp0_process_api_contract::invoke_c_api_void([] { throw 1; });
     using namespace cp0_process_api_contract;
-    const std::list<std::string> request = {"Kill", "42", "1000"};
+    const std::list<std::string> request = {"Spawn", "42", "1000"};
     assert(has_exact_arguments(request, 3));
     assert(has_at_least_arguments(request, 2));
     assert(argument_at(request, 1) && *argument_at(request, 1) == "42");
@@ -45,22 +45,6 @@ int main()
     assert(!parse_pid("0", value));
     assert(!parse_pid("12junk", value));
     assert(!parse_pid(" 12", value));
-    assert(parse_grace_ms("300000", value));
-    assert(!parse_grace_ms("300001", value));
-    assert(!parse_grace_ms("-1", value));
-    assert(parse_delay_ms("0", value));
-    assert(!parse_delay_ms("99999999999999999999", value));
-
-    uintptr_t pointer = 0;
-    assert(parse_pointer("0", pointer) && pointer == 0);
-    assert(parse_pointer("123", pointer) && pointer == 123);
-    assert(!parse_pointer("0x10", pointer));
-
-    assert(parse_spawn_response("42", value) && value == 42);
-    assert(!parse_spawn_response("0", value));
-    assert(!parse_spawn_response("42junk", value));
-    assert(parse_lock_holder_response("0", value) && value == 0);
-    assert(!parse_lock_holder_response("-1", value));
 
     bool callback_called = false;
     invoke_callback_safely(

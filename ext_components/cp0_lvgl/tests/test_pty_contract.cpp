@@ -44,11 +44,6 @@ int main()
     assert(write.ok && write.request.command == Command::write && write.request.data.size() == 3);
     assert(!parse_request({"Write", "42"}).ok);
 
-    auto resize = parse_request({"Resize", "42", "100", "30"});
-    assert(resize.ok && resize.request.command == Command::resize);
-    assert(resize.request.columns == 100 && resize.request.rows == 30);
-    assert(!parse_request({"Resize", "42", "100", "bad"}).ok);
-
     assert(parse_request({"CheckChild", "42"}).request.command == Command::check_child);
     assert(parse_request({"Close", "42"}).request.command == Command::close);
     assert(!parse_request({}).ok && !parse_request({"Bogus"}).ok);

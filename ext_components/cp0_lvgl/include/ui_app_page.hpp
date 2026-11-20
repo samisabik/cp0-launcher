@@ -15,7 +15,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 class AppTopBarRegion;
@@ -24,19 +23,16 @@ namespace cp0::status { class Lifecycle; }
 
 /**
  * @file ui_app_page.hpp
- * @brief Page, content-region, top-bar, and bottom-bar building blocks.
+ * @brief Page, content-region, and top-bar building blocks.
  *
  * Page inheritance guide:
  * - Inherit from AppPageRoot for the smallest possible blank LVGL screen.
  * - Inherit from AppPage for a normal application page with a content region
  *   and an enabled top bar.
- * - Inherit from AppPageWithBottomBarLayout when a page also needs the bottom
- *   bar region. This class is a layout mixin; add it to your own page class.
  *
  * AppPageRoot creates and owns the LVGL screen. The screen is available from
- * screen() after the base constructor has completed. A page is normally
- * shown with cp0_lvgl_start_app_page(page) or the owning helper
- * cp0_lvgl_start_app<PageT>().
+ * screen() after the base constructor has completed. A page is shown with
+ * cp0_lvgl_start_app_page(page).
  *
  * Minimal blank-page example:
  * @code
@@ -49,7 +45,8 @@ namespace cp0::status { class Lifecycle; }
  *     }
  * };
  *
- * auto page = cp0_lvgl_start_app<BlankPage>();
+ * BlankPage page;
+ * cp0_lvgl_start_app_page(page);
  * @endcode
  *
  * Use AppPage instead when the page should participate in the standard
@@ -121,31 +118,12 @@ public:
 
     void enable_top_bar();
     void disable_top_bar();
-    bool top_bar_enabled() const;
     void set_page_title(const std::string &title);
-    void update_time();
-    void update_status();
-    void update_battery(const cp0_battery_info_t &battery);
-    void update_datetime_status() { update_time(); }
-    void update_status_bar() { update_status(); }
-    void update_battery_status(const cp0_battery_info_t &battery) { update_battery(battery); }
-    AppTopBarComponent *add_top_bar_component(
-        std::unique_ptr<AppTopBarComponent> component);
-    bool remove_top_bar_component(const std::string &id);
-    AppTopBarComponent *top_bar_component(const std::string &id) const;
-    void clear_content();
-
-    template <typename Component>
-    lv_obj_t *add_bar(Component &&component)
-    {
-        return component.create(root_screen_);
-    }
 
     std::string page_title_ = "APP";
     lv_group_t *input_group_ = nullptr;
     lv_obj_t *root_screen_ = nullptr;
     std::function<void()> navigate_home;
-    bool has_bottom_bar_ = false;
     int top_bar_height_px_ = kTopBarHeightPx;
 
 private:
@@ -172,9 +150,6 @@ public:
 
     void refresh();
 
-    // Kept for source compatibility with existing applications.
-    void refash() { refresh(); }
-
     // Full-bleed mode: hide the 20 px top bar and grow the content container to
     // the whole 320x170 screen. For apps that want every pixel and do not need
     // the clock/battery chrome while running.
@@ -185,25 +160,6 @@ public:
 private:
     static void container_delete_cb(lv_event_t *event);
     UIAppContainer app_container_;
-};
-
-/**
- * @brief Adds the standard bottom-bar container to a page layout.
- *
- * The bottom-bar object is available as ui_BOTTOM_Container. Use this as a
- * virtual layout base when a custom page needs a bottom navigation region.
- */
-class AppBottomBarRegion : virtual public AppPageRoot, virtual public AppContentRegion
-{
-public:
-    AppBottomBarRegion();
-
-    virtual ~AppBottomBarRegion();
-
-    lv_obj_t *ui_BOTTOM_Container = nullptr;
-
-private:
-    static void container_delete_cb(lv_event_t *event);
 };
 
 /**
@@ -236,9 +192,7 @@ public:
     lv_obj_t *obj() const { return obj_; }
 
     void set_visible(bool visible);
-    bool visible() const;
 
-    virtual void activate() {}
     virtual void deactivate() {}
     virtual void refresh() {}
 
@@ -372,12 +326,8 @@ public:
     void update_network();
     void update_battery(const cp0_battery_info_t &battery);
     void set_visible(bool visible);
-    bool visible() const;
     void set_active(bool active);
     void detach_from_deleted_parent();
-    AppTopBarComponent *add_component(std::unique_ptr<AppTopBarComponent> component);
-    bool remove_component(const std::string &id);
-    AppTopBarComponent *component(const std::string &id) const;
     lv_obj_t *container() const { return container_; }
 
 private:
@@ -388,16 +338,13 @@ private:
         delete_callback_ = std::move(callback);
     }
     static void container_delete_cb(lv_event_t *event);
-    static void custom_container_delete_cb(lv_event_t *event);
     int height_ = 20;
     bool active_ = false;
     lv_obj_t *container_ = nullptr;
-    lv_obj_t *custom_container_ = nullptr;
     std::unique_ptr<AppTopBarTitleComponent> title_;
     std::unique_ptr<AppTopBarNetworkComponent> network_;
     std::unique_ptr<AppTopBarTimeComponent> time_;
     std::unique_ptr<AppTopBarBatteryComponent> battery_;
-    std::unordered_map<std::string, std::unique_ptr<AppTopBarComponent>> components_;
     std::function<void()> delete_callback_;
 };
 
@@ -416,18 +363,10 @@ public:
     void enable();
     void disable();
     void on_screen_deleted();
-    bool enabled() const { return enabled_; }
     void set_page_title(const std::string &title);
     void update_time();
     void update_status();
     void update_battery(const cp0_battery_info_t &battery);
-    void update_datetime_status() { update_time(); }
-    void update_status_bar() { update_status(); }
-    void update_battery_status(const cp0_battery_info_t &battery) { update_battery(battery); }
-    AppTopBarComponent *add_component(std::unique_ptr<AppTopBarComponent> component);
-    bool remove_component(const std::string &id);
-    AppTopBarComponent *component(const std::string &id) const;
-    lv_obj_t *container() const { return top_bar_.container(); }
 
 private:
     static void battery_event_cb(lv_event_t *event);
@@ -455,20 +394,6 @@ public:
 };
 
 /**
- * @brief Standard content layout combined with a bottom-bar region.
- *
- * This is a mixin layout. A concrete page can inherit from it and add its own
- * page-specific UI and behavior.
- */
-class AppPageWithBottomBarLayout : virtual public AppContentRegion,
-                                   virtual public AppBottomBarRegion
-{
-public:
-    AppPageWithBottomBarLayout();
-    virtual ~AppPageWithBottomBarLayout() = default;
-};
-
-/**
  * @brief Default application page base.
  *
  * Inherit from AppPage for a normal page. It provides the root screen, the
@@ -488,17 +413,3 @@ public:
  * @param page Page object whose screen should become active.
  */
 void cp0_lvgl_start_app_page(AppPageRoot &page);
-
-/**
- * @brief Construct, start, and return an application page.
- * @tparam PageT Concrete page type derived from AppPageRoot.
- * @param args Arguments forwarded to PageT's constructor.
- * @return Owning pointer to the running page.
- */
-template <class PageT, class... Args>
-std::unique_ptr<PageT> cp0_lvgl_start_app(Args &&...args)
-{
-    auto page = std::make_unique<PageT>(std::forward<Args>(args)...);
-    cp0_lvgl_start_app_page(*page);
-    return page;
-}

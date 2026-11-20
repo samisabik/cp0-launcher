@@ -20,7 +20,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>
-#include <fcntl.h>
 #include <functional>
 #include <condition_variable>
 #include <chrono>
@@ -31,18 +30,6 @@
 #include <thread>
 #include <utility>
 #include <unistd.h>
-
-#if __has_include(<sys/ioctl.h>)
-#include <sys/ioctl.h>
-#endif
-
-#if __has_include(<linux/i2c.h>) && __has_include(<linux/i2c-dev.h>)
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
-#define CP0_HAS_LINUX_I2C_RDWR 1
-#else
-#define CP0_HAS_LINUX_I2C_RDWR 0
-#endif
 
 namespace {
 
@@ -87,8 +74,7 @@ public:
             {
                 std::lock_guard<std::mutex> lock(api_mutex_);
                 reply = cp0::battery::dispatch_api_request(
-                    arg, [this] { return read_cached(); },
-                    [this](int index) { return calibrate(index); });
+                    arg, [this] { return read_cached(); });
             }
             result.complete(reply.code, reply.data);
         });
@@ -131,41 +117,6 @@ public:
         return cache_.read();
     }
 
-    int calibrate(int command_index)
-    {
-#if CP0_HAS_LINUX_I2C_RDWR
-        static const int cmds[] = {0x0081, 0x000A, 0x0009, 0x0080};
-        if (command_index < 0 || command_index >= static_cast<int>(sizeof(cmds) / sizeof(cmds[0]))) {
-            return -1;
-        }
-
-        int fd = open(kI2cDev, O_RDWR);
-        if (fd < 0) {
-            return -errno;
-        }
-
-        struct i2c_msg msg;
-        struct i2c_rdwr_ioctl_data data;
-        unsigned char buf[3] = {0x00,
-                                static_cast<unsigned char>(cmds[command_index] & 0xFF),
-                                static_cast<unsigned char>((cmds[command_index] >> 8) & 0xFF)};
-        msg.addr = kI2cAddr;
-        msg.flags = 0;
-        msg.len = 3;
-        msg.buf = buf;
-        data.msgs = &msg;
-        data.nmsgs = 1;
-
-        int ret = ioctl(fd, I2C_RDWR, &data);
-        int saved_errno = errno;
-        close(fd);
-        return ret >= 0 ? 0 : -saved_errno;
-#else
-        (void)command_index;
-        return -1;
-#endif
-    }
-
 private:
     static constexpr std::chrono::seconds kSamplePeriod{3};
 
@@ -195,9 +146,6 @@ private:
     std::thread worker_;
     bool stopping_ = false;
     cp0::battery::SnapshotCache cache_;
-
-    static constexpr const char *kI2cDev = "/dev/i2c-1";
-    static constexpr int kI2cAddr = 0x55;
 
     static int read_long(const char *path, long *value)
     {
@@ -308,20 +256,6 @@ cp0_battery_info_t cp0_battery_read(void)
         info = {};
     }
     return info;
-}
-
-int cp0_bq27220_calibrate(int command_index)
-{
-    int ret = -1;
-    try {
-        cp0_signal_bq27220_api({"Calibrate", std::to_string(command_index)}, [&](int code, std::string data) {
-            (void)data;
-            ret = code;
-        });
-    } catch (...) {
-        ret = -1;
-    }
-    return ret;
 }
 
 void init_bq27220(void)

@@ -18,7 +18,6 @@ enum class Command {
     open,
     read,
     write,
-    resize,
     check_child,
     close,
 };

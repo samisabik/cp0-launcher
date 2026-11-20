@@ -25,7 +25,6 @@
 #include "settings_system_page.hpp"
 #include "settings_adapter.hpp"
 #include "settings_static_info_page.hpp"
-#include "settings_value_page.hpp"
 #include "settings_volume_page.hpp"
 #include "settings_wifi_page.hpp"
 #include "settings_tree_types.hpp"
@@ -228,14 +227,12 @@ void refresh_submenu_labels(const NodeIter &page_node)
 static std::unique_ptr<DComponens::LvglComponensBase> roller_page_factory(lv_obj_t *parent, const NodeIter &page_node,
                                                                           std::function<void()> on_back)
 {
-#ifdef LAUNCHER_BUILD
     if (page_node->label == "apps") {
         Tree *tree = settings_tree_factory_context();
         if (tree) {
             settings_t12b::populate_launcher_children(*tree, page_node);
         }
     }
-#endif
     if (page_node->label == "time") {
         // Refresh before the page is built: the constructor's own status read
         // then sees initialized=true and returns, so one visit costs one D-Bus
@@ -245,12 +242,6 @@ static std::unique_ptr<DComponens::LvglComponensBase> roller_page_factory(lv_obj
     }
     refresh_submenu_labels(page_node);
     return std::make_unique<LvSettingRollerPage2>(parent, page_node, std::move(on_back));
-}
-
-static std::unique_ptr<DComponens::LvglComponensBase> roller_page3_factory(lv_obj_t *parent, const NodeIter &page_node,
-                                                                           std::function<void()> on_back)
-{
-    return std::make_unique<LvSettingRollerPage3>(parent, page_node, std::move(on_back));
 }
 
 static std::unique_ptr<DComponens::LvglComponensBase> brightness_page3_factory(lv_obj_t *parent,
@@ -466,9 +457,7 @@ void UISettingTreePage::create_page_detail()
 
     mode_tree.append_child(root, SettingEntry{"battery", settings_battery_info_page_factory, PageType::FullCustom});
 
-#ifdef LAUNCHER_BUILD
     mode_tree.append_child(root, SettingEntry{"apps", roller_page_factory});
-#endif
 
     {
         NodeIter date_time = mode_tree.append_child(root, SettingEntry{"time", roller_page_factory});

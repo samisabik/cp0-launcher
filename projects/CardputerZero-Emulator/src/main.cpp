@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
-// ── Layout from M5CardputerEmu.png (1280x840 RGBA) ─────────────
+// ── Layout from assets/device_skin.png (1280x840 RGBA) ─────────────
 static constexpr int SKIN_W = 1280;
 static constexpr int SKIN_H = 840;
 static constexpr int LCD_SX = 323;
@@ -101,7 +101,6 @@ static SDL_Texture  *g_lcd_tex = nullptr;
 static uint32_t     *g_lcd_buf = nullptr;
 
 typedef void (*sdl_kbd_handler_fn)(SDL_Event *);
-typedef void *(*sdl_kbd_create_fn)(void);
 static sdl_kbd_handler_fn g_kbd_handler = nullptr;
 
 static float g_dpi_scale = 1.0f;  // renderer_pixels / window_points
@@ -296,7 +295,6 @@ static void set_exe_dir()
         if (last) { *last = '\0'; chdir(path); }
     }
 #endif
-    // Linux: usually launched from the right dir, or use /proc/self/exe
 }
 
 static unsigned emu_test_frame(const char *name)
@@ -400,15 +398,11 @@ int main(int argc, char *argv[])
     if (!app) { fprintf(stderr, "[EMU] dlopen: %s\n", dlerror()); return 1; }
     printf("[EMU] Loaded: %s\n", app_path);
 
-    auto kbd_create = (sdl_kbd_create_fn)dlsym(app, "lv_sdl_keyboard_create");
     g_kbd_handler = (sdl_kbd_handler_fn)dlsym(app, "lv_sdl_keyboard_handler");
     if (!g_kbd_handler)
         g_kbd_handler = (sdl_kbd_handler_fn)dlsym(RTLD_DEFAULT, "lv_sdl_keyboard_handler");
 
-    if (kbd_create) {
-        kbd_create();
-        printf("[EMU] App keyboard driver loaded\n");
-    } else if (g_kbd_handler) {
+    if (g_kbd_handler) {
         printf("[EMU] Host cp0 keyboard driver\n");
     } else {
         lv_indev_t *kb = lv_indev_create();

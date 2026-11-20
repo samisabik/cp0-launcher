@@ -42,33 +42,15 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ:
     DEFINITIONS_PRIVATE = []
     LDFLAGS = []
     LINK_SEARCH_PATH = []
-    optional_services = {
-        'AUDIO': 'audio',
-        'BATTERY': 'battery',
-        'BQ27220': 'bq27220',
-        'CONFIG': 'config',
-        'FILESYSTEM': 'filesystem',
-        'OSINFO': 'osinfo',
-        'PROCESS': 'process',
-        'PTY': 'pty',
-        'SCREENSHOT': 'screenshot',
-        'SETTINGS': 'settings',
-        'SOUNDCARD': 'soundcard',
-        'WIFI': 'network',
-    }
+    services = ['AUDIO', 'BATTERY', 'BQ27220', 'CONFIG', 'FILESYSTEM', 'OSINFO', 'PROCESS', 'PTY',
+                'SCREENSHOT', 'SETTINGS', 'WIFI', 'SUDO', 'BLUETOOTH', 'SAVED_SETTINGS']
 
     def service_enabled(name):
         return 'CONFIG_CP0_LVGL_INIT_' + name in os.environ
 
-    for name in optional_services:
+    for name in services:
         if service_enabled(name):
             DEFINITIONS += ['-DCONFIG_CP0_LVGL_INIT_' + name + '=1']
-    for name in ['RPC', 'SUDO', 'BLUETOOTH', 'SAVED_SETTINGS']:
-        if service_enabled(name):
-            DEFINITIONS += ['-DCONFIG_CP0_LVGL_INIT_' + name + '=1']
-
-    if service_enabled('AUDIO'):
-        REQUIREMENTS += ['Miniaudio']
 
     SRCS += Glob('src/*.c*')
     if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
@@ -80,25 +62,19 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ:
             File('src/cp0/cp0_desktop_exec_policy.cpp'),
             File('src/cp0/cp0_process_commands.cpp'),
             File('src/cp0/cp0_process_lifecycle.cpp'),
-            File('src/cp0/cp0_timedate_client.cpp'),
         ]
     else:
         platform_srcs = Glob('src/cp0/*.c*')
-        platform_srcs += [File('src/cp0/cp0_timedate_client.cpp')]
         REQUIREMENTS += ['input', 'xkbcommon', 'udev', 'pthread']
         REQUIREMENTS += [':libdbus-1.so.3']
         configure_target_gio(REQUIREMENTS, DEFINITIONS, LDFLAGS)
         PRIVATE_INCLUDE += [toolchain_path('usr', 'include', 'dbus-1.0'),
                             toolchain_path('usr', 'lib', env.get('GCC_DUMPMACHINE', ''), 'dbus-1.0', 'include')]
 
-    source_selected_services = {'AUDIO'}
     for source in platform_srcs:
-        source_name = str(source).lower()
-        disabled = any(token in source_name and not service_enabled(name)
-                       for name, token in optional_services.items()
-                       if name in source_selected_services)
-        if not disabled:
-            SRCS.append(source)
+        if 'audio' in str(source).lower() and not service_enabled('AUDIO'):
+            continue
+        SRCS.append(source)
 
     env["COMPONENTS"].append(
         {

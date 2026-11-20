@@ -28,13 +28,6 @@ assert "TimeoutMs = 10000" in LOCK
 assert "KEY_TAB" in LOCK
 assert "KEY_ENTER" in LOCK and "KEY_KPENTER" in LOCK
 
-# The lock screen is silent: the launcher ships no UI sounds and the platform has
-# no system-sound player to route them through.
-assert "blocked" not in LOCK
-for silent in ("play_lockscreen_sound", "SystemSound", "system_play", "cp0_signal_audio_api", ".mp3"):
-    assert silent not in SOURCE, silent
-assert not (ROOT / "APPLaunch/share/audio").exists()
-
 # Both entry points (the idle timeout and the long-press gesture) share one path,
 # so the two can no longer drift apart.
 assert "void enter_lockscreen()" in SOURCE
@@ -64,7 +57,6 @@ assert "hold.fire" in SOURCE
 # The visible lock states cover the whole display, top bar included: the card
 # carries the time and status, and the simulation fills the screen.
 assert "kTopBarHeightPx" in PAGE_SHELL
-assert "AppPageRoot::kTopBarHeightPx" not in SOURCE
 assert "refresh_status(true)" in SOURCE
 
 # The locked state paints pure black over the whole display, so the black screen
@@ -72,7 +64,6 @@ assert "refresh_status(true)" in SOURCE
 # backends accept the write and dim nothing.
 assert "LockscreenPanel full_screen_panel()" in SOURCE
 assert "apply_panel(full_screen_panel())" in SOURCE
-assert "panel_layout" not in SOURCE
 
 # The visible states show a clock and a prompt line with the step hint; no wallpaper.
 assert "LockscreenPanel wake_panel()" in SOURCE
@@ -81,18 +72,12 @@ assert "press tab to unlock" in SOURCE
 assert "press enter to unlock" in SOURCE
 assert "show_hint(" in SOURCE and "hide_hint()" in SOURCE
 assert "refresh_clock()" in SOURCE
-assert "lockscreen.png" not in SOURCE
 
 # Unlocking slides the wallpaper away, restoring the backlight first.
 assert "lv_anim_set_values(&animation, s_panel.y, -s_panel.height)" in SOURCE
 assert "release_screen_off_backlight();" in SOURCE
 
-assert "launcher_platform::path_c" not in SOURCE
 assert "std::thread" not in SOURCE
-
-PLATFORM = ROOT / "../../ext_components/cp0_lvgl/src"
-assert not (PLATFORM / "cp0/cp0_audio_system_sound_player.cpp").exists()
-assert "SystemSound" not in (PLATFORM / "cp0_audio_api_contract.cpp").read_text()
 
 # The panel is driven dark on entry and restored on every exit path, including
 # teardown and the object-delete callbacks.

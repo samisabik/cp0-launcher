@@ -26,8 +26,6 @@
 #include "signal_register_plan.h"
 #undef def_hal_fun
 
-eventpp::EventQueue<CP0_C_EVENT_t, void(const std::list<std::string>)> cp0_task_queue;
-
 extern "C" int cp0_wifi_status_read(cp0_wifi_status_t *status)
 {
     if (!status)
@@ -114,19 +112,6 @@ extern "C" int cp0_wifi_radio_enabled(void)
 extern "C" int cp0_wifi_radio_set_enabled(int enabled)
 {
     return wifi_command({"RadioSetEnabled", enabled ? "on" : "off"});
-}
-static std::atomic_bool queue_run_flage{true};
-extern "C" void init_lvgl_event_cpp()
-{
-    // cp0_task_queue.appendListener(CP0_C_EVENT_END, [](const std::list<std::string> args)
-    //                               { queue_run_flage = false; });
-    // std::thread t([]()
-    //               {
-    //     while (queue_run_flage.load()) {
-    //         cp0_task_queue.wait();
-    //         cp0_task_queue.process();
-    //     } });
-    // t.detach();
 }
 
 static int config_get_int(const char *key, int default_val)

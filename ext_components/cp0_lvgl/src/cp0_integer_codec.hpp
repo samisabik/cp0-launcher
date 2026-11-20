@@ -53,20 +53,6 @@ inline bool parse_int(const std::string &text, int &value)
                          std::numeric_limits<int>::max(), value);
 }
 
-inline bool parse_int_with_leading_whitespace(const std::string &text, int &value)
-{
-    const char *end = text.data() + text.size();
-    const char *begin = detail::skip_ascii_space(text.data(), end);
-    if (begin == end) return false;
-    bool positive_sign = *begin == '+';
-    if (positive_sign && ++begin == end) return false;
-    int parsed = 0;
-    const auto result = std::from_chars(begin, end, parsed, 10);
-    if (result.ec != std::errc{} || result.ptr != end) return false;
-    value = parsed;
-    return true;
-}
-
 inline int parse_int_prefix_clamped(const std::string &text, int fallback_if_empty)
 {
     if (text.empty()) return fallback_if_empty;

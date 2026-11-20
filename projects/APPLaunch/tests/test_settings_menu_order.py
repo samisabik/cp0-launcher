@@ -68,7 +68,6 @@ def test_sound_holds_volume_and_mic_gain():
     assert sound_entries == ["volume", "mic gain"]
     assert re.search(r'sound,\s*SettingEntry\{"volume",\s*volume_page3_factory,\s*PageType::FullCustom\}', builder)
     assert "settings_mic_gain_page_factory" in builder
-    assert "system_sounds_api" not in SETTINGS_PAGE
 
 
 def test_wifi_menu_joins_hidden_networks_from_the_list():
@@ -79,7 +78,6 @@ def test_wifi_menu_joins_hidden_networks_from_the_list():
     assert wifi_entries == ["enable", "networks"]
     assert 'SettingEntry{"enable", wifi_power_api, true}' in SETTINGS_PAGE
     assert 'SettingEntry{"networks", wifi_scan_page3_factory, PageType::FullCustom}' in SETTINGS_PAGE
-    assert "wifi_add_hidden_page_factory" not in SETTINGS_PAGE
     assert '"+ hidden network"' in WIFI_PAGE
     assert 'cp0::ui::title_row(hidden_panel_, "settings/wi-fi/hidden")' in WIFI_PAGE
 
@@ -90,8 +88,6 @@ def test_bluetooth_menu_has_power_paired_and_scan():
         settings_tree_builder(),
     )
     assert bluetooth_entries == ["power", "paired", "scan"]
-    assert "bt_named_only" not in SETTINGS_PAGE
-    assert "BtDiscoverable" not in SETTINGS_PAGE
 
 
 def test_ethernet_submenu_shows_the_address_read_only():
@@ -104,8 +100,6 @@ def test_ethernet_submenu_shows_the_address_read_only():
     assert 'settings_interface_ipv4("eth0")' in SETTINGS_PAGE
     assert 'SettingEntry{"enable", ethernet_enabled_api, true}' in SETTINGS_PAGE
     assert '"GENERAL.STATE", "device", "show", "eth0"' in ETHERNET_CONTROLLER
-    assert "GENERAL.AUTOCONNECT" not in SETTINGS_PAGE
-    assert "GENERAL.AUTOCONNECT" not in ETHERNET_CONTROLLER
     assert 'operation == Operation::Connect ? "connect" : "disconnect"' in ETHERNET_CONTROLLER
 
 
@@ -132,10 +126,7 @@ def test_ext_port_order_and_hardware_mappings():
 
 def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
     assert SETTINGS_ADAPTER.count("launcher_app_registry_entries(&count)") == 1
-    assert "launcher_builtin_app_registry_entries(&count)" not in SETTINGS_ADAPTER
-    assert "launcher::is_launcher_settings_origin(descriptor.origin)" in SETTINGS_ADAPTER
-    assert "launcher::is_protected_launcher_app(descriptor.config_key)" in SETTINGS_ADAPTER
-    assert '{"Python", "python_100.png", "app_Python", true, false}' in BUILTIN_REGISTRY
+    assert '{"Python", "app_Python", true, false}' in BUILTIN_REGISTRY
 
 
 def test_system_entries_and_power_actions():
@@ -151,14 +142,9 @@ def test_system_entries_and_power_actions():
     assert "settings_t12b_about_page_factory" in system
     assert "settings_hardware_page_factory" in system
     assert "settings_updates_page_factory" in system
-    assert "settings_storage_page_factory" not in system
-    assert "settings_credit_page_factory" not in system
     assert system.index("ssh_entry") < system.index('"updates"')
     assert system.index("boot_actions::Action::Reboot") < system.index("boot_actions::Action::Shutdown")
     assert "settings_power_request(action)" in SETTINGS_PAGE
-    for removed in ('SettingEntry{"OS"', 'SettingEntry{"APPLaunch"',
-                    'SettingEntry{"Help"', 'SettingEntry{"Boot"'):
-        assert removed not in system
 
 
 if __name__ == "__main__":

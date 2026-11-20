@@ -30,16 +30,11 @@ int main()
 
     const cp0_battery_info_t info = cp0_battery_read();
     assert(info.valid == 1 && info.soc >= 55 && info.soc <= 96);
-    assert(cp0_bq27220_calibrate(0) == 0);
-    assert(cp0_bq27220_calibrate(3) == 0);
-    assert(cp0_bq27220_calibrate(-1) == -1);
-    assert(cp0_bq27220_calibrate(4) == -1);
 
     cp0_signal_bq27220_api.append(
         [](std::list<std::string>, std::function<void(int, std::string)>) {
             throw std::runtime_error("signal");
         });
     assert(cp0_battery_read().valid == 0);
-    assert(cp0_bq27220_calibrate(0) == -1);
     return 0;
 }

@@ -17,7 +17,6 @@ int main()
         "Exec=/usr/bin/demo --flag=value\nTerminal=True\nSysplause=0\n");
     assert(entry);
     assert(entry->name == "Demo App");
-    assert(entry->icon == "demo.png");
     assert(entry->exec == "/usr/bin/demo --flag=value");
     assert(entry->terminal);
     assert(!entry->sysplause);

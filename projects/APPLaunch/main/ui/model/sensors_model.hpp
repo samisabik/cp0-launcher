@@ -42,7 +42,6 @@ Reading parse_line(const std::string &json);
 
 struct Sensor {
     Reading latest;
-    double first_seen = 0.0;
     double last_seen = 0.0;
     uint32_t count = 0;
     // Ring of temperatures, oldest first after history().

@@ -1,8 +1,7 @@
 # Current Implementation and Components
 
 This document is a source-of-truth snapshot for the implementation currently
-present in this checkout. It complements the longer launcher guides, which
-describe the original architecture and historical paths.
+present in this checkout.
 
 ## Build and runtime flow
 
@@ -15,7 +14,7 @@ projects/<project>/SConstruct
         v
 project executable
         |
-        +-- cp0_lvgl_run() / cp0_lvgl_run_app()
+        +-- cp0_lvgl_run()
         +-- LVGL display, input, timers, and service initialization
         +-- project setup callback
         v
@@ -35,13 +34,13 @@ then TAB and ENTER unlock it. External process handoff pauses lock-screen
 activity and restarts the idle interval on return; UI teardown calls
 `ui_lockscreen_deinit()`.
 
-`projects/APPLaunch/main/SConstruct` compiles `main/src`, `main/ui`, and
-`main/ui/settings`, generates `build/generated/include/generated/page_app.h`,
-and injects the launcher version, channel, build date, and Git commit into the
+`projects/APPLaunch/main/SConstruct` compiles `main/src` and `main/ui`,
+generates `build/generated/include/generated/page_app.h`,
+and injects the launcher version, build date, and Git commit into the
 compile. APPLaunch uses the local FreeType override in `main/lvgl/` while the
 remaining LVGL implementation comes from the SDK.
 
-The build profiles cover the device framebuffer, Linux and macOS SDL2 hosts,
+The build profiles cover the device framebuffer, a Linux SDL2 host,
 and AArch64 cross-builds from Linux and macOS. `AGENTS.md` lists them.
 
 ## Current module boundaries
@@ -54,7 +53,7 @@ and AArch64 cross-builds from Linux and macOS. `AGENTS.md` lists them.
 | Input | Native LVGL key delivery plus the shared `LV_EVENT_KEYBOARD` event and `key_item` contract |
 | Launcher shell | `projects/APPLaunch/main/ui/launcher_ui_runtime.*`, `launch.*`, registry, desktop loader, and page models |
 | Settings | `projects/APPLaunch/main/ui/settings` with policy/model/page files and generated UI component data |
-| Built-in pages | `projects/APPLaunch/main/ui/page_app` for Audio, Files, IP Panel, Rec, SDR, Spectrum, SSH, and ST terminal pages |
+| Built-in pages | `projects/APPLaunch/main/ui/page_app`, one `ui_app_*.hpp` per page |
 | External applications | `.desktop` discovery in `desktop_app_loader.*`, process policy in cp0, and process-group cleanup in `cp0_external_app_runner.*` |
 | Bluetooth and Wi-Fi | BlueZ and NetworkManager bridges inside `ext_components/cp0_lvgl/src/cp0` |
 
@@ -79,11 +78,9 @@ The setup callback does not register another event. Native navigation uses
 
 ## Optional services
 
-`ext_components/cp0_lvgl/Kconfig` exposes filesystem, configuration, PTY, RPC,
-audio, process, sudo, OS information, screenshot, Wi-Fi, Bluetooth,
-settings, BQ27220, saved settings, battery, and sound-card services.
-The SConstruct file maps enabled services to compile definitions and links
-Miniaudio for audio. Native builds additionally use
+`ext_components/cp0_lvgl/Kconfig` lists the optional services as
+`CP0_LVGL_INIT_*` options. The SConstruct file maps enabled services to
+compile definitions. Native builds additionally use
 DBus/GIO/GLib, NetworkManager, BlueZ, udev and xkbcommon; SDL builds
 select the SDL platform sources.
 

@@ -24,7 +24,6 @@ enum class Operation {
 struct Presentation
 {
     std::string_view label;
-    std::string_view confirmation_title;
 };
 
 const Presentation &presentation(Action action);

@@ -45,15 +45,6 @@ const char *build_date()
 #endif
 }
 
-const char *build_channel()
-{
-#ifdef LAUNCHER_CHANNEL_RAW
-    return SETTINGS_T12B_STRINGIFY(LAUNCHER_CHANNEL_RAW);
-#else
-    return "unknown";
-#endif
-}
-
 const char *build_commit()
 {
 #ifdef LAUNCHER_GIT_COMMIT_RAW
@@ -72,10 +63,10 @@ LvSettingStaticInfoPage3::LvSettingStaticInfoPage3() = default;
 
 LvSettingStaticInfoPage3::LvSettingStaticInfoPage3(
     lv_obj_t *parent,
-    const NodeIter &page_node,
+    const NodeIter &,
     std::function<void()> back_callback,
     settings_t12b::about_help::Content content)
-    : page_node_(page_node), content_(std::move(content))
+    : content_(std::move(content))
 {
     LeaveSelfPage = std::move(back_callback);
     create_ui(parent);

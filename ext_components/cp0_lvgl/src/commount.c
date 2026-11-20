@@ -39,5 +39,4 @@ void init_lvgl_event()
 {
     for (int i = 0; i < CP0_C_EVENT_END; i++)
         lv_c_event[i] = lv_event_register_id();
-    init_lvgl_event_cpp();
 }

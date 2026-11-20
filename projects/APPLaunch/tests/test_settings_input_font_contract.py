@@ -7,7 +7,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WIFI_HEADER = (ROOT / "main/ui/settings/settings_wifi_page.hpp").read_text()
 WIFI_SOURCE = (ROOT / "main/ui/settings/settings_wifi_page.cpp").read_text()
-BLUETOOTH_HEADER = (ROOT / "main/ui/settings/settings_bluetooth_page.hpp").read_text()
 BLUETOOTH_SOURCE = (ROOT / "main/ui/settings/settings_bluetooth_page.cpp").read_text()
 CP0_INCLUDE = ROOT.parents[1] / "ext_components/cp0_lvgl/include"
 SETTINGS_FONTS = (CP0_INCLUDE / "settings_fonts.hpp").read_text()
@@ -45,7 +44,6 @@ def test_editors_use_regular_bitmap_freetype_style():
     cjk_sans = function_definition(
         SETTINGS_FONTS, "inline const lv_font_t *cjk_sans"
     )
-    assert "LV_FREETYPE_FONT_STYLE_NORMAL" in cjk_sans
     assert "get_chrome(size)" in cjk_sans
 
     get_start = FONT_SERVICE.index("lv_font_t *get(")
@@ -69,7 +67,6 @@ def test_wifi_editors_share_the_configured_input_font():
     assert hidden_panel.count("create_hidden_input(") == 2
     assert "lv_textarea_create(parent)" in hidden_input
     assert "input_font(11)" in hidden_input
-    assert "settings_text_cursor" not in WIFI_HEADER + WIFI_SOURCE
 
 
 def test_hidden_wifi_cursor_is_centered_in_explicit_character_spacing():
@@ -95,7 +92,6 @@ def test_bluetooth_editor_uses_one_font_for_all_cursor_states():
     )
     assert alias_editor.count("input_font(11)") == 1
     assert "lv_obj_set_style_text_font(alias_input_, input_font(11), LV_PART_MAIN);" in alias_editor
-    assert "settings_text_cursor" not in BLUETOOTH_HEADER + BLUETOOTH_SOURCE
 
 
 if __name__ == "__main__":

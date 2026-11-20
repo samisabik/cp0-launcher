@@ -15,7 +15,6 @@ int main()
 
     assert(classify_resource("icon.PNG") == ResourceKind::image);
     assert(classify_resource("photo.JpEg") == ResourceKind::image);
-    assert(classify_resource("share/audio/chime.OGG") == ResourceKind::audio);
     assert(classify_resource("font.otf") == ResourceKind::font);
     assert(classify_resource("dir.with.dot/file") == ResourceKind::none);
     assert(classify_resource("file.") == ResourceKind::none);

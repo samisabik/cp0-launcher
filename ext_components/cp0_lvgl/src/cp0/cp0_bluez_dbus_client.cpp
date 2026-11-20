@@ -1277,14 +1277,4 @@ void connect_async(const char *address, Completion completion) { command("connec
 void disconnect_async(const char *address, Completion completion) { command("disconnect", address, std::move(completion)); }
 void remove_async(const char *address, Completion completion) { command("remove", address, std::move(completion)); }
 
-int set_power(int enabled) { set_power_async(enabled, {}); return 0; }
-int set_alias(const char *alias) { set_alias_async(alias, {}); return 0; }
-int set_discoverable(int enabled) { set_discoverable_async(enabled, {}); return 0; }
-int start_discovery() { start_discovery_async({}); return 0; }
-int stop_discovery() { stop_discovery_async({}); return 0; }
-int pair(const char *address) { pair_async(address, {}); return 0; }
-int connect(const char *address) { connect_async(address, {}); return 0; }
-int disconnect(const char *address) { disconnect_async(address, {}); return 0; }
-int remove(const char *address) { remove_async(address, {}); return 0; }
-
 } // namespace cp0_bluez_dbus

@@ -32,7 +32,6 @@ int main()
         assert(!lease);
         assert(gate.pending() == 1);
     }
-    gate.wait_for_drain();
     assert(gate.pending() == 0);
 
     gate.resume();
@@ -66,20 +65,12 @@ int main()
     }
     while (acquired.load() != kCallbacks) std::this_thread::yield();
 
-    std::atomic<bool> drained{false};
-    std::thread shutdown([&] {
-        gate.begin_shutdown();
-        gate.wait_for_drain();
-        drained.store(true);
-    });
-    while (gate.accepting()) std::this_thread::yield();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    assert(!drained.load());
+    gate.begin_shutdown();
+    assert(!gate.accepting());
     assert(!gate.reserve());
+    assert(gate.pending() == kCallbacks);
 
     release_callbacks.store(true);
     for (auto &worker : workers) worker.join();
-    shutdown.join();
-    assert(drained.load());
     assert(gate.pending() == 0);
 }

@@ -9,7 +9,6 @@
 #include "../include/cp0_bounded_task_registry.hpp"
 
 #include <atomic>
-#include <cerrno>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -25,15 +24,10 @@ struct Result {
 
 class Jobs {
 public:
-    using Operation = std::function<Result(const std::atomic<bool> &cancel_requested)>;
+    using Operation = std::function<Result()>;
     using Progress = std::function<std::string()>;
 
-    std::string start(Operation operation)
-    {
-        return start(std::move(operation), {});
-    }
-
-    std::string start(Operation operation, Progress progress)
+    std::string start(Operation operation, Progress progress = {})
     {
         const std::string id = std::to_string(next_.fetch_add(1));
         auto job = std::make_shared<Job>();
@@ -45,7 +39,7 @@ public:
         std::lock_guard<std::mutex> task_lock(task_mutex_);
         const bool started = tasks_.start([job, operation = std::move(operation)]() mutable {
             Result result;
-            try { result = operation ? operation(job->cancel_requested) : Result{}; } catch (...) {}
+            try { result = operation ? operation() : Result{}; } catch (...) {}
             {
                 std::lock_guard<std::mutex> lock(job->mutex);
                 job->stage = std::move(result.stage);
@@ -60,13 +54,6 @@ public:
             job->done.store(true);
         }
         return id;
-    }
-
-    std::string start(std::function<Result()> operation)
-    {
-        return start([operation = std::move(operation)](const std::atomic<bool> &) mutable {
-            return operation ? operation() : Result{};
-        });
     }
 
     bool status(const std::string &id, std::string &value)
@@ -95,8 +82,7 @@ public:
         else {
             std::string stage;
             { std::lock_guard<std::mutex> lock(job->mutex); stage = job->stage; }
-            if (job->result.load() == -ECANCELED) value = "cancelled";
-            else if (job->result.load() == 0) value = "succeeded:" + stage;
+            if (job->result.load() == 0) value = "succeeded:" + stage;
             else value = "failed:" + stage + ":" + std::to_string(job->result.load());
             std::lock_guard<std::mutex> lock(mutex_);
             jobs_.erase(id);
@@ -104,27 +90,9 @@ public:
         return true;
     }
 
-    bool cancel(const std::string &id)
-    {
-        {
-            std::lock_guard<std::mutex> lock(task_mutex_);
-            tasks_.reap_finished();
-        }
-        std::shared_ptr<Job> job;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            const auto found = jobs_.find(id);
-            if (found == jobs_.end()) return false;
-            job = found->second;
-        }
-        job->cancel_requested.store(true);
-        return true;
-    }
-
 private:
     struct Job {
         std::atomic<bool> done{false};
-        std::atomic<bool> cancel_requested{false};
         std::atomic<int> result{-1};
         std::mutex mutex;
         std::string stage = "starting";

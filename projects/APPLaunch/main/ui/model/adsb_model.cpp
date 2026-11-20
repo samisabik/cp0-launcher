@@ -190,11 +190,6 @@ Velocity velocity(const Frame &frame)
     if (track < 0.0) track += 360.0;
     if (track >= 360.0) track -= 360.0;
     out.track_deg = track;
-    const int raw_vr = ((frame[8] & 0x07) << 6) | (frame[9] >> 2);
-    if (raw_vr != 0) {
-        out.has_vertical_rate = true;
-        out.vertical_rate_fpm = ((frame[8] & 0x08) ? -1 : 1) * (raw_vr - 1) * 64;
-    }
     return out;
 }
 
@@ -222,7 +217,6 @@ bool Table::feed(const std::string &line, double now)
     }
     Aircraft &aircraft = *it;
     aircraft.last_seen = now;
-    ++aircraft.messages;
 
     const int tc = type_code(frame);
     if (tc >= 1 && tc <= 4) {

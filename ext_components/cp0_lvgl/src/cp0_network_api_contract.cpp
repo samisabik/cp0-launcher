@@ -117,10 +117,6 @@ bool parse_api_request(const std::list<std::string> &args, ApiRequest &request)
             request.password = *argument;
         return true;
     }
-    if (command == "Disconnect") {
-        request.command = ApiCommand::Disconnect;
-        return exact_size(args, 1);
-    }
     if (command == "ProfileForget" || command == "ProfileExists") {
         request.command = command == "ProfileForget" ? ApiCommand::ProfileForget : ApiCommand::ProfileExists;
         if (!exact_size(args, 2))

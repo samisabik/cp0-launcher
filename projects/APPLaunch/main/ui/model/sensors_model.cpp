@@ -119,7 +119,6 @@ bool Table::add(const Reading &reading, double now)
             }));
         }
         Sensor fresh;
-        fresh.first_seen = now;
         sensors_.push_back(fresh);
         it = sensors_.end() - 1;
     }

@@ -17,13 +17,6 @@ namespace cp0::pulse {
 // the server is unavailable every call fails and the caller falls back to the
 // persisted configuration. No call spawns a process.
 
-// Loads libpulse.so.0 and resolves the client symbols. Call this during
-// startup (for example while the splash animation is on screen) so the first
-// volume action does not pay the loader cost. Returns false when libpulse is
-// missing. The call is idempotent and thread-safe; later calls only return the
-// cached result.
-bool preload();
-
 bool default_sink_name(std::string &name);
 int read_default_sink_volume();
 int write_default_sink_volume(int percent);

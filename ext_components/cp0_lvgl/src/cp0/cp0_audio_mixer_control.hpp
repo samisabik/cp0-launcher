@@ -36,9 +36,6 @@ public:
     int write_volume(int percent) const;
     int read_mute() const;
     int toggle_mute() const;
-    // Loads the PulseAudio client library ahead of the first use. Idempotent;
-    // returns false when the client library is unavailable.
-    bool preload() const;
 };
 
 // Decides one pass of the startup volume restore. The loop itself lives in

@@ -191,7 +191,6 @@ Analysis analyze_at(const std::vector<Pulse> &pulses, uint32_t total_us, int te)
     const Pulse &head = pulses[best->first];
     const Pulse &tail = pulses[best->first + best->count - 1];
     result.packet_start_us = head.start_us;
-    result.packet_us = tail.start_us + tail.high_us - head.start_us;
     for (int i = 0; i < result.bit_count; ++i) result.bit_edges_us.push_back(pulses[best->first + i].start_us);
     if (result.bit_count > 0) {
         if (best->sync) {

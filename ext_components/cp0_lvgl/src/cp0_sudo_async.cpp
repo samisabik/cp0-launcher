@@ -911,28 +911,6 @@ extern "C" int cp0_sudo_run_argv_async_ex(const char *const *argv,
     });
 }
 
-extern "C" int cp0_sudo_run_argv_async(const char *const *argv,
-    cp0_sudo_callback_thread_t callback_thread, cp0_sudo_output_cb_t output_cb,
-    cp0_sudo_complete_cb_t complete_cb, void *user)
-{
-    return cp0_sudo_run_argv_async_ex(argv, callback_thread, output_cb, complete_cb,
-                                     user, 0, 0, nullptr);
-}
-
-extern "C" int cp0_sudo_run_shell_async(const char *command,
-    cp0_sudo_callback_thread_t callback_thread, cp0_sudo_output_cb_t output_cb,
-    cp0_sudo_complete_cb_t complete_cb, void *user)
-{
-    if (!command || !command[0] || !valid_callback_thread(callback_thread)) return -EINVAL;
-    return cp0_sudo::invoke_c_api([&] {
-        if (!sudo_running()) return -ESHUTDOWN;
-        auto built = g_request_factory.create_shell(command, callback_thread, output_cb,
-                                                    complete_cb, user);
-        if (built.error != 0) return built.error;
-        return enqueue(std::move(built.request), nullptr);
-    });
-}
-
 extern "C" int cp0_sudo_cancel(uint64_t request_id)
 {
     return cp0_sudo::invoke_c_api([&] {
@@ -941,27 +919,6 @@ extern "C" int cp0_sudo_cancel(uint64_t request_id)
         int rc = g_coordinator.cancel(request_id, actions, now_ms());
         if (rc != 0) return rc;
         if (!post_actions(actions)) g_coordinator.requeue_actions(std::move(actions));
-        return 0;
-    });
-}
-
-extern "C" int cp0_sudo_queue_password(const char *password)
-{
-    if (!password || !password[0]) return -EINVAL;
-    const size_t length = std::strlen(password);
-    if (length > kMaxPasswordBytes) return -E2BIG;
-    return cp0_sudo::invoke_c_api([&] {
-        if (!sudo_running()) return -ESHUTDOWN;
-        {
-            std::lock_guard<std::mutex> lock(g_queued_password_mutex);
-            secure_clear(g_queued_password);
-            g_queued_password.assign(password, length);
-            g_queued_password_deadline_ms = now_ms() + 60000;
-        }
-        if (!schedule_apply_queued_password()) {
-            clear_queued_password();
-            return -EIO;
-        }
         return 0;
     });
 }

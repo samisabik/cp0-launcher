@@ -41,18 +41,6 @@ int main()
         "5", std::uint64_t{6}, std::uint64_t{4}, unsigned_value));
     assert(unsigned_value == 17);
 
-    value = 91;
-    assert(cp0_integer_codec::parse_int_with_leading_whitespace(" \t+42", value));
-    assert(value == 42);
-    assert(cp0_integer_codec::parse_int_with_leading_whitespace("\n-3", value));
-    assert(value == -3);
-    assert(!cp0_integer_codec::parse_int_with_leading_whitespace("12tail", value));
-    assert(value == -3);
-    assert(!cp0_integer_codec::parse_int_with_leading_whitespace("   ", value));
-    assert(value == -3);
-    assert(!cp0_integer_codec::parse_int_with_leading_whitespace("2147483648", value));
-    assert(value == -3);
-
     assert(cp0_integer_codec::parse_int_prefix_clamped("", 7) == 7);
     assert(cp0_integer_codec::parse_int_prefix_clamped("garbage", 7) == 0);
     assert(cp0_integer_codec::parse_int_prefix_clamped(" \t+12tail", 7) == 12);

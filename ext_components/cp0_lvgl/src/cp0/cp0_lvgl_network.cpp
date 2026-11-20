@@ -139,9 +139,6 @@ public:
             result.complete(connect(request.ssid.c_str(),
                 request.password.empty() ? nullptr : request.password.c_str(), true), "");
             break;
-        case cp0::network::ApiCommand::Disconnect:
-            result.complete(disconnect(), "");
-            break;
         case cp0::network::ApiCommand::ProfileForget:
             result.complete(profile_forget(request.ssid.c_str()), "");
             break;
