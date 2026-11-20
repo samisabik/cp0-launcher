@@ -43,30 +43,6 @@ std::string format_mhz(uint32_t hz)
     return text;
 }
 
-std::string csv_header(const std::string &started_iso)
-{
-    std::string text = "# cc1101 spectrum session, started " + started_iso + "\n";
-    text += "# rssi in dBm (approximate), one row per sweep\n";
-    for (const Band &band : kBands) {
-        char line[96];
-        std::snprintf(line, sizeof(line), "# band %s start_hz=%u stop_hz=%u bins=%d\n",
-                      band.label, band.start_hz, band.stop_hz, kBins);
-        text += line;
-    }
-    text += "timestamp_ms,band";
-    for (int bin = 0; bin < kBins; ++bin) text += ",b" + std::to_string(bin);
-    text += "\n";
-    return text;
-}
-
-std::string csv_row(int64_t timestamp_ms, const Band &band, const int8_t *dbm, std::size_t count)
-{
-    std::string text = std::to_string(timestamp_ms) + "," + band.label;
-    for (std::size_t i = 0; i < count; ++i) text += "," + std::to_string(static_cast<int>(dbm[i]));
-    text += "\n";
-    return text;
-}
-
 std::vector<int32_t> normalize_durations(const std::vector<int32_t> &durations)
 {
     std::vector<int32_t> out;

@@ -9,10 +9,6 @@
 #include "cp0_lvgl_app.h"
 #include "../cp0_battery_lifecycle.hpp"
 #include "../cp0_battery_publish_gate.hpp"
-#include "../cp0_signal_registration.hpp"
-
-#include <functional>
-#include <memory>
 
 namespace {
 
@@ -45,14 +41,7 @@ cp0::battery::Lifecycle &battery_lifecycle()
 extern "C" void init_battery()
 {
     battery_lifecycle().start(
-        [] {
-            using Registration = cp0::SignalRegistration<decltype(cp0_signal_battery_pub)>;
-            auto registration = std::make_shared<Registration>();
-            const bool registered = registration->replace(
-                cp0_signal_battery_pub, [](std::function<void()>) { publish_battery(); });
-            return cp0::battery::LifecycleResource{
-                registered, [registration] { registration->reset(); }};
-        },
+        [] { return cp0::battery::LifecycleResource{true, {}}; },
         [] {
             lv_timer_t *timer = lv_timer_create(battery_timer_cb, 100, nullptr);
             return cp0::battery::LifecycleResource{

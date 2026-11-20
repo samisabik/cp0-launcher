@@ -61,11 +61,5 @@ int main()
     assert(call({"WatchPoll", "123456789"}).code == -1);
     assert(call({"WatchStop", started.data}).code == 0);
     assert(call({"WatchStop", started.data}).code == -1);
-
-    cp0_watcher_t watcher = cp0_dir_watch_start("/tmp");
-    assert(watcher != nullptr && cp0_dir_watch_poll(watcher) >= 0);
-    cp0_dir_watch_stop(watcher);
-    cp0_dir_watch_stop(watcher);
-    assert(cp0_dir_watch_poll(watcher) == -1);
     return 0;
 }

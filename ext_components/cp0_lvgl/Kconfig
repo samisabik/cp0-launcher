@@ -53,9 +53,6 @@ config CP0_LVGL_INIT_SAVED_SETTINGS
 config CP0_LVGL_INIT_BATTERY
     bool "Initialize battery service"
     default n
-config CP0_LVGL_INIT_SOUNDCARD
-    bool "Initialize sound card service"
-    default n
 
 endmenu
 

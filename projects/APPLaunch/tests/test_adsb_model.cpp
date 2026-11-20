@@ -94,7 +94,6 @@ static void test_velocity()
     assert(v.valid);
     assert(std::fabs(v.speed_kt - 159.20) < 0.01);
     assert(std::fabs(v.track_deg - 182.88) < 0.01);
-    assert(v.has_vertical_rate && v.vertical_rate_fpm == -832);
     assert(!velocity(frame_of(kIdent)).valid);
 }
 
@@ -124,7 +123,6 @@ static void test_table()
     other = table.find(0x40621D);
     assert(other && other->has_position);
     assert(std::fabs(other->lat - 52.2572) < 0.0001 && std::fabs(other->lon - 3.91937) < 0.0001);
-    assert(other->messages == 2);
 
     assert(table.feed(std::string("*") + kVelocity + ";", 5.0));
     const Aircraft *third = table.find(0x485020);

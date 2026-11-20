@@ -13,25 +13,13 @@ Paths in the evidence column are relative to the repository root.
 | Component | Build/source evidence | License and local text |
 | --- | --- | --- |
 | M5Stack Linux Libs SDK | `SDK`, pinned gitlink; SCons/Kconfig framework | [MIT, 2024 M5Stack](../LICENSES/M5Stack-SDK-MIT.txt) |
-| LVGL 9.5 | SDK LVGL component, emulator `lib/lvgl`, APPLaunch `lv_freetype*` and `lv_sdl_keyboard.c` overrides | [MIT](../LICENSES/LVGL-MIT.txt); bundled sublibraries retain their own notices |
-| FreeType | APPLaunch `main/lvgl/ftmodule.h` and `main/SConstruct` | FTL or GPL-2.0; [FTL text](../projects/APPLaunch/main/lvgl/freetype-LICENSE.txt) |
+| LVGL 9.5 | SDK LVGL component, emulator `lib/lvgl`, APPLaunch `main/lvgl/lv_freetype*` overrides | [MIT](../LICENSES/LVGL-MIT.txt); bundled sublibraries retain their own notices |
+| FreeType | linked by APPLaunch `main/lvgl/lv_freetype*` through `main/SConstruct` | FTL or GPL-2.0; [FTL text](../projects/APPLaunch/main/lvgl/freetype-LICENSE.txt) |
 | tree.hh 3.20 | `ext_components/cp0_lvgl/include/tree.hh`, Kasper Peeters 2001–2024 | [GPL-3.0-only](../LICENSES/tree.hh-GPL-3.0-only.txt): header specifies version 3 without an “or later” grant |
-| miniaudio 0.11.25 | `ext_components/Miniaudio/include/miniaudio.h`; audio service | [Unlicense OR MIT-0](../ext_components/Miniaudio/LICENSE), David Reid |
 | eventpp | cp0_lvgl and APPLaunch requirements; SDK eventpp component | [Apache-2.0](../LICENSES/eventpp-Apache-2.0.txt) |
-| fmt | `SDK/components/utilities/SConstruct`, `party/fmt` | [MIT with optional compiled-object exception](../LICENSES/fmt-MIT.txt) |
-| nlohmann/json 3.11.3 | `projects/CardputerZero-Emulator/vendor/nlohmann/json.hpp` | [MIT](../LICENSES/nlohmann-json-MIT.txt), Niels Lohmann; original SPDX preserved |
 | Departure Mono | `projects/APPLaunch/APPLaunch/share/font` | [OFL-1.1](../projects/APPLaunch/APPLaunch/share/font/DepartureMono-OFL.txt) |
 
 LVGL embeds separately licensed codecs, renderers and fonts. Preserve its `src/libs/*/LICENSE*`, `src/stdlib/builtin/LICENSE*` and `scripts/built_in_font/font_license/` records when distributing those features. Generated font arrays retain the input font's license.
-
-## Additional SDK downloads
-
-These source trees exist locally; cache presence does not establish that APPLaunch links them.
-
-| Component | Evidence / selection | License text |
-| --- | --- | --- |
-| cJSON | Optional `SDK/components/cjson/SConstruct` | [MIT](../LICENSES/cJSON-MIT.txt) |
-| C-Thread-Pool | `SDK/github_source/C-Thread-Pool`; no direct launcher wrapper found | [MIT](../LICENSES/C-Thread-Pool-MIT.txt) |
 
 ## Platform dependencies
 
@@ -39,11 +27,11 @@ Component SConstruct files and application SConstruct/CMake files resolve these 
 
 | Dependency | Use | License family |
 | --- | --- | --- |
-| SDL2, optional SDL2_mixer | Simulator/emulator display, input and audio | zlib; mixer codecs have separate terms |
+| SDL2, SDL2_image | Simulator/emulator display and input | zlib |
 | GLib, GObject, GIO | Native service/event integration | LGPL-2.1-or-later |
 | libdbus; BlueZ daemon | Bluetooth IPC | D-Bus AFL/GPL dual terms; BlueZ GPL/LGPL per component |
 | libpulse.so.0; pipewire-pulse daemon | Speaker volume/mute through the PulseAudio-compatible server (`dlopen`, no build-time dependency) | libpulse LGPL-2.1-or-later; PipeWire MIT (Expat) with LGPL-2.1+ parts |
-| libnm; NetworkManager daemon | Wi-Fi | libnm LGPL-2.1-or-later; NetworkManager GPL-2.0-or-later |
+| NetworkManager daemon and `nmcli` | Wi-Fi, run as a separate process | GPL-2.0-or-later |
 | libinput, xkbcommon, udev | Native input/device discovery | MIT for libinput/xkbcommon; udev LGPL terms |
 | libcrypt, libc, libstdc++ | Account setup and runtime | Package-specific LGPL/GPL with runtime exceptions |
 

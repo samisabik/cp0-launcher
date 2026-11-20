@@ -33,7 +33,7 @@ Related files (all worth a quick scan):
 
 **The three most frequently violated rules** (memorize these first):
 
-1. **Run `scons` inside `projects/<project>/`, and run `scons distclean` before switching profiles** (§4.1).
+1. **Run `scons` inside `projects/<project>/`** (§4.1).
 2. **`generated/page_app.h` is a build artifact — never edit it by hand, never commit it**; adding a page means touching only `page_app/` + `BUILTIN_APPS[]` (§6.2).
 3. **Run `git status --short` before you start; never `git add -A`, never commit submodule pointer drift** (§10.3, §13).
 
@@ -48,7 +48,6 @@ launcher/
 ├── SDK/                       # [submodule] M5Stack_Linux_Libs: component libs + SCons toolchain + 3rd-party source cache
 ├── ext_components/            # vendored external components (cp0_lvgl is the core platform layer)
 │   ├── cp0_lvgl/              #   ★ platform adapter: LVGL runner, AppPage bases, cp0_signal_* service bus
-│   ├── Miniaudio/
 │   └── THIRD_PARTY_NOTICES.md
 ├── projects/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
@@ -127,7 +126,7 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 **Hard rules**:
 
 1. **You must run `scons` inside `projects/<project>/`.** Running it from the repo root fails — `CONFIG_DEFAULT_FILE` is a bare filename and the SDK resolves it with `resolve()` relative to the CWD.
-2. **Run `scons distclean` before switching profiles.** APPLaunch's `SConstruct` has no config-invalidation logic. When `build/config/global_config.mk` already exists the SDK will not regenerate the config → you will compile arm64 while believing you are on SDL2.
+2. **Switching profiles regenerates the config.** `SConstruct` drops `build/config/global_config.*` when the selected profile or its contents change (`build_support/config_default_file.py`). `scons distclean` gives a fully fresh build.
 3. **Do not run `scons save`**, which writes back into the shared `*_config_defaults.mk` — those are public profiles used by everyone.
 
 ### 4.2 Artifacts and directories
@@ -135,7 +134,7 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 ```
 projects/APPLaunch/
 ├── build/config/{global_config.mk, global_config.h, lvgl_config.h, config_tmp.mk}
-├── build/<Component>/*.o                # cp0_lvgl / lvgl_component / eventpp / Miniaudio ...
+├── build/<Component>/*.o                # cp0_lvgl / lvgl_component / eventpp ...
 ├── main/build/generated/include/generated/page_app.h   # ← auto-generated; do not edit or commit
 ├── main/build/static/APPLaunch/         # staged resource tree (re-copied on every scons run)
 └── dist/
@@ -170,7 +169,7 @@ Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scri
 ### 4.5 Other build notes
 
 - **Automation environments must `export CONFIG_REPO_AUTOMATION=y`**: otherwise, when third-party sources are missing, `SDK/tools/scons/SConstruct_tool.py` blocks on an `input()` prompt.
-- **Semantic version**: `APPLAUNCH_VERSION` must be `X.Y.Z[-tag]` (`main/SConstruct` validates it with a regex and raises otherwise); there are also `APPLAUNCH_CHANNEL` and `SOURCE_DATE_EPOCH`.
+- **Semantic version**: `APPLAUNCH_VERSION` must be `X.Y.Z[-tag]` (`main/SConstruct` validates it with a regex and raises otherwise); `SOURCE_DATE_EPOCH` sets the build date.
 - **Cross-compile sysroot**: `<repo>/sysroot` (git-ignored), made from the device by `scripts/make_sysroot.sh [ssh-host]` (default host `cp0`): the device's runtime libraries plus `-dev` packages at its own versions. Cross builds stop with a message when it is missing. CI builds it with `scripts/make_sysroot.sh --docker` from a Debian trixie arm64 container. Rebuild it after upgrading packages on the device.
 - **The third-party source cache does not validate versions**: after changing a pin you must delete `SDK/github_source/<repo>` to force a re-fetch.
 
@@ -183,7 +182,7 @@ Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scri
 ```
 main/src/main.cpp  main()
   ├─ options.after_resource_init          # backlight to 0 → restore previous brightness
-  ├─ options.setup   → launcher_ui::init() [ui/ui.cpp:36] + ui_lockscreen_init()
+  ├─ options.setup   → launcher_ui::init() [ui/ui.cpp] + ui_lockscreen_init()
   └─ cp0_lvgl_run(options)                # ★ the real main loop
         [ext_components/cp0_lvgl/src/cp0_lvgl_app_runner.cpp  cp0_lvgl_run()]
         lv_init() → cp0_lvgl_init() → setup() → first frame →
@@ -191,13 +190,13 @@ main/src/main.cpp  main()
 ```
 
 - **The main loop is not under `projects/APPLaunch/main/`**; it lives in `ext_components/cp0_lvgl/src/cp0_lvgl_app_runner.cpp`.
-- To wake the UI from another thread use `cp0_lvgl_wake()`. **Never** spin up your own thread to touch LVGL.
-- `ui/ui.cpp:36` `launcher_ui::init()`: installs the global key handler → constructs `LauncherUiRuntime` → `start()`.
+- **Never** touch LVGL from another thread; worker results reach the UI through the `cp0_signal_*` callbacks (§8).
+- `ui/ui.cpp` `launcher_ui::init()`: installs the global key handler → constructs `LauncherUiRuntime` → `start()`.
 
 ### 5.2 The display backend is selected at **compile time**
 
 `CONFIG_V9_5_LV_USE_SDL` decides whether `ext_components/cp0_lvgl/SConstruct` collects `src/sdl/*` or `src/cp0/*`, and injects `-DHAL_PLATFORM_SDL=1`.
-APPLaunch has only two `#ifdef HAL_PLATFORM_SDL` branches: `ui/launcher_ui_runtime.cpp` (skips the boot GIF) and `ui/builtin_app_registry.cpp` (SSH / IP Panel are device-only).
+APPLaunch has one `HAL_PLATFORM_SDL` branch, in `ui/builtin_app_registry.cpp` (SSH / IP Panel are device-only).
 Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 
 ### 5.3 "I want to change X → open Y"
@@ -207,9 +206,8 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Goal | File | Key symbols |
 | --- | --- | --- |
 | Add/remove a built-in app | `main/ui/builtin_app_registry.cpp` | `BUILTIN_APPS[]`, `append_page_app<PageT>`, `append_cli_app` |
-| Change app fields / origin semantics | `main/ui/app_registry.h` | `AppDescriptor`, `LauncherAppOrigin` |
+| Change app fields | `main/ui/app_registry.h` | `AppDescriptor` |
 | Enable/disable an app | `main/ui/app_registry.cpp` | `launcher_app_registry_is_enabled/_set_enabled/_notify_changed` |
-| Change home app ordering | `main/ui/app_display_order.cpp` | `kBuiltInAppOrder`, `launcher_builtin_app_display_order` |
 | `.desktop` parsing (add a field) | `main/ui/desktop_entry.cpp` + `tests/test_desktop_entry.cpp` | `parse_desktop_entry`, `desktop_entry.h` |
 | `.desktop` scanning/filtering/limit | `main/ui/desktop_app_loader.cpp` | `launcher_append_desktop_apps` (limit 128, `desktop_app_loader.hpp`) |
 | `.desktop` directory watching | `main/ui/app_directory_watcher.cpp` | `WATCH_POLL_PERIOD_MS` (3000ms) |
@@ -222,11 +220,10 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Home app types and their order | `main/ui/app_display_order.cpp` | `kHomeOrder`, `launcher_home_category` |
 | Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white alpha masks, recoloured at runtime; slugs listed in `kKnown`; sources and licences in the `*-LICENSE.txt` / `*-NOTICE.txt` files beside them |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
-| Boot logo / GIF | `main/ui/launcher_ui_runtime.cpp` + `ui_launch_page.cpp` | `start_startup_gif` |
-| Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `kIconSize`, `rebuild`, `find` |
+| Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `rebuild`, `find` |
 | Default placeholder icon | `main/ui/home_icon_fallback.c` | 50×50 ARGB8888; constrained by `tests/test_home_icon_fallback_contract.py` |
 | Add a built-in page | `main/ui/page_app/` + `builtin_app_registry.cpp` | see §6 |
-| Page base class / top bar / bottom bar | `ext_components/cp0_lvgl/include/ui_app_page.hpp` (**not in `main/ui/`**) | `AppPageRoot`, `AppPage`, `AppPageWithBottomBarLayout`, `cp0_lvgl_start_app_page` |
+| Page base class / top bar | `ext_components/cp0_lvgl/include/ui_app_page.hpp` (**not in `main/ui/`**) | `AppPageRoot`, `AppPage`, `cp0_lvgl_start_app_page` |
 | Return-home state machine | `main/ui/model/launcher_navigation_model.hpp` | `LauncherPageLifecycleModel` |
 | ESC long-press to return home | `main/ui/esc_hold_hint_controller.cpp` | `handle`, `poll` |
 | Hang watchdog | `main/ui/esc_ui_watchdog.{h,cpp}` | `ESC_UI_RECOVERY_DELAY_MS` (exit code 75) |
@@ -238,10 +235,10 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Lock screen (timeout/unlock/Game of Life/status card) | `main/ui/ui_lockscreen.cpp` + `model/lockscreen_state_model.hpp`, `model/lockscreen_activity_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
 | Low-battery policy / appearance | `main/ui/low_battery_flow.hpp` / `ui_low_battery.cpp` | the policy is pure logic and unit-tested |
 | Settings menu structure | `main/ui/settings/settings_page.cpp` | `create_page_detail` (node order = menu order), `UISettingTreePage` |
-| Settings entry policy/gating | `main/ui/settings/settings_tree_types.hpp` | `SettingEntry`, `SettingActivationPolicy`, `activation_gate` |
+| Settings entry gating | `main/ui/settings/settings_tree_types.hpp` | `SettingEntry`, `activation_gate` |
 | Add a settings sub-page | new `*_page.{hpp,cpp}` in `main/ui/settings/` + a factory and tree node in `settings_page.cpp` | three-level value pages derive from `LvSettingValuePage3Base` |
 | Settings value ranges (brightness/volume) | `main/ui/model/setup_value_policy.{hpp,cpp}` | unit-tested |
-| Theme / display initialization | `main/ui/launcher_ui_runtime.cpp` | `create_display`, `build_launcher_home`, `show_initial_screen` |
+| Theme / display initialization | `main/ui/launcher_ui_runtime.cpp` | `create_display`, `build_launcher_home` |
 | Resource install layout | `main/SConstruct` | `STATIC_FILES` ← `projects/APPLaunch/APPLaunch/` |
 | Deployment / systemd | `scripts/device_install.sh`, `scripts/APPLaunch.service` | — |
 
@@ -280,15 +277,14 @@ Drop it into `projects/APPLaunch/APPLaunch/applications/` (installed as `/usr/sh
 Name=MyApp
 Exec=/usr/share/APPLaunch/bin/my_app
 Terminal=false
-Icon=share/images/my_app_100.png
 Type=Application
 ```
 
-Only these keys are parsed: `Name` (≤128B, required), `Icon` (≤512B), `Exec` (≤512B, required), `Terminal`, `Sysplause` (default true), `Type` (must be `Application`), `Hidden`/`NoDisplay`. All other keys (including `TryExec`) are **ignored**.
+Only these keys are parsed: `Name` (≤128B, required), `Exec` (≤512B, required), `Terminal`, `Sysplause` (default true), `Type` (must be `Application`), `Hidden`/`NoDisplay`. All other keys (including `TryExec`) are **ignored**.
 
-Silently skipped when: the filename does not end in `.desktop`; it contains `/ \` or control characters; `Name`/`Exec` is missing; `Exec` fails the backend `DesktopExecIsSafe` check; `Exec` duplicates a built-in or an already-loaded entry; `Icon` cannot be resolved. **Check the stderr log — do not delete those rejection messages.**
+Silently skipped when: the filename does not end in `.desktop`; it contains `/ \` or control characters; `Name`/`Exec` is missing; `Exec` fails the backend `DesktopExecIsSafe` check; `Exec` duplicates a built-in or an already-loaded entry. **Check the stderr log — do not delete those rejection messages.**
 
-Desktop entries get origin `LauncherAppOrigin::External` and are always shown; only built-in pages can be switched off under Settings→Launcher.
+Desktop entries are always shown, with the home icon chosen from the app name (`line_icon_path`); only built-in pages can be switched off under Settings→Launcher.
 
 ---
 
@@ -296,8 +292,7 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
 
 | Resource | Development path | Access method |
 | --- | --- | --- |
-| Images | `projects/APPLaunch/APPLaunch/share/images/` | `launcher_platform::path("xxx.png")` / `path_c(...)` |
-| Audio | `.../share/audio/` | `launcher_platform::path(...)` + `cp0_signal_audio_api` |
+| Images | `projects/APPLaunch/APPLaunch/share/images/` | `launcher_platform::path("xxx.png")` |
 | Fonts | `.../share/font/` | `launcher_fonts().get(...)` (`main/ui/ui.h`; wraps `cp0_fonts()`) |
 | External binaries | `.../bin/` | the `.desktop` `Exec` |
 | App descriptors | `.../applications/*.desktop` | scanned automatically |
@@ -338,7 +333,7 @@ Desktop entries get origin `LauncherAppOrigin::External` and are always shown; o
 | Scope | Command | Contents | CI |
 | --- | --- | --- | --- |
 | APPLaunch | `sh projects/APPLaunch/tests/run_tests.sh` | C++ unit tests and Python contract tests | ❌ not run, except `test_release_workflow.py` |
-| APPLaunch (LVGL UI) | `sh projects/APPLaunch/tests/low_battery_ui/run_tests.sh` | 1 `.cpp` (needs an LVGL build) | ❌ |
+| APPLaunch (LVGL UI) | `bash projects/APPLaunch/tests/low_battery_ui/run_tests.sh` | 1 `.cpp` (needs an LVGL build) | ❌ |
 | cp0_lvgl | `sh ext_components/cp0_lvgl/tests/run_tests.sh` | C++ unit tests | ✅ run |
 | cp0_lvgl (Bluetooth, on-device) | `run_bluetooth_reset_test.sh`, `build_bluetooth_backend_smoke.sh` | 2 `.cpp` (need real hardware) | ❌ |
 
@@ -378,7 +373,6 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 ### 10.4 Build / environment
 
 - Running `scons` from the repo root → fails.
-- Switching profiles without `distclean` → compiled with the wrong config.
 - Changing resources without rebuilding → `dist/` still holds the old ones.
 - Missing `CONFIG_REPO_AUTOMATION=y` → CI/automation hangs on `input()`.
 - No `sysroot/` → cross builds stop; run `scripts/make_sysroot.sh`.
@@ -439,7 +433,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 
 ### How `ext_components` is consumed
 
-- Among `ext_components`, APPLaunch **depends directly only on `cp0_lvgl`**. The base `REQUIREMENTS` list in `main/SConstruct` is `cp0_lvgl`, `eventpp`, `utilities`, `lvgl_component`, `freetype`, `pthread` — the latter five are SDK or system libraries, not `ext_components`. `Miniaudio` is pulled in transitively by `cp0_lvgl` via `CONFIG_CP0_LVGL_INIT_AUDIO`.
+- Among `ext_components`, APPLaunch **depends directly only on `cp0_lvgl`**. The base `REQUIREMENTS` list in `main/SConstruct` is `cp0_lvgl`, `eventpp`, `utilities`, `lvgl_component`, `freetype`, `pthread` — the latter five are SDK or system libraries, not `ext_components`.
 - `eventpp` is an SDK component and a global dependency.
 - The cache of upstream-fetched components **does not validate versions**; after changing a pin you must delete `SDK/github_source/<repo>`.
 

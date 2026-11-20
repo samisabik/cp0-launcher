@@ -69,7 +69,6 @@ public:
         case cp0::network::ApiCommand::ConnectHidden:
             result.complete(hal_wifi_connect(request.ssid.c_str(), request.password.c_str()), "");
             break;
-        case cp0::network::ApiCommand::Disconnect:
         case cp0::network::ApiCommand::ProfileDisconnectActive:
             result.complete(hal_wifi_disconnect(), "");
             break;

@@ -126,15 +126,6 @@ void test_frames()
     const Durations first = encode_nec(make("nec", 0x04, 0x08));
     const Durations repeat = encode_nec_repeat();
 
-    Durations stream = {-30000};
-    stream.insert(stream.end(), first.begin(), first.end());
-    stream.push_back(-40000);
-    stream.insert(stream.end(), repeat.begin(), repeat.end());
-    stream.push_back(-96000);
-    const std::vector<Durations> frames = split_frames(stream);
-    assert(frames.size() == 2);
-    assert(frames[0] == first && frames[1] == repeat);
-
     FrameAssembler assembler;
     Durations frame;
     assert(!assembler.feed(kMode2Space | 50000u, frame));
@@ -148,7 +139,6 @@ void test_frames()
     assert(!assembler.feed(kMode2Space | 2250u, frame));
     assert(!assembler.feed(kMode2Pulse | 560u, frame));
     assert(!assembler.feed(kMode2Frequency | 38000u, frame));
-    assert(assembler.measured_carrier() == 38000);
     assert(assembler.feed(kMode2Timeout | 125000u, frame));
     assert(frame == repeat);
     assert(!assembler.pending());

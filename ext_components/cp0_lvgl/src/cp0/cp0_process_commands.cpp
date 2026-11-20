@@ -54,18 +54,6 @@ int wait_for_child(pid_t pid, bool report_signal = true)
     return -1;
 }
 
-void redirect_to_devnull()
-{
-    int fd = open("/dev/null", O_RDWR);
-    if (fd < 0)
-        return;
-    dup2(fd, STDIN_FILENO);
-    dup2(fd, STDOUT_FILENO);
-    dup2(fd, STDERR_FILENO);
-    if (fd > STDERR_FILENO)
-        close(fd);
-}
-
 bool is_nologin_shell(const char *shell)
 {
     if (!shell || !shell[0])
@@ -99,24 +87,6 @@ std::string configured_run_user()
 }
 
 } // namespace
-
-int run_argv(const std::vector<std::string> &argv, bool background)
-{
-    if (argv.empty() || argv[0].empty())
-        return -EINVAL;
-
-    pid_t pid = fork();
-    if (pid < 0)
-        return -errno;
-    if (pid == 0) {
-        if (background)
-            redirect_to_devnull();
-        auto raw = make_argv(argv);
-        execvp(raw[0], raw.data());
-        _exit(127);
-    }
-    return background ? 0 : wait_for_child(pid);
-}
 
 int capture_argv(const std::vector<std::string> &argv, std::string &output)
 {

@@ -24,8 +24,6 @@ Command command_from(const Arguments &arguments)
         return Command::BacklightMax;
     if (command == "BacklightWrite")
         return Command::BacklightWrite;
-    if (command == "Log")
-        return Command::Log;
     if (command == "TimeStr")
         return Command::TimeStr;
     if (command == "GpioSet")
@@ -42,8 +40,6 @@ bool valid_arguments(const Arguments &arguments)
     if (command == Command::BacklightRead || command == Command::BacklightMax ||
         command == Command::TimeStr)
         return arguments.size() == 1;
-    if (command == Command::Log)
-        return arguments.size() == 3;
     if (command == Command::GpioGet)
         return arguments.size() == 2 &&
                power_output_from_name(argument_at(arguments, 1)) != PowerOutput::Unknown;

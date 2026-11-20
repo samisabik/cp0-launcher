@@ -11,8 +11,6 @@ ASSET = (ROOT / "main/ui/home_icon_fallback.c").read_text(encoding="utf-8")
 
 assert '#include "home_icon_fallback.h"' in POOL
 assert "return found == icons_.end() ? &home_icon_fallback" in POOL
-assert "return &home_icon_fallback;" in POOL
-assert "lv_color32_make(0x44, 0x44, 0x44" not in POOL
 assert "const lv_image_dsc_t home_icon_fallback" in ASSET
 assert "uint8_t home_icon_fallback_map[]" in ASSET
 assert ".cf = LV_COLOR_FORMAT_ARGB8888" in ASSET

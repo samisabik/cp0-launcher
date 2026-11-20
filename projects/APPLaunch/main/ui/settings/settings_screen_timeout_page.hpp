@@ -107,7 +107,6 @@ private:
     bool pending_ = false;
     bool loaded_ = false;
     std::uint64_t generation_ = 0;
-    int saved_seconds_ = static_cast<int>(DefaultValue::DarkTimeSeconds);
     int saved_index_ = 2;
     lv_obj_t *status_label_ = nullptr;
     std::function<void()> back_callback_;

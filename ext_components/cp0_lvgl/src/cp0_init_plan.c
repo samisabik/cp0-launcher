@@ -37,7 +37,6 @@ size_t cp0_build_init_plan(uint64_t features, cp0_init_step_t *steps, size_t cap
         {CP0_INIT_FEATURE_BQ27220, CP0_INIT_STEP_BQ27220},
         {CP0_INIT_FEATURE_SAVED_SETTINGS, CP0_INIT_STEP_SAVED_SETTINGS},
         {CP0_INIT_FEATURE_BATTERY, CP0_INIT_STEP_BATTERY},
-        {CP0_INIT_FEATURE_SOUNDCARD, CP0_INIT_STEP_SOUNDCARD},
     };
     size_t count = 0;
     size_t index;

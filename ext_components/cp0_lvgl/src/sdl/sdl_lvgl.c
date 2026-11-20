@@ -59,9 +59,6 @@ static uint64_t enabled_features(void)
 #ifdef CONFIG_CP0_LVGL_INIT_BATTERY
     features |= CP0_INIT_FEATURE_BATTERY;
 #endif
-#ifdef CONFIG_CP0_LVGL_INIT_SOUNDCARD
-    features |= CP0_INIT_FEATURE_SOUNDCARD;
-#endif
     return features;
 }
 
@@ -139,11 +136,6 @@ static int run_init_step(cp0_init_step_t step)
         init_battery();
 #endif
         break;
-    case CP0_INIT_STEP_SOUNDCARD:
-#ifdef CONFIG_CP0_LVGL_INIT_SOUNDCARD
-        init_soundcard();
-#endif
-        break;
     case CP0_INIT_STEP_BLUETOOTH:
         break;
     }
@@ -154,7 +146,7 @@ void cp0_lvgl_init(void)
 {
     static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     static size_t next_step = 0;
-    cp0_init_step_t plan[CP0_INIT_STEP_SOUNDCARD + 1];
+    cp0_init_step_t plan[CP0_INIT_STEP_BATTERY + 1];
     const size_t step_count = cp0_build_init_plan(enabled_features(), plan,
         sizeof(plan) / sizeof(plan[0]));
 

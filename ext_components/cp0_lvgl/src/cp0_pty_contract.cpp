@@ -99,12 +99,6 @@ ParseResult parse_request(const std::list<std::string> &arguments)
         if (!parse_required_handle(arguments, request)) return failure("invalid pty handle\n");
         if (arguments.size() < 3) return failure("missing pty write data\n");
         request.data = argument_at(arguments, 2);
-    } else if (command == "Resize") {
-        request.command = Command::resize;
-        if (!parse_required_handle(arguments, request)) return failure("invalid pty handle\n");
-        if (!parse_positive_int(argument_at(arguments, 2), request.columns) ||
-            !parse_positive_int(argument_at(arguments, 3), request.rows))
-            return failure("invalid pty size\n");
     } else if (command == "CheckChild") {
         request.command = Command::check_child;
         if (!parse_required_handle(arguments, request)) return failure("invalid pty handle\n");

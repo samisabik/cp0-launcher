@@ -65,22 +65,12 @@ public:
     {
         return !current_.empty();
     }
-    // Last carrier reported by a LIRC_MODE2_FREQUENCY sample, or 0.
-    uint32_t measured_carrier() const
-    {
-        return carrier_;
-    }
 
 private:
     Durations current_;
-    uint32_t carrier_ = 0;
 
     bool finish(Durations &frame);
 };
-
-// Splits a duration list at spaces of gap_us or more. Frames have no leading
-// or trailing space.
-std::vector<Durations> split_frames(const Durations &durations, int32_t gap_us = kFrameGapUs);
 
 Durations encode_nec(const Code &code);
 Durations encode_nec_repeat();

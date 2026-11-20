@@ -89,10 +89,7 @@ bool FrameAssembler::feed(uint32_t sample, Durations &frame)
         return false;
     }
     if (type == kMode2Timeout) return finish(frame);
-    if (type == kMode2Frequency) {
-        carrier_ = sample & kMode2ValueMask;
-        return false;
-    }
+    if (type == kMode2Frequency) return false;
     if (type == kMode2Overflow) {
         // linux/lirc.h only names this sample type. It is taken to mean that
         // samples were lost, so the partial frame is dropped (unverified).
@@ -104,30 +101,6 @@ bool FrameAssembler::feed(uint32_t sample, Durations &frame)
 bool FrameAssembler::flush(Durations &frame)
 {
     return finish(frame);
-}
-
-std::vector<Durations> split_frames(const Durations &durations, int32_t gap_us)
-{
-    std::vector<Durations> frames;
-    Durations current;
-    auto close = [&] {
-        if (!current.empty() && current.back() < 0) current.pop_back();
-        if (!current.empty()) frames.push_back(current);
-        current.clear();
-    };
-    for (int32_t value : durations) {
-        if (value > 0) {
-            append(current, value);
-        } else if (value < 0) {
-            if (current.empty()) continue;
-            if (-value >= gap_us)
-                close();
-            else
-                append(current, value);
-        }
-    }
-    close();
-    return frames;
 }
 
 Durations encode_nec(const Code &code)

@@ -13,10 +13,6 @@
 
 namespace {
 
-constexpr std::array<std::string_view, 8> kBuiltInAppOrder = {
-    "settings", "cli", "python", "ssh", "ippanel", "files", "rec", "audio",
-};
-
 std::string normalized_label(std::string_view label)
 {
     std::string normalized;
@@ -68,16 +64,4 @@ int launcher_home_category(std::string_view label) noexcept
 const char *launcher_home_category_name(int category) noexcept
 {
     return category >= 0 && category < kHomeCategoryCount ? kCategoryNames[static_cast<std::size_t>(category)] : "";
-}
-
-int launcher_builtin_app_display_order(std::string_view label) noexcept
-{
-    try {
-        const std::string normalized = normalized_label(label);
-        for (std::size_t index = 0; index < kBuiltInAppOrder.size(); ++index)
-            if (normalized == kBuiltInAppOrder[index]) return static_cast<int>(index);
-    } catch (...) {
-        // An allocation failure must not prevent the launcher from showing apps.
-    }
-    return -1;
 }

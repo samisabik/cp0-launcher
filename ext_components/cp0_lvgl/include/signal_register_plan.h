@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-def_hal_fun(void(std::string), cp0_signal_audio_play)
-def_hal_fun(void(bool), cp0_signal_audio_cap)
-def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_audio_setup)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_audio_api)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_pty_api)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_config_api)
@@ -21,11 +18,7 @@ def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>),
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_osinfo_api)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_timedate_api)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_bq27220_api)
-def_hal_fun(void(), cp0_signal_network)
-def_hal_fun(void(), cp0_signal_forkexec)
 def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_screenshot_api)
-def_hal_fun(void(std::function<void()>), cp0_signal_battery_pub)
-def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_soundcard_api)
 def_hal_fun(void(std::list<std::string>, int, int, std::function<void(int, int)>, std::function<void(int, uint64_t)>), cp0_signal_sudo_argv_async)
 def_hal_fun(void(uint64_t, std::function<void(int)>), cp0_signal_sudo_cancel)
 def_hal_fun(void(std::list<std::string>, int, int, std::function<void(int, int)>, std::function<void(int, uint64_t)>), cp0_signal_system_admin_async)

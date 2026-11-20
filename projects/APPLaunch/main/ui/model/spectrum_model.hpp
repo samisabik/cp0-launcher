@@ -50,9 +50,6 @@ int level_index(int dbm);
 
 std::string format_mhz(uint32_t hz);
 
-std::string csv_header(const std::string &started_iso);
-std::string csv_row(int64_t timestamp_ms, const Band &band, const int8_t *dbm, std::size_t count);
-
 // Capture formats. A capture is a list of signed durations in microseconds:
 // positive while the demodulated signal is high (carrier on), negative while low.
 

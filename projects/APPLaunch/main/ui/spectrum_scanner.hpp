@@ -89,7 +89,6 @@ struct FinderStatus {
     std::array<uint32_t, spectrum::kFinderChannels.size()> hz{};
     std::array<int8_t, spectrum::kFinderChannels.size()> rssi{};
     uint32_t sequence = 0;
-    int passes_per_second = 0;
     struct Hit {
         uint32_t hz = 0;
         int rssi_dbm = spectrum::kMinDbm;
@@ -134,11 +133,6 @@ public:
     void set_paused(bool paused) { paused_.store(paused); }
     bool paused() const { return paused_.load(); }
 
-    // Recording streams every sweep to a CSV file in ~/spectrum.
-    void toggle_recording() { record_request_.store(true); }
-    bool recording() const { return recording_.load(); }
-    int64_t recording_started_ms() const { return recording_started_ms_.load(); }
-
     // Capture records demodulated pulse timings at one frequency to
     // ~/spectrum/capture-*.ook (rtl_433) and .sub (Flipper RAW).
     void toggle_capture(uint32_t hz);
@@ -173,13 +167,9 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> paused_{false};
     std::atomic<std::size_t> band_{1};
-    std::atomic<bool> record_request_{false};
-    std::atomic<bool> recording_{false};
-    std::atomic<int64_t> recording_started_ms_{0};
     std::mutex mutex_;
     SpectrumFrame frame_;
     std::string message_;
-    std::FILE *file_ = nullptr;
 
     struct Edge {
         int64_t ns;
@@ -215,8 +205,6 @@ private:
     bool auto_session_ = false;
     int64_t auto_started_ns_ = 0;
     int64_t last_packet_ns_ = 0;
-    int64_t rate_window_ns_ = 0;
-    int rate_passes_ = 0;
     std::string capture_stem_;
     std::atomic<uint32_t> listen_hz_{0};
     uint32_t listen_active_hz_ = 0;
@@ -242,7 +230,5 @@ private:
     bool set_tx_line(bool high);
 
     void run();
-    void handle_record_request();
-    void close_file(bool report);
     void post_message(const std::string &text);
 };

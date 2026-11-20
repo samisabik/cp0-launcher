@@ -16,8 +16,6 @@ assert "startsWith(github.ref, 'refs/heads/ci/')" not in workflow
 assert "${{ steps.version.outputs.version }}" in workflow
 # The release tag is pinned to the commit that was actually built.
 assert "target_commitish: ${{ github.sha }}" in workflow
-# A manual release is a normal GitHub Release; CI runs stay pre-releases.
-assert "prerelease: ${{ !inputs.publish }}" in workflow
 # The versioned release rejects missing assets.
 assert workflow.count("fail_on_unmatched_files: true") == 1
 assert "overwrite_files: true" in workflow

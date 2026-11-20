@@ -41,8 +41,6 @@ def test_page_seeds_the_cached_volume_before_the_list_is_built():
     for member in (
         "original_volume_",
         "backend_volume_",
-        "last_preview_requested_",
-        "last_preview_actual_",
         "locked_selection_",
     ):
         assert member in body[seed:built], f"{member} is not seeded before create_ui"

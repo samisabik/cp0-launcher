@@ -18,10 +18,6 @@ struct Content
     std::vector<std::string> lines;
 };
 
-Content about(std::string_view version,
-              std::string_view build_date,
-              std::string_view channel,
-              std::string_view commit);
 Content credit();
 
 } // namespace settings_t12b::about_help

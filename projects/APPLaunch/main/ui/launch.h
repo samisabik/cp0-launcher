@@ -38,21 +38,16 @@ inline constexpr page_t<PageT> page_v{};
 struct app
 {
     std::string Name;
-    std::string Icon;
     std::string Exec;
     std::function<void(Launch *)> launch;
 
-    app(std::string name, std::string icon, std::string exec, bool terminal);
-    app(std::string name, std::string icon, std::string exec, bool terminal, bool sysplause);
-    app(std::string name, std::string icon, std::string exec, bool terminal, bool sysplause, bool run_as_root);
-    app(std::string name, std::string icon, std::string exec, bool terminal, bool sysplause,
-        bool run_as_root, TerminalHelpFactory help_factory);
+    app(std::string name, std::string exec, bool terminal, bool sysplause,
+        TerminalHelpFactory help_factory = nullptr);
 
     template <class PageT>
-    app(std::string name, std::string icon, page_t<PageT> tag);
+    app(std::string name, page_t<PageT> tag);
     template <class PageT>
-    app(std::string name, std::string icon, page_t<PageT> tag,
-        TerminalHelpFactory help_factory);
+    app(std::string name, page_t<PageT> tag, TerminalHelpFactory help_factory);
 };
 
 class Launch
@@ -77,9 +72,9 @@ private:
     void abort_page_launch() noexcept;
     void launch_Exec_in_terminal(const std::string &exec, bool sysplause = true,
                                  TerminalHelpFactory help_factory = nullptr);
-    void launch_Exec(const std::string &exec, bool keep_root = false);
+    void launch_Exec(const std::string &exec);
     void applications_load();
-    void refresh_home_carousel();
+    void refresh_home();
     void reload_home_icons();
     void applications_reload();
     void rebuild_builtin_apps();
@@ -95,15 +90,14 @@ private:
     AppDirectoryWatcher app_directory_watcher_;
     EscUiWatchdog esc_ui_watchdog_;
     LauncherPageLifecycleModel page_lifecycle_;
-    int fixed_count = 0;
     bool bound_ = false;
     std::list<app> app_list;
     std::shared_ptr<void> app_Page;
 };
 
 template <class PageT>
-app::app(std::string name, std::string icon, page_t<PageT>)
-    : Name(std::move(name)), Icon(std::move(icon))
+app::app(std::string name, page_t<PageT>)
+    : Name(std::move(name))
 {
     launch = [](Launch *owner) {
         if (!owner->begin_page_launch()) return;
@@ -120,8 +114,8 @@ app::app(std::string name, std::string icon, page_t<PageT>)
 }
 
 template <class PageT>
-app::app(std::string name, std::string icon, page_t<PageT>, TerminalHelpFactory help_factory)
-    : Name(std::move(name)), Icon(std::move(icon))
+app::app(std::string name, page_t<PageT>, TerminalHelpFactory help_factory)
+    : Name(std::move(name))
 {
     launch = [help_factory](Launch *owner) {
         if (!owner->begin_page_launch()) return;

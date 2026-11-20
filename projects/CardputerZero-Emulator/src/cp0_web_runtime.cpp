@@ -570,16 +570,6 @@ const char *cp0_file_path_c(const char *file)
     return path.c_str();
 }
 
-int cp0_dir_list(const char *, cp0_dirent_t *, int, int *out_count)
-{
-    if (out_count) *out_count = 0;
-    return 0;
-}
-
-cp0_watcher_t cp0_dir_watch_start(const char *) { return nullptr; }
-int cp0_dir_watch_poll(cp0_watcher_t) { return 0; }
-void cp0_dir_watch_stop(cp0_watcher_t) {}
-
 int cp0_network_list(cp0_netif_info_t *entries, int max_entries, int *out_count)
 {
     if (out_count) *out_count = 0;
@@ -592,58 +582,14 @@ int cp0_network_list(cp0_netif_info_t *entries, int max_entries, int *out_count)
     return 0;
 }
 
-int cp0_process_exec_blocking(const char *, int) { return -1; }
-cp0_pid_t cp0_process_spawn(const char *, int) { return -1; }
-void cp0_process_stop(cp0_pid_t) {}
-int cp0_process_check_lock(const char *, int *holder_pid)
-{
-    if (holder_pid) *holder_pid = 0;
-    return 0;
-}
-void cp0_process_kill(int, int) {}
 void cp0_system_shutdown(void) {}
-void cp0_system_reboot(void) {}
 
-int cp0_process_run_argv(const char *const *, int) { return -1; }
-int cp0_process_capture_argv(const char *const *, char *out, int out_size)
-{
-    if (out && out_size > 0) out[0] = '\0';
-    return -1;
-}
-int cp0_file_read_first_line(const char *, char *out, int out_size)
-{
-    if (out && out_size > 0) out[0] = '\0';
-    return -1;
-}
 int cp0_desktop_exec_is_safe(const char *, char *reason, int reason_size)
 {
     copy_cstr(reason, static_cast<size_t>(std::max(reason_size, 0)), "web emulator does not execute desktop apps");
     return 0;
 }
 
-int cp0_network_default_info_read(cp0_eth_info_t *info)
-{
-    if (!info) return -1;
-    std::memset(info, 0, sizeof(*info));
-    copy_cstr(info->ipv4, sizeof(info->ipv4), "0.0.0.0");
-    copy_cstr(info->gateway, sizeof(info->gateway), "0.0.0.0");
-    copy_cstr(info->mac, sizeof(info->mac), "N/A");
-    return 0;
-}
-int cp0_eth_info_read(cp0_eth_info_t *info) { return cp0_network_default_info_read(info); }
-int cp0_account_info_read(cp0_account_info_t *info)
-{
-    if (!info) return -1;
-    std::memset(info, 0, sizeof(*info));
-    copy_cstr(info->user, sizeof(info->user), "web");
-    copy_cstr(info->hostname, sizeof(info->hostname), "cardputer-zero-emu");
-    return 0;
-}
-
-int cp0_time_set(const char *) { return -1; }
-int cp0_time_ntp_get(void) { return 0; }
-int cp0_time_ntp_set(int) { return -1; }
-int cp0_bq27220_calibrate(int) { return -1; }
 cp0_battery_info_t cp0_battery_read(void)
 {
     cp0_battery_info_t info{};
@@ -653,8 +599,6 @@ cp0_battery_info_t cp0_battery_read(void)
     return info;
 }
 
-int cp0_backlight_read(void) { return 100; }
-int cp0_backlight_max(void) { return 100; }
 int cp0_backlight_write(int val) { return val; }
 
 void cp0_time_str(char *buf, int buf_size)

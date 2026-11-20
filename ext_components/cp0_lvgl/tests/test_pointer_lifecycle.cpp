@@ -58,8 +58,7 @@ int main()
     assert(!cp0::is_direct_event_target(&second, &first));
     assert(!cp0::is_direct_event_target(
         static_cast<int *>(nullptr), static_cast<int *>(nullptr)));
-    static_assert(cp0::app_content_height(false) == 150);
-    static_assert(cp0::app_content_height(true) == 130);
+    static_assert(cp0::kAppContentHeight == 150);
     assert(cp0::input_type_uses_group(1, 1, 2));
     assert(cp0::input_type_uses_group(2, 1, 2));
     assert(!cp0::input_type_uses_group(0, 1, 2));

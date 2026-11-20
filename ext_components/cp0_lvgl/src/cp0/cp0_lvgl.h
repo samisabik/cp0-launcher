@@ -38,7 +38,6 @@ void init_osinfo(void);
 void init_bq27220(void);
 void deinit_bq27220(void);
 void init_battery();
-void init_soundcard(void);
 #ifdef __cplusplus
 }
 #endif

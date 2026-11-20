@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
-# SPDX-License-Identifier: MIT
-
-
-menuconfig MINIAUDIO_COMPONENT_ENABLED
-    bool "Enable Miniaudio"
-    default n
-
-

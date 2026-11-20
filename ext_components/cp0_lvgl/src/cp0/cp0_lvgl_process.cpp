@@ -14,16 +14,13 @@
 #include "../cp0_process_api_contract.hpp"
 #include "../cp0_signal_registration.hpp"
 
-#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
-#include <fstream>
 #include <list>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 #include <utility>
 
@@ -66,32 +63,6 @@ public:
                 return invalid(callback);
             cp0_process_lifecycle::stop(static_cast<cp0_pid_t>(pid));
             report(callback, 0, "");
-        } else if (cmd == "CheckLock") {
-            const auto *path = cp0_process_api_contract::argument_at(arg, 1);
-            if (!cp0_process_api_contract::has_exact_arguments(arg, 2) || !path || path->empty())
-                return invalid(callback);
-            int holder_pid = 0;
-            int ret = cp0_process_lifecycle::check_lock(path->c_str(), &holder_pid);
-            report(callback, ret, std::to_string(holder_pid));
-        } else if (cmd == "Kill") {
-            int pid = 0;
-            int grace_ms = 0;
-            const auto *pid_text = cp0_process_api_contract::argument_at(arg, 1);
-            const auto *grace_text = cp0_process_api_contract::argument_at(arg, 2);
-            if (!cp0_process_api_contract::has_exact_arguments(arg, 3) || !pid_text ||
-                !grace_text || !cp0_process_api_contract::parse_pid(*pid_text, pid) ||
-                !cp0_process_api_contract::parse_grace_ms(*grace_text, grace_ms))
-                return invalid(callback);
-            cp0_process_lifecycle::kill(pid, grace_ms);
-            report(callback, 0, "");
-        } else if (cmd == "RunArgv") {
-            bool background = false;
-            const auto *flag = cp0_process_api_contract::argument_at(arg, 1);
-            if (!cp0_process_api_contract::has_at_least_arguments(arg, 3) || !flag ||
-                !cp0_process_api_contract::parse_bool(*flag, background))
-                return invalid(callback);
-            report(callback, cp0_process_commands::run_argv(
-                                 cp0_process_api_contract::arguments_from(arg, 2), background), "");
         } else if (cmd == "CaptureArgv") {
             if (!cp0_process_api_contract::has_at_least_arguments(arg, 2))
                 return invalid(callback);
@@ -116,14 +87,6 @@ public:
             std::string reason;
             const int result = system_reboot(reason);
             report(callback, result, reason);
-        } else if (cmd == "DelayMs") {
-            int delay_ms = 0;
-            const auto *text = cp0_process_api_contract::argument_at(arg, 1);
-            if (!cp0_process_api_contract::has_exact_arguments(arg, 2) || !text ||
-                !cp0_process_api_contract::parse_delay_ms(*text, delay_ms))
-                return invalid(callback);
-            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-            report(callback, 0, "");
         } else {
             report(callback, -1, "unknown process api command");
         }
@@ -200,93 +163,6 @@ extern "C" void init_process(void)
     });
 }
 
-extern "C" int cp0_process_exec_blocking(const char *exec_path, int keep_root)
-{
-    return cp0_process_api_contract::invoke_c_api([&] {
-        return ProcessSystem::api_simple(
-            {"ExecBlocking", exec_path ? exec_path : "", std::to_string(keep_root)});
-    });
-}
-
-extern "C" cp0_pid_t cp0_process_spawn(const char *exec_path, int keep_root)
-{
-    const int result = cp0_process_api_contract::invoke_c_api([&] {
-        std::string data;
-        int ret = ProcessSystem::api_simple({"Spawn", exec_path ? exec_path : "", std::to_string(keep_root)}, &data);
-        int pid = 0;
-        return ret == 0 && cp0_process_api_contract::parse_spawn_response(data, pid) ? pid : -1;
-    });
-    return result < 0 ? static_cast<cp0_pid_t>(-1) : static_cast<cp0_pid_t>(result);
-}
-
-extern "C" void cp0_process_stop(cp0_pid_t pid)
-{
-    cp0_process_api_contract::invoke_c_api_void(
-        [&] { ProcessSystem::api_simple({"Stop", std::to_string(pid)}); });
-}
-
-extern "C" int cp0_process_check_lock(const char *lock_path, int *holder_pid)
-{
-    if (holder_pid) *holder_pid = 0;
-    return cp0_process_api_contract::invoke_c_api([&] {
-        std::string data;
-        int ret = ProcessSystem::api_simple({"CheckLock", lock_path ? lock_path : ""}, &data);
-        int parsed_pid = 0;
-        if (holder_pid) {
-            if (!cp0_process_api_contract::parse_lock_holder_response(data, parsed_pid)) return -1;
-            *holder_pid = parsed_pid;
-        }
-        return ret;
-    });
-}
-
-extern "C" void cp0_process_kill(int pid, int grace_ms)
-{
-    cp0_process_api_contract::invoke_c_api_void([&] {
-        ProcessSystem::api_simple({"Kill", std::to_string(pid), std::to_string(grace_ms)});
-    });
-}
-
-extern "C" int cp0_process_run_argv(const char *const *argv, int background)
-{
-    return cp0_process_api_contract::invoke_c_api([&] {
-        std::list<std::string> args = {"RunArgv", std::to_string(background)};
-        if (argv) for (int i = 0; argv[i]; ++i) args.push_back(argv[i]);
-        return ProcessSystem::api_simple(args);
-    });
-}
-
-extern "C" int cp0_process_capture_argv(const char *const *argv, char *out, int out_size)
-{
-    if (out && out_size > 0)
-        out[0] = '\0';
-    return cp0_process_api_contract::invoke_c_api([&] {
-        std::list<std::string> args = {"CaptureArgv"};
-        if (argv) for (int i = 0; argv[i]; ++i) args.push_back(argv[i]);
-        std::string data;
-        int ret = ProcessSystem::api_simple(args, &data);
-        if (out && out_size > 0) cp0_copy_string(out, out_size, data);
-        return ret;
-    });
-}
-
-extern "C" int cp0_file_read_first_line(const char *path, char *out, int out_size)
-{
-    if (out && out_size > 0)
-        out[0] = '\0';
-    if (!path || !out || out_size <= 0)
-        return -1;
-    return cp0_process_api_contract::invoke_c_api([&] {
-        std::ifstream file(path);
-        if (!file.is_open()) return -1;
-        std::string line;
-        if (!std::getline(file, line)) return -1;
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        cp0_copy_string(out, out_size, line);
-        return 0;
-    });
-}
-
 extern "C" int cp0_desktop_exec_is_safe(const char *exec, char *reason, int reason_size)
 {
     return cp0_process_api_contract::invoke_c_api([&] {
@@ -300,10 +176,4 @@ extern "C" void cp0_system_shutdown(void)
 {
     cp0_process_api_contract::invoke_c_api_void(
         [] { ProcessSystem::api_simple({"Shutdown"}); });
-}
-
-extern "C" void cp0_system_reboot(void)
-{
-    cp0_process_api_contract::invoke_c_api_void(
-        [] { ProcessSystem::api_simple({"Reboot"}); });
 }

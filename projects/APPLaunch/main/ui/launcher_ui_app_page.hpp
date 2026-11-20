@@ -35,6 +35,4 @@ public:
     }
 
     lv_obj_t *content_container() const { return ui_APP_Container; }
-    lv_obj_t *top_container() const { return root_screen_; }
-    void use_bold_home_title_font() {}
 };

@@ -147,18 +147,6 @@ fi
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src" "$root/src/cp0_alsa_parser.cpp" \
-    "$root/tests/test_alsa_parser.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src" \
-    "$root/src/cp0_alsa_parser.cpp" \
-    "$root/src/cp0_soundcard_contract.cpp" \
-    "$root/tests/test_soundcard_contract.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src/cp0" \
     "$root/src/cp0/cp0_desktop_exec_policy.cpp" \
     "$root/tests/test_desktop_exec_policy.cpp" -o "$binary"
@@ -344,19 +332,6 @@ fi
     "$root/src/cp0_battery_lifecycle.cpp" \
     "$root/src/sdl/sdl_lvgl_bq27220.cpp" \
     "$root/tests/test_sdl_bq27220_api.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/include" -I"$root/src" \
-    "$root/src/cp0_osinfo_codec.cpp" \
-    "$root/tests/test_osinfo_codec.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/include" -I"$root/src" \
-    "$root/src/cp0_osinfo_codec.cpp" \
-    "$root/src/cp0_osinfo_contract.cpp" \
-    "$root/tests/test_osinfo_contract.cpp" -o "$binary"
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \

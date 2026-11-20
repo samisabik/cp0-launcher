@@ -45,8 +45,6 @@ public:
     lv_font_t *get(const char *font_name, uint16_t size,
                    lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL,
                    lv_freetype_font_render_mode_t render_mode = LV_FREETYPE_FONT_RENDER_MODE_BITMAP);
-    lv_font_t *get_mono(const char *font_name, uint16_t size,
-                        lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL);
     // UI font: kCp0ChromeFont at the nearest crisp size (11 or 22 px), falling
     // back to DejaVu Sans for glyphs it does not cover.
     lv_font_t *get_chrome(uint16_t size);
@@ -55,6 +53,8 @@ public:
     void release();
 
 private:
+    lv_font_t *get_mono(const char *font_name, uint16_t size,
+                        lv_freetype_font_style_t style = LV_FREETYPE_FONT_STYLE_NORMAL);
 #if LV_USE_FREETYPE
     static std::string resolve_path(const char *font_name);
     static std::string key(const std::string &path, uint16_t size,

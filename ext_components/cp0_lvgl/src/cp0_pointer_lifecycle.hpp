@@ -38,10 +38,7 @@ bool is_direct_event_target(T *target, T *current_target)
     return target != nullptr && target == current_target;
 }
 
-constexpr int app_content_height(bool has_bottom_bar)
-{
-    return has_bottom_bar ? 130 : 150;
-}
+inline constexpr int kAppContentHeight = 150;
 
 template <typename Type>
 bool input_type_uses_group(Type type, Type keypad, Type encoder)

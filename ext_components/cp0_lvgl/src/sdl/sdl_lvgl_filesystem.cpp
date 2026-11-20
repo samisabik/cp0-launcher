@@ -5,7 +5,6 @@
  */
 
 #include "cp0_lvgl_app.h"
-#include "cp0_lvgl_filesystem.hpp"
 #include "hal/hal_paths.h"
 #include "hal_lvgl_bsp.h"
 #include "../cp0_filesystem_api.hpp"
@@ -121,11 +120,6 @@ public:
 
     std::string path(std::string file) { return resolve_path(file); }
 
-    int dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        return list_dir(path, entries, max_entries, out_count);
-    }
-
     cp0_watcher_t dir_watch_start(const char *path)
     {
         return watchers_.add(native_watch_start(path));
@@ -186,11 +180,6 @@ private:
             return rel;
         }
         return file;
-    }
-
-    static int list_dir(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-    {
-        return cp0_posix_filesystem::list_directory(path, entries, max_entries, out_count, true);
     }
 
     static void snapshot(SdlWatcher *watcher)
@@ -263,26 +252,6 @@ extern "C" const char *cp0_file_path_c(const char *file)
             it = paths.emplace(key, cp0_file_path(key)).first;
         return it->second.c_str();
     });
-}
-
-extern "C" int cp0_dir_list(const char *path, cp0_dirent_t *entries, int max_entries, int *out_count)
-{
-    return filesystem().dir_list(path, entries, max_entries, out_count);
-}
-
-extern "C" cp0_watcher_t cp0_dir_watch_start(const char *path)
-{
-    return filesystem().dir_watch_start(path);
-}
-
-extern "C" int cp0_dir_watch_poll(cp0_watcher_t watcher)
-{
-    return filesystem().dir_watch_poll(watcher);
-}
-
-extern "C" void cp0_dir_watch_stop(cp0_watcher_t watcher)
-{
-    (void)filesystem().dir_watch_stop(watcher);
 }
 
 extern "C" void init_filesystem(void)

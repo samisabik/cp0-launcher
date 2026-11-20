@@ -66,8 +66,6 @@ struct Velocity {
     bool valid = false;
     double speed_kt = 0.0;
     double track_deg = 0.0; // clockwise from north, [0, 360)
-    bool has_vertical_rate = false;
-    int vertical_rate_fpm = 0;
 };
 Velocity velocity(const Frame &frame);
 
@@ -83,7 +81,6 @@ struct Aircraft {
     double speed_kt = 0.0;
     double track_deg = 0.0;
     double last_seen = 0.0;
-    uint32_t messages = 0;
 
     // Latest raw CPR frame of each parity (index 0 even, 1 odd).
     bool cpr_valid[2] = {false, false};

@@ -9,11 +9,7 @@
 #include "cp0_theme.hpp"
 #include "settings_fonts.hpp"
 
-#if __has_include("model/setup_value_policy.hpp")
-#include "model/setup_value_policy.hpp"
-#elif __has_include("../../../APPLaunch/main/ui/model/setup_value_policy.hpp")
-#include "../../../APPLaunch/main/ui/model/setup_value_policy.hpp"
-#endif
+#include "../model/setup_value_policy.hpp"
 
 #include <condition_variable>
 #include <memory>
@@ -286,7 +282,6 @@ void LvSettingDarkTimePage3::finish_load(const DarkTimeReadResult &result)
     }
 
     loaded_ = true;
-    saved_seconds_ = result.seconds;
     saved_index_ = result.index;
     select(saved_index_);
     restore_focus();
@@ -299,7 +294,6 @@ void LvSettingDarkTimePage3::finish_load(const DarkTimeReadResult &result)
 void LvSettingDarkTimePage3::finish_load_failure()
 {
     loaded_ = false;
-    saved_seconds_ = static_cast<int>(DefaultValue::DarkTimeSeconds);
     saved_index_ = 2;
     select(saved_index_);
     restore_focus();
@@ -353,7 +347,6 @@ void LvSettingDarkTimePage3::finish_write(const DarkTimeWriteResult &result)
 {
     pending_ = false;
     if (result.succeeded()) {
-        saved_seconds_ = result.applied_seconds;
         saved_index_ = setup_values::dark_time_index(result.applied_seconds);
         select(saved_index_);
         set_status("", false);

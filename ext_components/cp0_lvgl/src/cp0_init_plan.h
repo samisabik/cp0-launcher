@@ -32,7 +32,6 @@ typedef enum cp0_init_step {
     CP0_INIT_STEP_BQ27220,
     CP0_INIT_STEP_SAVED_SETTINGS,
     CP0_INIT_STEP_BATTERY,
-    CP0_INIT_STEP_SOUNDCARD,
 } cp0_init_step_t;
 
 enum {
@@ -50,7 +49,6 @@ enum {
     CP0_INIT_FEATURE_BQ27220 = UINT64_C(1) << 13,
     CP0_INIT_FEATURE_SAVED_SETTINGS = UINT64_C(1) << 15,
     CP0_INIT_FEATURE_BATTERY = UINT64_C(1) << 16,
-    CP0_INIT_FEATURE_SOUNDCARD = UINT64_C(1) << 18,
 };
 
 size_t cp0_build_init_plan(uint64_t features, cp0_init_step_t *steps, size_t capacity);

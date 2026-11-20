@@ -39,17 +39,13 @@ int main()
     assert(!launcher_media_osd_timer_is_current(nullptr, &timer));
 
     LauncherMediaControlsModel controls;
-    assert(!controls.has_volume());
-    assert(!controls.has_brightness());
     assert(controls.volume_or(50) == 50);
     controls.set_volume(110);
-    assert(controls.has_volume());
     assert(controls.volume_or(0) == 100);
     controls.set_volume(-10);
     assert(controls.volume_or(50) == 0);
 
     controls.set_brightness(25);
-    assert(controls.has_brightness());
     assert(controls.brightness_or(0) == 25);
     assert(controls.toggle_mute());
     assert(controls.muted());

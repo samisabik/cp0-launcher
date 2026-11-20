@@ -421,7 +421,6 @@ void SpectrumScanner::stop()
     running_.store(false);
     if (worker_.joinable()) worker_.join();
     close_capture(false);
-    close_file(false);
     radio_.close();
     listen_active_hz_ = 0;
 }
@@ -831,41 +830,6 @@ void SpectrumScanner::post_message(const std::string &text)
     message_ = text;
 }
 
-void SpectrumScanner::close_file(bool report)
-{
-    if (!file_) return;
-    std::fclose(file_);
-    file_ = nullptr;
-    recording_.store(false);
-    if (report) post_message("session saved");
-}
-
-void SpectrumScanner::handle_record_request()
-{
-    if (!record_request_.exchange(false)) return;
-    if (file_) {
-        close_file(true);
-        return;
-    }
-    const char *home = std::getenv("HOME");
-    const std::string directory = std::string(home && home[0] ? home : "/tmp") + "/spectrum";
-    if (mkdir(directory.c_str(), 0755) != 0 && errno != EEXIST) {
-        post_message("cannot create ~/spectrum");
-        return;
-    }
-    const std::string name = "cc1101-" + local_stamp("%Y%m%d-%H%M%S") + ".csv";
-    file_ = std::fopen((directory + "/" + name).c_str(), "w");
-    if (!file_) {
-        post_message("cannot write " + name);
-        return;
-    }
-    const std::string header = spectrum::csv_header(local_stamp("%Y-%m-%dT%H:%M:%S"));
-    std::fputs(header.c_str(), file_);
-    recording_started_ms_.store(now_ms());
-    recording_.store(true);
-    post_message("rec ~/spectrum/" + name);
-}
-
 FinderStatus SpectrumScanner::finder_status()
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -927,14 +891,6 @@ void SpectrumScanner::finder_step()
     for (int i = 0; i < count; ++i) rssi[i] = static_cast<int8_t>(radio_.finder_read(active_hz[i]));
     const int64_t now_ns = monotonic_ns();
     const spectrum::FinderHit hit = detector_.update(rssi.data(), static_cast<uint32_t>(now_ns / 1000000));
-
-    ++rate_passes_;
-    int rate = -1;
-    if (now_ns - rate_window_ns_ >= 1000000000LL) {
-        rate = static_cast<int>(rate_passes_ * 1000000000LL / std::max<int64_t>(1, now_ns - rate_window_ns_));
-        rate_window_ns_ = now_ns;
-        rate_passes_ = 0;
-    }
     const uint32_t hit_hz = hit.hit && hit.slot < count ? active_hz[hit.slot] : 0;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -944,7 +900,6 @@ void SpectrumScanner::finder_step()
         finder_.hz = active_hz;
         finder_.rssi = rssi;
         ++finder_.sequence;
-        if (rate >= 0) finder_.passes_per_second = rate;
         if (hit_hz) {
             finder_.hits.insert(finder_.hits.begin(), {hit_hz, hit.rssi_dbm, now_ms()});
             if (finder_.hits.size() > 4) finder_.hits.resize(4);
@@ -973,7 +928,6 @@ void SpectrumScanner::run()
 {
     std::array<int8_t, spectrum::kBins> sweep{};
     while (running_.load()) {
-        handle_record_request();
         handle_listen();
         handle_capture_request();
         handle_transmit_request();
@@ -1005,13 +959,6 @@ void SpectrumScanner::run()
             std::lock_guard<std::mutex> lock(mutex_);
             frame_.dbm[index] = sweep;
             ++frame_.sequence[index];
-        }
-        if (file_) {
-            const std::string row = spectrum::csv_row(now_ms(), band, sweep.data(), sweep.size());
-            if (std::fputs(row.c_str(), file_) < 0) {
-                close_file(false);
-                post_message("write failed, recording stopped");
-            }
         }
     }
 }

@@ -234,11 +234,6 @@ bool LvSettingVolumePage3::ready() const
     return ready_;
 }
 
-const std::string &LvSettingVolumePage3::last_error() const
-{
-    return last_error_;
-}
-
 int LvSettingVolumePage3::initial_selection() const
 {
     // The persisted volume is seeded before the value list is built, so the
@@ -292,8 +287,6 @@ void LvSettingVolumePage3::initialize_page(lv_obj_t *parent, std::function<void(
                           : settings_audio_com::read_saved_volume(metric(LayoutMetric::MaxVolume));
     original_volume_        = saved;
     backend_volume_         = saved;
-    last_preview_requested_ = saved;
-    last_preview_actual_    = saved;
     locked_selection_       = selection_for_volume(saved);
     initialize(parent);
     if (ComponensObj) start_read_request();
@@ -329,7 +322,6 @@ void LvSettingVolumePage3::observe_key_event(lv_event_t *event)
         lv_event_stop_processing(event);
         return;
     }
-    preview_touched_       = true;
     select_volume(next_index);
 
     if (active_request_) {
@@ -449,16 +441,12 @@ void LvSettingVolumePage3::handle_volume_result(const ActiveRequest &request,
             launcher_media_controls::update_cached_volume(result.value);
             original_volume_       = result.value;
             backend_volume_        = result.value;
-            last_preview_requested_ = result.value;
-            last_preview_actual_    = result.value;
             ready_                  = true;
-            last_error_.clear();
             select_volume(selection_for_volume(result.value));
         } else {
             // Keep the persisted value seeded at page open: a failed mixer
             // read must not drag the selection back to the 100% default.
             ready_      = true;
-            last_error_ = result.data.empty() ? "unable to read volume" : result.data;
             select_volume(selection_for_volume(backend_volume_));
         }
         if (back_requested_) finish_back();
@@ -472,20 +460,14 @@ void LvSettingVolumePage3::handle_volume_result(const ActiveRequest &request,
         if (valid) {
             backend_volume_ = result.value;
             launcher_media_controls::update_cached_volume(result.value);
-        } else {
-            last_error_ = result.data.empty() ? "unable to restore volume" : result.data;
         }
         select_volume(selection_for_volume(original_volume_));
-        preview_touched_        = false;
-        last_preview_requested_ = backend_volume_;
-        last_preview_actual_    = backend_volume_;
         if (back_requested_)
             finish_back();
         return;
     }
 
     if (!valid) {
-        last_error_ = result.data.empty() ? "volume write rejected" : result.data;
         handle_write_failure();
         return;
     }
@@ -494,14 +476,12 @@ void LvSettingVolumePage3::handle_volume_result(const ActiveRequest &request,
     /* Preview and commit writes already changed the mixer; keep the shared
      * cache in step so leaving this page cannot expose a stale value. */
     launcher_media_controls::update_cached_volume(result.value);
-    last_error_.clear();
     if (request.kind == RequestKind::PreviewWrite) {
         handle_preview_success(request);
         return;
     }
 
     if (!settings_audio_com::save_volume_config(result.value)) {
-        last_error_ = "volume config save failed";
         handle_write_failure();
         return;
     }
@@ -512,9 +492,6 @@ void LvSettingVolumePage3::handle_volume_result(const ActiveRequest &request,
     }
 
     original_volume_        = result.value;
-    preview_touched_        = false;
-    last_preview_requested_ = result.value;
-    last_preview_actual_    = result.value;
     select_volume(selection_for_volume(result.value));
     commit_requested_ = false;
     finish_commit();
@@ -571,12 +548,8 @@ void LvSettingVolumePage3::accept_commit_without_write()
 {
     if (active_request_) return;
     original_volume_         = backend_volume_;
-    preview_touched_         = false;
-    last_preview_requested_  = backend_volume_;
-    last_preview_actual_     = backend_volume_;
     commit_requested_        = false;
-    if (!settings_audio_com::save_volume_config(backend_volume_))
-        last_error_ = "volume config save failed";
+    settings_audio_com::save_volume_config(backend_volume_);
     select_volume(selection_for_volume(backend_volume_));
     finish_commit();
 }

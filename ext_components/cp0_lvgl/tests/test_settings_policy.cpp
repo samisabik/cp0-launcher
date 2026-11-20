@@ -19,7 +19,6 @@ int main()
     assert(cp0::settings::command_from({"BacklightRead"}) == Command::BacklightRead);
     assert(cp0::settings::command_from({"BacklightMax"}) == Command::BacklightMax);
     assert(cp0::settings::command_from({"BacklightWrite", "50"}) == Command::BacklightWrite);
-    assert(cp0::settings::command_from({"Log"}) == Command::Log);
     assert(cp0::settings::command_from({"TimeStr"}) == Command::TimeStr);
     assert(cp0::settings::command_from({"GpioSet"}) == Command::GpioSet);
     assert(cp0::settings::command_from({"GpioGet"}) == Command::GpioGet);
@@ -38,8 +37,6 @@ int main()
     assert(!cp0::settings::valid_arguments({"GpioSet", "unknown", "1"}));
     assert(cp0::settings::valid_arguments({"GpioGet", "GROVE5V"}));
     assert(!cp0::settings::valid_arguments({"GpioGet", "unknown"}));
-    assert(cp0::settings::valid_arguments({"Log", "topic", "message"}));
-    assert(!cp0::settings::valid_arguments({"Log", "topic"}));
 
     const Arguments arguments{"GpioSet", "GROVE5V", "1"};
     assert(cp0::settings::argument_at(arguments, 0) == "GpioSet");

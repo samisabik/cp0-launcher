@@ -28,7 +28,7 @@ class LvglComponensBase;
 using SettingApiCallBack              = eventpp::CallbackList<void(int, void *)>;
 using SettingApiCallBackFunc          = std::function<void(int, void *)>;
 using SettingApiReadFlagTimeStartData = std::tuple<bool, std::atomic_bool *>;
-enum SettingApiEvent : int {
+enum : int {
     SettingApiReadFlag          = 0,
     SettingApiActivate          = 1,
     SettingApiReadFlagTimeStart = 2,
@@ -51,17 +51,10 @@ enum class SettingComponentState : uint8_t {
     Cancelled,
 };
 
-enum class SettingActivationPolicy : uint8_t {
-    LeaveImmediately,
-    WaitForResult,
-};
-
 enum class SettingStatusReadPolicy : uint8_t {
     Async,
     Direct,
 };
-
-using SettingApiAsyncCallBackFunc = std::function<SettingApiResult(int, void *)>;
 
 class SettingRequestState {
 public:
@@ -73,11 +66,6 @@ public:
         ++generation_;
         if (generation_ == 0) generation_ = 1;
         return generation_;
-    }
-
-    bool mark_pending(uint64_t generation) noexcept
-    {
-        return transition(generation, SettingComponentState::Pending);
     }
 
     bool mark_success(uint64_t generation) noexcept
@@ -130,11 +118,6 @@ private:
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (generation == 0 || generation != generation_) return false;
-        if (next == SettingComponentState::Pending) {
-            if (state_ != SettingComponentState::Activate) return false;
-            state_ = next;
-            return true;
-        }
         if (state_ != SettingComponentState::Activate && state_ != SettingComponentState::Pending) return false;
         state_ = next;
         return true;
@@ -167,8 +150,6 @@ struct SettingEntry {
     SettingPageFactory page_factory;
     bool icon_enabled = false;
     SettingApiCallBack Componens_api;
-    SettingApiAsyncCallBackFunc Async_api;
-    SettingActivationPolicy activation_policy = SettingActivationPolicy::LeaveImmediately;
     SettingStatusReadPolicy status_read_policy = SettingStatusReadPolicy::Async;
     std::shared_ptr<SettingRequestState> request_state = std::make_shared<SettingRequestState>();
     PageType page_type = PageType::NextPageNeeded;
@@ -226,26 +207,8 @@ struct SettingEntry {
         Componens_api.append(std::move(func));
     }
 
-    void set_async_api(SettingApiAsyncCallBackFunc func,
-                       SettingActivationPolicy policy = SettingActivationPolicy::WaitForResult)
-    {
-        Async_api          = std::move(func);
-        activation_policy = policy;
-    }
-
-    static SettingEntry make_async(const std::string &name,
-                                   SettingApiAsyncCallBackFunc func,
-                                   bool enable_icon = false,
-                                   SettingActivationPolicy policy = SettingActivationPolicy::WaitForResult)
-    {
-        SettingEntry entry{name};
-        entry.icon_enabled = enable_icon;
-        entry.set_async_api(std::move(func), policy);
-        return entry;
-    }
-
     bool has_api() const noexcept
     {
-        return static_cast<bool>(Componens_api) || static_cast<bool>(Async_api);
+        return static_cast<bool>(Componens_api);
     }
 };

@@ -95,7 +95,6 @@ public:
             report(callback, 0, std::to_string(value));
             break;
         }
-        case cp0::settings::Command::Log:
         case cp0::settings::Command::Unknown:
         default:
             report(callback, -1, "unknown settings api command");
@@ -176,18 +175,6 @@ extern "C" void init_settings(void)
             settings->api_call(args, callback);
         });
     sdl_bluetooth_settings::register_api();
-}
-
-extern "C" int cp0_backlight_read(void)
-{
-    return SettingsSystem::api_int(
-        {"BacklightRead"}, -1, 0, std::numeric_limits<int>::max());
-}
-
-extern "C" int cp0_backlight_max(void)
-{
-    return SettingsSystem::api_int(
-        {"BacklightMax"}, 100, 1, std::numeric_limits<int>::max());
 }
 
 extern "C" int cp0_backlight_write(int value)

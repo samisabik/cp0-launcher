@@ -79,14 +79,12 @@ void HomeIconBufferPool::DrawBufferDeleter::operator()(lv_draw_buf_t *buffer) co
 
 void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths, uint32_t size)
 {
-    base_size_ = size == 0 ? kIconSize : size;
     icons_.clear();
-    resized_icons_.clear();
     icons_.reserve(icon_paths.size());
 
     for (const std::string &path : icon_paths) {
         if (path.empty() || icons_.find(path) != icons_.end()) continue;
-        DrawBufferPtr icon = decode_and_prepare(path, base_size_);
+        DrawBufferPtr icon = decode_and_prepare(path, size);
         if (!icon) {
             SLOGW("[HOME] failed to preload icon: %s", path.c_str());
             continue;
@@ -102,33 +100,9 @@ const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path) const
     return found == icons_.end() ? &home_icon_fallback : as_image(found->second);
 }
 
-const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path, uint32_t size)
-{
-    if (size == 0 || size == base_size_)
-        return find(path);
-
-    const auto found = icons_.find(path);
-    if (found == icons_.end())
-        return &home_icon_fallback;
-
-    const std::string key = path + "\n" + std::to_string(size);
-    const auto resized = resized_icons_.find(key);
-    if (resized != resized_icons_.end())
-        return as_image(resized->second);
-
-    DrawBufferPtr icon = decode_and_prepare(path, size);
-    if (!icon)
-        return as_image(found->second);
-    const lv_image_dsc_t *result = as_image(icon);
-    resized_icons_.emplace(key, std::move(icon));
-    return result;
-}
-
 void HomeIconBufferPool::swap(HomeIconBufferPool &other) noexcept
 {
-    std::swap(base_size_, other.base_size_);
     icons_.swap(other.icons_);
-    resized_icons_.swap(other.resized_icons_);
 }
 
 HomeIconBufferPool::DrawBufferPtr

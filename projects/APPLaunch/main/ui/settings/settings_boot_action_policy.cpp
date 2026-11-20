@@ -9,8 +9,8 @@
 namespace settings_t12b::boot_actions {
 namespace {
 
-constexpr Presentation kReboot{"reboot", "reboot?"};
-constexpr Presentation kShutdown{"shutdown", "power off?"};
+constexpr Presentation kReboot{"reboot"};
+constexpr Presentation kShutdown{"shutdown"};
 
 } // namespace
 

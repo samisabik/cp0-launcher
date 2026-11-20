@@ -33,11 +33,6 @@ public:
                                    cp0_sudo_complete_cb_t complete_cb,
                                    void *user, int auth_timeout_ms,
                                    int exec_timeout_ms);
-    RequestBuildResult create_shell(const char *command,
-                                    cp0_sudo_callback_thread_t callback_thread,
-                                    cp0_sudo_output_cb_t output_cb,
-                                    cp0_sudo_complete_cb_t complete_cb,
-                                    void *user);
 
 private:
     static bool valid_thread(cp0_sudo_callback_thread_t thread);

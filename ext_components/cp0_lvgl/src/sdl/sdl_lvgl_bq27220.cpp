@@ -67,8 +67,7 @@ public:
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 reply = cp0::battery::dispatch_api_request(
-                    arg, [this] { return read(); },
-                    [this](int index) { return calibrate(index); });
+                    arg, [this] { return read(); });
             }
             result.complete(reply.code, reply.data);
         });
@@ -77,11 +76,6 @@ public:
     cp0_battery_info_t read()
     {
         return simulated_battery_info();
-    }
-
-    int calibrate(int command_index)
-    {
-        return (command_index >= 0 && command_index < 4) ? 0 : -1;
     }
 
 private:
@@ -104,20 +98,6 @@ cp0_battery_info_t cp0_battery_read(void)
         info = {};
     }
     return info;
-}
-
-int cp0_bq27220_calibrate(int command_index)
-{
-    int ret = -1;
-    try {
-        cp0_signal_bq27220_api({"Calibrate", std::to_string(command_index)}, [&](int code, std::string data) {
-            (void)data;
-            ret = code;
-        });
-    } catch (...) {
-        ret = -1;
-    }
-    return ret;
 }
 
 void init_bq27220(void)

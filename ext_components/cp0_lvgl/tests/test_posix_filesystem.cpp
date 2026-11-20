@@ -32,25 +32,10 @@ int main()
     const std::string child_directory = std::string(directory) + "/child";
     assert(mkdir(child_directory.c_str(), 0700) == 0);
 
-    cp0_dirent_t entries[4]{};
-    int count = 0;
-    assert(cp0_posix_filesystem::list_directory(directory, entries, 4, &count, true) == 0);
-    assert(count == 2);
-    bool found_file = false;
-    bool found_directory = false;
-    for (int index = 0; index < count; ++index) {
-        if (std::strcmp(entries[index].name, "a%\tb") == 0) found_file = !entries[index].is_dir;
-        if (std::strcmp(entries[index].name, "child") == 0)
-            found_directory = entries[index].is_dir;
-    }
-    assert(found_file && found_directory);
-
     std::string encoded;
-    assert(cp0_posix_filesystem::encode_directory(directory, false, true, encoded) == 0);
+    assert(cp0_posix_filesystem::encode_directory(directory, encoded) == 0);
     assert(encoded.find("F\ta%25%09b\n") != std::string::npos);
     assert(encoded.find("D\tchild\n") != std::string::npos);
-    assert(cp0_posix_filesystem::encode_directory(directory, true, true, encoded) == 0);
-    assert(encoded.find("F\t5\ta%25%09b\n") != std::string::npos);
 
     std::string contents;
     assert(cp0_posix_filesystem::read_file_limited(file_path, 5, contents) == 0);
@@ -58,9 +43,7 @@ int main()
     assert(cp0_posix_filesystem::read_file_limited(file_path, 4, contents) == -EFBIG);
 
     const std::string missing = std::string(directory) + "/missing";
-    assert(cp0_posix_filesystem::list_directory(missing.c_str(), entries, 4, &count, false) == -1);
-    assert(cp0_posix_filesystem::list_directory(missing.c_str(), entries, 4, &count, true) ==
-           -ENOENT);
+    assert(cp0_posix_filesystem::encode_directory(missing.c_str(), encoded) == -ENOENT);
 
     cp0_watcher_t watched = reinterpret_cast<cp0_watcher_t>(static_cast<uintptr_t>(0x1234));
     bool watch_stopped = false;
@@ -94,8 +77,6 @@ int main()
     assert(code == 0 && data == "resolved/asset.png");
     invoke({"DirList", directory}, code, data);
     assert(code == 0 && data.find("F\ta%25%09b\n") != std::string::npos);
-    invoke({"DirListDetail", directory}, code, data);
-    assert(code == 0 && data.find("F\t5\ta%25%09b\n") != std::string::npos);
     invoke({"Exists", file_path}, code, data);
     assert(code == 0 && data == "1");
     invoke({"ReadFile", file_path, "5"}, code, data);
@@ -114,11 +95,6 @@ int main()
     const std::string ensured = std::string(directory) + "/ensured";
     invoke({"EnsureDirForUser", ensured}, code, data);
     assert(code == 0);
-    const std::string touched = std::string(directory) + "/touched";
-    invoke({"Touch", touched}, code, data);
-    assert(code == 0 && access(touched.c_str(), F_OK) == 0);
-    invoke({"Remove", touched}, code, data);
-    assert(code == 0 && access(touched.c_str(), F_OK) != 0);
     invoke({"WatchStart", directory}, code, data);
     assert(code == 0 && !data.empty());
     const std::string watcher_handle = data;
@@ -146,7 +122,7 @@ int main()
 
     invoke({"Exists"}, code, data);
     assert(code == -1);
-    invoke({"Touch", ""}, code, data);
+    invoke({"Exists", ""}, code, data);
     assert(code == -1);
     invoke({"DirList", directory, "extra"}, code, data);
     assert(code == -1);

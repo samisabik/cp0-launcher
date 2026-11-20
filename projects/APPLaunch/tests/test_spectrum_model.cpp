@@ -52,13 +52,6 @@ int main()
     assert(format_mhz(433920000) == "433.920");
     assert(format_mhz(315000000) == "315.000");
 
-    const std::string header = csv_header("2026-11-14T23:00:00");
-    assert(header.find("band 868 start_hz=863000000 stop_hz=870000000 bins=160") != std::string::npos);
-    assert(header.find("timestamp_ms,band,b0,b1,") != std::string::npos);
-    assert(header.find(",b159\n") != std::string::npos);
-
-    const int8_t values[3] = {-100, -64, -41};
-    assert(csv_row(1700000000123, kBands[0], values, 3) == "1700000000123,315,-100,-64,-41\n");
     const std::vector<int32_t> raw = {-50, 300, 20, -700, 0, -100, 350, -9000};
     const std::vector<int32_t> norm = normalize_durations(raw);
     assert((norm == std::vector<int32_t>{320, -800, 350, -9000}));

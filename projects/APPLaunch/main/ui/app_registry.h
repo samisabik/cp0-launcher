@@ -7,21 +7,12 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
-
-enum class LauncherAppOrigin : std::uint8_t {
-    Builtin,
-    // A .desktop entry in the applications folder; always shown.
-    External,
-};
 
 struct AppDescriptor {
     const char *label;
-    const char *icon;
     const char *config_key;
     bool configurable;
     bool always_on;
-    LauncherAppOrigin origin = LauncherAppOrigin::Builtin;
 };
 
 const AppDescriptor *launcher_app_registry_entries(std::size_t *count);

@@ -76,7 +76,6 @@ std::optional<DesktopEntry> parse_desktop_entry(std::string_view contents)
         trim(value);
 
         if (key == "Name") entry.name = std::move(value);
-        else if (key == "Icon") entry.icon = std::move(value);
         else if (key == "Exec") entry.exec = std::move(value);
         else if (key == "Terminal") entry.terminal = parse_bool(value);
         else if (key == "Sysplause") entry.sysplause = parse_bool(value);
@@ -85,9 +84,8 @@ std::optional<DesktopEntry> parse_desktop_entry(std::string_view contents)
     }
     if (hidden || !valid_type || entry.name.empty() || entry.exec.empty() ||
         entry.name.size() > DESKTOP_ENTRY_MAX_NAME_BYTES ||
-        entry.icon.size() > DESKTOP_ENTRY_MAX_ICON_BYTES ||
         entry.exec.size() > DESKTOP_ENTRY_MAX_EXEC_BYTES ||
-        contains_control(entry.name) || contains_control(entry.icon) || contains_nul(entry.exec))
+        contains_control(entry.name) || contains_nul(entry.exec))
         return std::nullopt;
     return entry;
 }

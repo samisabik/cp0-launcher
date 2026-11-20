@@ -4,7 +4,6 @@
 from pathlib import Path
 import os, sys
 import platform
-import subprocess
 from build_support.config_default_file import sync_config_default, sync_config_tmp
 """
   The default cross-compilation toolchain can be specified in a 
@@ -15,8 +14,6 @@ export CONFIG_DEFAULT_FILE=linux_x86_cross_cp0_config_defaults.mk
 scons -j8
 """
 
-
-cross_package_enabled = False
 
 local_path = Path(os.getcwd())
 sdk_path = local_path.parent.parent / "SDK"
@@ -36,7 +33,6 @@ selected_config = os.environ.get("CONFIG_DEFAULT_FILE", "config_defaults.mk")
 sync_config_default(config_dir, selected_config)
 
 if "cross" in os.environ.get("CONFIG_DEFAULT_FILE", ''):
-    cross_package_enabled = True
     if not (sysroot_path / "usr" / "include").is_dir():
         sys.exit(f"missing sysroot {sysroot_path}: run scripts/make_sysroot.sh with the device reachable over SSH")
     sysroot_path_str = sysroot_path.as_posix().replace('"', r'\"')

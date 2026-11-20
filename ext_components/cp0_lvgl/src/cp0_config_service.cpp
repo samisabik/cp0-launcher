@@ -126,11 +126,6 @@ void ConfigService::api_call(Arguments arguments, Callback callback)
     }
 
     const std::string command = arguments.front();
-    if (command == "Init") {
-        const bool loaded = reload();
-        report(callback, loaded ? 0 : -1, loaded ? "ok" : "load failed");
-        return;
-    }
     if (command == "Save") {
         std::lock_guard<std::mutex> mutation_lock(mutation_mutex_);
         Entries snapshot;

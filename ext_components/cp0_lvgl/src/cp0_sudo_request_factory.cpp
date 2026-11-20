@@ -46,18 +46,4 @@ RequestBuildResult RequestFactory::create_argv(
     return {0, std::move(request)};
 }
 
-RequestBuildResult RequestFactory::create_shell(
-    const char *command, cp0_sudo_callback_thread_t callback_thread,
-    cp0_sudo_output_cb_t output_cb, cp0_sudo_complete_cb_t complete_cb,
-    void *user)
-{
-    if (!command || !command[0] || !valid_thread(callback_thread))
-        return {-EINVAL, {}};
-
-    auto request = create(callback_thread, output_cb, complete_cb, user);
-    request->argv.emplace_back(command);
-    request->use_login_shell = true;
-    return {0, std::move(request)};
-}
-
 } // namespace cp0_sudo

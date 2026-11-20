@@ -11,12 +11,6 @@
 namespace settings_t12b::about_help {
 namespace {
 
-std::string value_or_unknown(std::string_view value)
-{
-    return value.empty() ? "unknown" : std::string(value);
-}
-
-
 std::vector<std::string> split_lines(std::string_view text)
 {
     std::vector<std::string> lines;
@@ -34,24 +28,6 @@ std::vector<std::string> split_lines(std::string_view text)
 }
 
 } // namespace
-
-Content about(std::string_view version,
-              std::string_view build_date,
-              std::string_view channel,
-              std::string_view commit)
-{
-    return {
-        "About",
-        {
-            "M5CardputerZero",
-            "LVGL: 9.x",
-            "Version: " + value_or_unknown(version),
-            "Build: " + value_or_unknown(build_date),
-            "Channel: " + value_or_unknown(channel),
-            "Commit: " + value_or_unknown(commit),
-        },
-    };
-}
 
 Content credit()
 {
@@ -90,8 +66,6 @@ D-Bus, AFL-2.1 or GPL-2.0-or-later
 https://gitlab.freedesktop.org/dbus/dbus
 GLib, LGPL-2.1-or-later
 https://gitlab.gnome.org/GNOME/glib
-miniaudio, Unlicense or MIT-0
-https://github.com/mackron/miniaudio
 eventpp, Apache-2.0
 https://github.com/wqking/eventpp
 tree.hh, GPL-3.0-only

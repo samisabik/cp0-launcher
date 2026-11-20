@@ -31,24 +31,6 @@ bool valid_path(const std::string &path)
     return !path.empty() && path.find('\0') == std::string::npos;
 }
 
-int touch_file(const std::string &path)
-{
-    const auto slash = path.find_last_of('/');
-    if (slash != std::string::npos && slash > 0) {
-        const std::string parent = path.substr(0, slash);
-        struct stat status{};
-        if ((mkdir(parent.c_str(), 0755) != 0 && errno != EEXIST) ||
-            stat(parent.c_str(), &status) != 0 || !S_ISDIR(status.st_mode)) {
-            return -1;
-        }
-    }
-
-    FILE *file = fopen(path.c_str(), "a");
-    if (!file) return -1;
-    fclose(file);
-    return 0;
-}
-
 } // namespace
 
 cp0_watcher_t WatcherRegistry::add(cp0_watcher_t watcher)
@@ -101,16 +83,13 @@ void dispatch(const std::list<std::string> &arguments, const Operations &operati
                 return;
             }
             report(0, operations.resolve_path(value));
-        } else if (command == "DirList" || command == "DirListDetail") {
+        } else if (command == "DirList") {
             if (arguments.size() != 2 || !valid_path(value)) {
                 report(-1, "invalid directory path");
                 return;
             }
-            const bool detail = command == "DirListDetail";
             std::string data;
-            const int code = cp0_posix_filesystem::encode_directory(
-                value.c_str(), detail,
-                detail ? operations.detail_errno_on_open_failure : true, data);
+            const int code = cp0_posix_filesystem::encode_directory(value.c_str(), data);
             report(code, std::move(data));
         } else if (command == "Exists") {
             if (arguments.size() != 2 || !valid_path(value)) {
@@ -139,18 +118,6 @@ void dispatch(const std::list<std::string> &arguments, const Operations &operati
                 return;
             }
             report(operations.ensure_directory(value), "");
-        } else if (command == "Touch") {
-            if (arguments.size() != 2 || !valid_path(value)) {
-                report(-1, "invalid filesystem path");
-                return;
-            }
-            report(touch_file(value), "");
-        } else if (command == "Remove") {
-            if (arguments.size() != 2 || !valid_path(value)) {
-                report(-1, "invalid filesystem path");
-                return;
-            }
-            report(std::remove(value.c_str()) == 0 ? 0 : -1, "");
         } else if (command == "WatchStart") {
             if (arguments.size() != 2 || !valid_path(value) || !operations.watch_start) {
                 report(-1, "invalid watch path");

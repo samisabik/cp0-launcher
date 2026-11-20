@@ -100,7 +100,6 @@ void test_pwm_with_sync()
         assert(std::abs(length - 4 * 350) <= 4 * 350 * 8 / 100 + 1);
     }
     // The packet ends after the sync pulse and before the gap.
-    assert(a.packet_us > a.bit_edges_us.back() && a.packet_us < a.bit_edges_us.back() + 2 * 350);
     uint64_t total = 0;
     for (int32_t d : durations) total += static_cast<uint64_t>(std::abs(d));
     assert(a.total_us == total);

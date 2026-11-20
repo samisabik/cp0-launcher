@@ -182,19 +182,6 @@ jobs:
       if: steps.sysroot-cache.outputs.cache-hit != 'true'
       run: sh scripts/make_sysroot.sh --docker
 
-    - name: Pre-download C-Thread-Pool (avoid flaky GitHub archive fetch during scons)
-      run: |
-        DEST=SDK/github_source/C-Thread-Pool
-        if [ ! -d "$DEST" ]; then
-          for i in 1 2 3; do
-            curl -fsSL -o /tmp/ctp.zip "https://github.com/Pithikos/C-Thread-Pool/archive/refs/heads/master.zip" && break
-            echo "retry $i..."; sleep 5
-          done
-          unzip -q /tmp/ctp.zip -d /tmp/ctp
-          mv /tmp/ctp/C-Thread-Pool-master "$DEST"
-        fi
-        ls "$DEST/thpool.c" && echo "C-Thread-Pool ready"
-
     - name: Build APPLauncher (cross-compile aarch64)
       run: |
         cd projects/APPLaunch
@@ -202,9 +189,6 @@ jobs:
         export CardputerZero=y
         export CONFIG_REPO_AUTOMATION=y
         export APPLAUNCH_VERSION="${{ steps.version.outputs.version }}"
-        # Build -DLAUNCHER_CHANNEL_RAW: "release" for reviewed releases,
-        # "prerelease" for CI builds. Display only.
-        export APPLAUNCH_CHANNEL="${{ inputs.publish && 'release' || 'prerelease' }}"
         export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
         scons -j$(nproc)
 
@@ -347,8 +331,7 @@ jobs:
         # Pin the tag to the commit that was actually built instead of letting
         # GitHub default to the current default-branch head.
         target_commitish: ${{ github.sha }}
-        name: "APPLauncher ${{ inputs.publish && 'Release' || 'Prerelease' }} v${{ needs.build.outputs.version }}"
-        prerelease: ${{ !inputs.publish }}
+        name: "APPLauncher Release v${{ needs.build.outputs.version }}"
         generate_release_notes: true
         fail_on_unmatched_files: true
         overwrite_files: true

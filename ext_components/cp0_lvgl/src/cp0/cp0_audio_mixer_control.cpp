@@ -33,8 +33,3 @@ int Cp0AudioMixerControl::toggle_mute() const
 {
     return cp0::pulse::toggle_default_sink_mute();
 }
-
-bool Cp0AudioMixerControl::preload() const
-{
-    return cp0::pulse::preload();
-}

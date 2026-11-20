@@ -24,7 +24,6 @@ public:
         ScreenH = 170,
         ContentX = 4,
         ContentW = 312,
-        TitleY = 1,
         LinesY = 20,
         LinesBottomY = 150,
         LineGap = 3,
@@ -71,7 +70,6 @@ private:
     void handle_key_event(lv_event_t *event);
     void handle_repeated_key(uint32_t key);
 
-    NodeIter page_node_;
     settings_t12b::about_help::Content content_;
     std::function<bool(std::vector<std::string> &)> lines_provider_;
     std::vector<lv_obj_t *> line_labels_;

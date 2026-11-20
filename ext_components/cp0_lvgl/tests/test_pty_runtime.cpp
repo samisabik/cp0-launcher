@@ -53,9 +53,6 @@ int main()
     assert(opened.callbacks == 1 && opened.code == 0 && !opened.data.empty());
     const std::string handle = opened.data;
 
-    Reply resized = call({"Resize", handle, "100", "30"});
-    assert(resized.code == 0);
-
     std::string output;
     for (int attempt = 0; attempt < 200 && output.find("ready") == std::string::npos; ++attempt) {
         Reply read = call({"Read", handle, "128"});
