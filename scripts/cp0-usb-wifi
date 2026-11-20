@@ -58,11 +58,14 @@ on)
     done
     ;;
 off)
-    # An access point still using the adapter keeps it.
-    if pgrep -x hostapd >/dev/null 2>&1; then
-        echo "busy: hostapd is running" >&2
-        exit 0
-    fi
+    # An access point still using the adapter keeps it. A hostapd that has
+    # exited but not been reaped yet (a zombie) has an empty command line.
+    for pid in $(pgrep -x hostapd 2>/dev/null); do
+        if [ -n "$(tr -d '\0' < "/proc/$pid/cmdline" 2>/dev/null)" ]; then
+            echo "busy: hostapd is running" >&2
+            exit 0
+        fi
+    done
     for module in $(modules); do
         modprobe -r "$module" 2>/dev/null
     done
