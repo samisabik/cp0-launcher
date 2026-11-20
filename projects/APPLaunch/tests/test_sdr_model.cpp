@@ -69,8 +69,29 @@ void test_demodulators()
     assert(std::fabs(audio_tone_hz(sdr::Demod::NFM, 5000.0, 1000.0) - 1000.0) < 30.0);
 }
 
+void test_bands()
+{
+    for (std::size_t i = 0; i < sdr::kBands.size(); ++i) {
+        const sdr::Band &band = sdr::kBands[i];
+        assert(band.low_hz <= band.hz && band.hz <= band.high_hz);
+        assert(sdr::clamp_hz(band.hz) == band.hz);
+        assert(band.step_index >= 0 && band.step_index < static_cast<int>(sdr::kSteps.size()));
+        assert(i == 0 || sdr::kBands[i - 1].high_hz < band.low_hz);
+        assert(sdr::band_near(band.hz) == static_cast<int>(i));
+    }
+    assert(std::string(sdr::kBands[static_cast<std::size_t>(sdr::band_near(100000000u))].label) == "fm");
+    assert(std::string(sdr::kBands[static_cast<std::size_t>(sdr::band_near(110000000u))].label) == "fm");
+    assert(std::string(sdr::kBands[static_cast<std::size_t>(sdr::band_near(116000000u))].label) == "air");
+    assert(sdr::band_near(100000u) == 0);
+    assert(sdr::band_near(1750000000u) == static_cast<int>(sdr::kBands.size()) - 1);
+    assert(sdr::band_range(sdr::kBands[0]) == "0.53-1.7");
+    assert(sdr::band_range(sdr::kBands[3]) == "88-108");
+    assert(sdr::band_range(sdr::kBands.back()) == "1090");
+}
+
 int main()
 {
+    test_bands();
     test_iq_spectrum();
     test_demodulators();
     assert(clamp_hz(0) == kMinHz);

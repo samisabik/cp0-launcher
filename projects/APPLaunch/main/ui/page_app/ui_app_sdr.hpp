@@ -24,10 +24,11 @@
 //  Shows "connect RTL-SDR" until a dongle is detected.
 //
 //  Keys:
-//    TAB            cycle mode
+//    TAB            band menu: arrows pick, ENTER jumps, TAB or ESC closes
+//    D              switch between scope and decode
 //    LEFT / RIGHT   tune centre by the step
 //    UP / DOWN      bigger / smaller tuning step
-//    1..6           presets (fm air 433 pmr noaa ads-b)
+//    1..9           jump to one of the first nine bands of the menu
 //    G              cycle gain (auto / 20 / 30 / 40 dB)
 //    Scope: S span, H clear peak hold
 //    Scope: M demod (wfm/nfm/am), O audio on/off
@@ -47,6 +48,8 @@ private:
     static constexpr int kCanvasTop = 64;
     static constexpr int kCanvasH = 86;
     static constexpr int kTraceH = 40;
+    static constexpr int kMenuRows = 6;
+    static constexpr int kMenuCount = static_cast<int>(sdr::kBands.size());
 
     Mode mode_ = Mode::Scope;
     bool present_ = false;
@@ -58,6 +61,8 @@ private:
     sdr::Demod demod_ = sdr::Demod::NFM;
     bool audio_out_ = true;
     bool decoding_ = false;
+    bool menu_open_ = false;
+    int menu_selection_ = 0;
 
     int detect_pid_ = -1;
     int proc_pid_ = -1;
@@ -99,6 +104,10 @@ private:
     lv_obj_t *big_ = nullptr;
     lv_obj_t *sub_ = nullptr;
     lv_obj_t *list_ = nullptr;
+    lv_obj_t *menu_ = nullptr;
+    std::array<lv_obj_t *, kMenuCount> menu_rows_{};
+    std::array<lv_obj_t *, kMenuCount> menu_names_{};
+    std::array<lv_obj_t *, kMenuCount> menu_ranges_{};
 
     lv_obj_t *hint_ = nullptr;
     lv_timer_t *timer_ = nullptr;
@@ -112,6 +121,9 @@ private:
     void poll_detect();
     void set_mode(Mode mode);
     void retune();
+    void jump_to_band(int index);
+    void render_menu();
+    void handle_menu_key(uint32_t key);
     void stop_proc();
     void start_scope();
     void start_decode();

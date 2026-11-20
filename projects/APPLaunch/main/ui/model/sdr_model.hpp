@@ -21,24 +21,40 @@ constexpr uint32_t kMaxHz = 1750000000u;
 enum class Demod { WFM, NFM, AM };
 const char *demod_label(Demod demod);
 
-struct Preset {
+// Tuning step sizes cycled with the step key.
+inline constexpr std::array<uint32_t, 5> kSteps = {1000u, 5000u, 25000u, 100000u, 1000000u};
+
+// A band the page jumps to: where it lands, and the demodulator, span and
+// tuning step that suit it. Ordered by frequency.
+struct Band {
     const char *label;
+    uint32_t low_hz;
+    uint32_t high_hz;
     uint32_t hz;
     Demod demod;
     uint32_t span_hz;
+    int step_index;
 };
 
-inline constexpr std::array<Preset, 6> kPresets = {{
-    {"fm", 98000000u, Demod::WFM, 2000000u},
-    {"air", 124000000u, Demod::AM, 1000000u},
-    {"433", 433920000u, Demod::NFM, 2000000u},
-    {"pmr", 446000000u, Demod::NFM, 1000000u},
-    {"noaa", 162400000u, Demod::NFM, 1000000u},
-    {"ads-b", 1090000000u, Demod::AM, 2000000u},
+inline constexpr std::array<Band, 12> kBands = {{
+    {"am", 530000u, 1700000u, 1000000u, Demod::AM, 1000000u, 1},
+    {"sw 49m", 5900000u, 6200000u, 6000000u, Demod::AM, 500000u, 1},
+    {"cb", 26900000u, 27500000u, 27185000u, Demod::AM, 500000u, 1},
+    {"fm", 88000000u, 108000000u, 98000000u, Demod::WFM, 2000000u, 3},
+    {"air", 118000000u, 137000000u, 124000000u, Demod::AM, 1000000u, 2},
+    {"ham 2m", 144000000u, 146000000u, 145500000u, Demod::NFM, 1000000u, 2},
+    {"marine", 156000000u, 162000000u, 156800000u, Demod::NFM, 1000000u, 2},
+    {"noaa", 162400000u, 162600000u, 162400000u, Demod::NFM, 1000000u, 2},
+    {"433", 433000000u, 434800000u, 433920000u, Demod::NFM, 2000000u, 2},
+    {"pmr", 446000000u, 446200000u, 446000000u, Demod::NFM, 1000000u, 1},
+    {"868", 863000000u, 870000000u, 868300000u, Demod::NFM, 2000000u, 2},
+    {"ads-b", 1090000000u, 1090000000u, 1090000000u, Demod::AM, 2000000u, 4},
 }};
 
-// Tuning step sizes cycled with the step key.
-inline constexpr std::array<uint32_t, 5> kSteps = {1000u, 5000u, 25000u, 100000u, 1000000u};
+// Index of the band holding hz, or of the nearest band when none does.
+int band_near(uint32_t hz);
+// "88-108" in MHz, or one number for a single-frequency band.
+std::string band_range(const Band &band);
 
 uint32_t clamp_hz(int64_t hz);
 
