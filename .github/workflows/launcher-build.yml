@@ -1,4 +1,4 @@
-name: Build APPLauncher
+name: Build cp0-launcher
 
 on:
   push:
@@ -155,7 +155,7 @@ jobs:
 
         echo "version=${version}" >> "${GITHUB_OUTPUT}"
         echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-        echo "Building APPLauncher ${version} (lower bound: ${latest:-<none>})"
+        echo "Building cp0-launcher ${version} (lower bound: ${latest:-<none>})"
 
     - name: Initialize submodules (SDK)
       run: git submodule update --init --depth=1 SDK
@@ -182,7 +182,7 @@ jobs:
       if: steps.sysroot-cache.outputs.cache-hit != 'true'
       run: sh scripts/make_sysroot.sh --docker
 
-    - name: Build APPLauncher (cross-compile aarch64)
+    - name: Build cp0-launcher (cross-compile aarch64)
       run: |
         cd projects/APPLaunch
         rm -rf build dist
@@ -331,7 +331,7 @@ jobs:
         # Pin the tag to the commit that was actually built instead of letting
         # GitHub default to the current default-branch head.
         target_commitish: ${{ github.sha }}
-        name: "APPLauncher Release v${{ needs.build.outputs.version }}"
+        name: "cp0-launcher v${{ needs.build.outputs.version }}"
         generate_release_notes: true
         fail_on_unmatched_files: true
         overwrite_files: true
