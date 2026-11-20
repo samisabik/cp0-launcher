@@ -144,6 +144,11 @@ Things that differ from the stock image and are easy to miss:
   `XDG_RUNTIME_DIR` from its environment (`commount.c`); a hardcoded
   `/run/user/1000` made every page that keeps files there fail, which showed
   as "scan timed out" in Air.
+- **Terminal type.** The CLI and Python pages start the shell with
+  `TERM=st-256color` (`ui_app_st_session.cpp`). Its terminfo entry is in
+  `ncurses-term`, which DietPi does not install. Without it a line editor
+  such as zsh's cannot move the cursor and reprints the line, which looks
+  like repeated and wrong letters from the keyboard.
 - **Text console on the LCD.** With `fbcon=map:1` the boot log shows on the
   LCD, and the console stays bound to it afterwards, which shows as a blinking
   cursor through the launcher. `scripts/cp0-fbcon-release.service` unbinds it

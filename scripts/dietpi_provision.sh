@@ -56,7 +56,7 @@ apt-get install -y --no-install-recommends \
     build-essential device-tree-compiler git ca-certificates \
     sudo dbus dbus-user-session libpam-systemd polkitd network-manager rtkit \
     pipewire pipewire-pulse pipewire-alsa wireplumber alsa-utils pulseaudio-utils \
-    rfkill iw iptables i2c-tools libinput10 libxkbcommon0 libfreetype6 \
+    rfkill iw iptables i2c-tools libinput10 libxkbcommon0 libfreetype6 ncurses-term \
     python3 curl ffmpeg micro hostapd dnsmasq rtl-sdr rtl-433 openssh-client \
     systemd-zram-generator
 systemctl disable --now dnsmasq.service >/dev/null 2>&1 || true
