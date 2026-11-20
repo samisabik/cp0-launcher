@@ -15,7 +15,6 @@ Paths in the evidence column are relative to the repository root.
 | M5Stack Linux Libs SDK | `SDK`, pinned gitlink; SCons/Kconfig framework | [MIT, 2024 M5Stack](../LICENSES/M5Stack-SDK-MIT.txt) |
 | LVGL 9.5 | SDK LVGL component, emulator `lib/lvgl`, APPLaunch `main/lvgl/lv_freetype*` overrides | [MIT](../LICENSES/LVGL-MIT.txt); bundled sublibraries retain their own notices |
 | FreeType | linked by APPLaunch `main/lvgl/lv_freetype*` through `main/SConstruct` | FTL or GPL-2.0; [FTL text](../projects/APPLaunch/main/lvgl/freetype-LICENSE.txt) |
-| tree.hh 3.20 | `ext_components/cp0_lvgl/include/tree.hh`, Kasper Peeters 2001–2024 | [GPL-3.0-only](../LICENSES/tree.hh-GPL-3.0-only.txt): header specifies version 3 without an “or later” grant |
 | eventpp | cp0_lvgl and APPLaunch requirements; SDK eventpp component | [Apache-2.0](../LICENSES/eventpp-Apache-2.0.txt) |
 | Departure Mono | `projects/APPLaunch/APPLaunch/share/font` | [OFL-1.1](../projects/APPLaunch/APPLaunch/share/font/DepartureMono-OFL.txt) |
 | DejaVu Sans 2.35 | `projects/APPLaunch/APPLaunch/share/font/DejaVuSans.ttf`; fallback glyphs in `cp0_font_service.cpp` | [Bitstream Vera and Arev terms, DejaVu changes public domain](../projects/APPLaunch/APPLaunch/share/font/DejaVuSans-LICENSE.txt) |
@@ -41,4 +40,4 @@ Component SConstruct files and application SConstruct/CMake files resolve these 
 | libinput, xkbcommon, udev | Native input/device discovery | MIT for libinput/xkbcommon; udev LGPL terms |
 | libcrypt, libc, libstdc++ | Account setup and runtime | Package-specific LGPL/GPL with runtime exceptions |
 
-Packaging must preserve notices for the selected configuration, including static libraries, fonts and audio. tree.hh GPL terms must be checked against the shipped artifact; this source inventory does not resolve those release-specific questions.
+Packaging must preserve notices for the selected configuration, including static libraries, fonts and audio.

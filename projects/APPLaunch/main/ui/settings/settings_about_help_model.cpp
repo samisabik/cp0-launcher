@@ -68,8 +68,6 @@ GLib, LGPL-2.1-or-later
 https://gitlab.gnome.org/GNOME/glib
 eventpp, Apache-2.0
 https://github.com/wqking/eventpp
-tree.hh, GPL-3.0-only
-https://github.com/kpeeters/tree.hh
 
 - Services and tools
 
