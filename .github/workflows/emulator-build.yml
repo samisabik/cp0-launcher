@@ -17,7 +17,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Initialize SDK submodule
       run: git submodule update --init --depth=1 SDK
     - name: Install SDK Python dependencies
@@ -48,7 +48,7 @@ jobs:
         cp -r build/assets dist/CardputerZero-Emulator/
         cp -r build/images dist/CardputerZero-Emulator/
         cd dist && tar czf ../CardputerZero-Emulator-Linux.tar.gz CardputerZero-Emulator
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: emulator-linux
         path: projects/CardputerZero-Emulator/CardputerZero-Emulator-Linux.tar.gz
