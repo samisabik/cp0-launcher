@@ -227,14 +227,9 @@ static void render()
     SDL_RenderPresent(g_ren);
 }
 
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#endif
-
 typedef void (*ui_init_fn)(void);
 typedef void (*ui_deinit_fn)(void);
 
-#if !defined(__APPLE__)
 extern "C" {
 void init_lvgl_env(void);
 void init_lvgl_event(void);
@@ -280,22 +275,6 @@ static void emu_init_cp0_runtime()
 
     initialized = true;
 }
-#endif
-
-
-// Set working directory to the exe's directory so relative paths work
-static void set_exe_dir()
-{
-#if defined(__APPLE__)
-    // macOS: SDL handles this, but just in case
-    char path[1024];
-    uint32_t size = sizeof(path);
-    if (_NSGetExecutablePath(path, &size) == 0) {
-        char *last = strrchr(path, '/');
-        if (last) { *last = '\0'; chdir(path); }
-    }
-#endif
-}
 
 static unsigned emu_test_frame(const char *name)
 {
@@ -313,17 +292,11 @@ static unsigned emu_test_frame(const char *name)
 
 int main(int argc, char *argv[])
 {
-    set_exe_dir();
-
     const unsigned test_reset_frame = emu_test_frame("EMU_TEST_RESET_FRAME");
     const unsigned test_quit_frame = emu_test_frame("EMU_TEST_QUIT_FRAME");
     const unsigned test_navigate_frame = emu_test_frame("EMU_TEST_NAVIGATE_FRAME");
 
-#if defined(__APPLE__)
-    const char *app_path = "apps/libAPPLaunch.dylib";
-#else
     const char *app_path = "apps/libAPPLaunch.so";
-#endif
     if (argc > 1) app_path = argv[1];
 
     printf("========================================\n");
@@ -389,10 +362,8 @@ int main(int argc, char *argv[])
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
-#if !defined(__APPLE__)
     emu_init_cp0_runtime();
     g_kbd_handler = lv_sdl_keyboard_handler;
-#endif
 
     void *app = dlopen(app_path, RTLD_NOW | RTLD_GLOBAL);
     if (!app) { fprintf(stderr, "[EMU] dlopen: %s\n", dlerror()); return 1; }
@@ -515,11 +486,9 @@ done:
     SDL_DestroyRenderer(g_ren);
     SDL_DestroyWindow(g_win);
     IMG_Quit();
-#if !defined(__APPLE__)
     // The saved-settings init starts a volume restore worker; join it before
     // the audio backend's statics go away. This host never calls deinit_audio.
     cp0_saved_volume_restore_stop();
-#endif
     SDL_Quit();
     return 0;
 }

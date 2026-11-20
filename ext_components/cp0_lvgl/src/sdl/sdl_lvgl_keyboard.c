@@ -47,11 +47,6 @@ __attribute__((weak)) int ui_lockscreen_filter_key(const struct key_item *elm)
     return 0;
 }
 
-__attribute__((weak)) void ui_global_hint_on_key(const struct key_item *elm)
-{
-    (void)elm;
-}
-
 static cp0_keyboard_key_handler_t global_key_handler;
 static cp0_keyboard_key_filter_t key_filter;
 static volatile int lvgl_keypad_intercept;
@@ -59,7 +54,7 @@ static atomic_int keyboard_input_context = KBD_INPUT_CONTEXT_NAVIGATION;
 
 void cp0_keyboard_set_input_context(cp0_keyboard_input_context_t context)
 {
-    if (context < KBD_INPUT_CONTEXT_NAVIGATION || context > KBD_INPUT_CONTEXT_GAME)
+    if (context < KBD_INPUT_CONTEXT_NAVIGATION || context > KBD_INPUT_CONTEXT_TEXT)
         context = KBD_INPUT_CONTEXT_NAVIGATION;
     atomic_store_explicit(&keyboard_input_context, context, memory_order_release);
 }
@@ -369,7 +364,6 @@ void *keyboard_read_thread(void *argv)
     (void)argv;
     return NULL;
 }
-void kbd_dump_keymap_table(void) {}
 
 const char *kbd_state_name(int state)
 {
@@ -491,8 +485,6 @@ static void cp0_sdl_keyboard_read(lv_indev_t *indev, lv_indev_data_t *data)
 
             if (global_key_handler)
                 global_key_handler(elm);
-            else
-                ui_global_hint_on_key(elm);
 
             if (!intercept) {
                 const uint32_t semantic_key = elm->semantic_key

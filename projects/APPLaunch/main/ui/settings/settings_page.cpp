@@ -276,7 +276,7 @@ static std::unique_ptr<DComponens::LvglComponensBase> wifi_scan_page3_factory(lv
 {
     bool enabled = false;
     query_wifi_power(enabled);
-    return std::make_unique<LvSettingWifiScanPage3>(parent, page_node, std::move(on_back), false, enabled);
+    return std::make_unique<LvSettingWifiScanPage3>(parent, page_node, std::move(on_back), enabled);
 }
 
 static std::unique_ptr<DComponens::LvglComponensBase> bluetooth_connected_page_factory(lv_obj_t *parent,

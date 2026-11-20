@@ -182,7 +182,7 @@ public:
         }
 
         // Set the current row font and colour first, then recalculate the text width using the final font.
-        lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
+        lv_obj_set_style_text_font(label, settings_fonts::font(font_px), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
         lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -432,9 +432,6 @@ public:
             style_label(label, distance, self && self->NextActive);
         }
     }
-
-    /** Default constructor, primarily to keep the component interface complete. */
-    LvSettingRoller() = default;
 
     // Parent container used when creating the second-level page.
     lv_obj_t *ui_APP_Container;

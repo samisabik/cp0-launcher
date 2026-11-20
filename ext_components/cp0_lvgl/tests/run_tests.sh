@@ -17,13 +17,12 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 binary="${TMPDIR:-/tmp}/cp0_lvgl_test_async_utils.$$"
-init_plan_object="${TMPDIR:-/tmp}/cp0_lvgl_test_init_plan.$$"
 esc_state_object="${TMPDIR:-/tmp}/cp0_esc_state.$$.$$.o"
 gc_sections_flag="-Wl,--gc-sections"
 if [ "$(uname -s)" = "Darwin" ]; then
     gc_sections_flag="-Wl,-dead_strip"
 fi
-trap 'rm -f "$binary" "$init_plan_object" "$esc_state_object"' EXIT HUP INT TERM
+trap 'rm -f "$binary" "$esc_state_object"' EXIT HUP INT TERM
 "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -I"$root/include" \
     -c "$root/src/cp0_esc_state.c" -o "$esc_state_object"
 
@@ -125,13 +124,6 @@ fi
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror -pthread \
     -I"$root/src" -I"$root/../../SDK/github_source/eventpp/include" \
     "$root/tests/test_signal_registration.cpp" -o "$binary"
-"$binary"
-
-"${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
-    -I"$root/src" -c "$root/src/cp0_init_plan.c" -o "$init_plan_object"
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src" "$init_plan_object" \
-    "$root/tests/test_init_plan.cpp" -o "$binary"
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
@@ -239,10 +231,6 @@ fi
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/include" "$root/tests/test_dispatch_testable.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/include" "$root/tests/test_dispatch_fallback.cpp" -o "$binary"
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \

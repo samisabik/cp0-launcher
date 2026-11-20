@@ -70,14 +70,12 @@ public:
         struct winsize ws = {};
         ws.ws_col = cols;
         ws.ws_row = rows;
-        std::string run_as_user = config_get_str("run_as_user", "");
-
         pid_t pid = forkpty(&master_fd, NULL, NULL, &ws);
         if (pid < 0) return NULL;
 
         if (pid == 0) {
             setenv("TERM", "vt100", 1);
-            drop_root_user(run_as_user);
+            drop_root_user();
 
             if (args)
                 execvp(cmd, const_cast<char *const *>(args));
@@ -271,36 +269,24 @@ private:
         return reinterpret_cast<pty_handle_t>(static_cast<uintptr_t>(value));
     }
 
-    static std::string config_get_str(const char *key, const char *default_val)
-    {
-        std::string value = default_val ? default_val : "";
-        cp0_signal_config_api({"GetStr", key ? std::string(key) : std::string(), value},
-                              [&](int code, std::string data) {
-                                  if (code == 0) value = std::move(data);
-                              });
-        return value;
-    }
-
-    static void drop_root_user(const std::string &configured_user)
+    static void drop_root_user()
     {
 #if defined(__linux__)
         if (getuid() != 0) return;
 
-        const char *username = configured_user.empty() ? NULL : configured_user.c_str();
-        if (!username) {
-            struct passwd *p = NULL;
-            setpwent();
-            while ((p = getpwent()) != NULL) {
-                if (p->pw_uid >= 1000 && p->pw_uid < 65534 &&
-                    p->pw_shell && p->pw_shell[0] &&
-                    !std::strstr(p->pw_shell, "nologin") &&
-                    !std::strstr(p->pw_shell, "/bin/false")) {
-                    username = p->pw_name;
-                    break;
-                }
+        const char *username = NULL;
+        struct passwd *p = NULL;
+        setpwent();
+        while ((p = getpwent()) != NULL) {
+            if (p->pw_uid >= 1000 && p->pw_uid < 65534 &&
+                p->pw_shell && p->pw_shell[0] &&
+                !std::strstr(p->pw_shell, "nologin") &&
+                !std::strstr(p->pw_shell, "/bin/false")) {
+                username = p->pw_name;
+                break;
             }
-            endpwent();
         }
+        endpwent();
         if (!username) username = "pi";
 
         struct passwd *pw = getpwnam(username);
@@ -323,8 +309,6 @@ private:
             (void)shell_result;
             (void)chdir_result;
         }
-#else
-        (void)configured_user;
 #endif
     }
 

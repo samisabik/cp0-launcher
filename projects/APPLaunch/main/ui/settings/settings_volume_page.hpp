@@ -27,10 +27,6 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingVolumePage3();
-
-    LvSettingVolumePage3(lv_obj_t *parent, const NodeIter &parent_node);
-
     LvSettingVolumePage3(lv_obj_t *parent,
                          const NodeIter &parent_node,
                          std::function<void()> back_callback);

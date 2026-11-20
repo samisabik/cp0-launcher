@@ -28,23 +28,8 @@ def function_definition(source: str, signature: str) -> str:
 
 
 def test_editors_use_regular_bitmap_freetype_style():
-    helpers = (
-        function_definition(
-            WIFI_SOURCE, "const lv_font_t *LvSettingWifiScanPage3::input_font"
-        ),
-        function_definition(
-            BLUETOOTH_SOURCE,
-            "const lv_font_t *LvSettingBluetoothAliasPage3::input_font",
-        ),
-    )
-    for helper in helpers:
-        assert "return settings_fonts::cjk_sans(size);" in helper
-        assert "LV_FREETYPE_FONT_STYLE_BOLD" not in helper
-
-    cjk_sans = function_definition(
-        SETTINGS_FONTS, "inline const lv_font_t *cjk_sans"
-    )
-    assert "get_chrome(size)" in cjk_sans
+    font = function_definition(SETTINGS_FONTS, "inline const lv_font_t *font")
+    assert "get_chrome(size)" in font
 
     get_start = FONT_SERVICE.index("lv_font_t *get(")
     get_declaration = FONT_SERVICE[
@@ -66,7 +51,7 @@ def test_wifi_editors_share_the_configured_input_font():
     assert password_panel.count("create_hidden_input(") == 1
     assert hidden_panel.count("create_hidden_input(") == 2
     assert "lv_textarea_create(parent)" in hidden_input
-    assert "input_font(11)" in hidden_input
+    assert "settings_fonts::font(11)" in hidden_input
 
 
 def test_hidden_wifi_cursor_is_centered_in_explicit_character_spacing():
@@ -90,8 +75,7 @@ def test_bluetooth_editor_uses_one_font_for_all_cursor_states():
     alias_editor = function_definition(
         BLUETOOTH_SOURCE, "void LvSettingBluetoothAliasPage3::render"
     )
-    assert alias_editor.count("input_font(11)") == 1
-    assert "lv_obj_set_style_text_font(alias_input_, input_font(11), LV_PART_MAIN);" in alias_editor
+    assert "lv_obj_set_style_text_font(alias_input_, settings_fonts::font(11), LV_PART_MAIN);" in alias_editor
 
 
 if __name__ == "__main__":

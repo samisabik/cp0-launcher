@@ -11,8 +11,6 @@
 #include <exception>
 #include <utility>
 
-LvSettingRollerPage2::LvSettingRollerPage2() = default;
-
 void LvSettingRollerPage2::AnimateNextIn(std::function<void()> animate_over_func)
 {
     if (roller3_ && !page3_transitioning_) {
@@ -97,12 +95,6 @@ LvSettingRollerPage2::~LvSettingRollerPage2()
     hint_         = nullptr;
 }
 
-LvSettingRollerPage2::LvSettingRollerPage2(lv_obj_t *parent, const NodeIter &parent_node)
-    : parent_(parent), ui_APP_Container(parent), parent_node_(parent_node)
-{
-    create_ui(parent);
-}
-
 LvSettingRollerPage2::LvSettingRollerPage2(lv_obj_t *parent, const NodeIter &parent_node,
                                            std::function<void()> back_callback)
     : parent_(parent), ui_APP_Container(parent), parent_node_(parent_node)
@@ -127,7 +119,7 @@ void LvSettingRollerPage2::style_label(lv_obj_t *label, int distance, bool compa
     const lv_opa_t opa = distance >= 3 ? LV_OPA_50 : LV_OPA_COVER;
     const int font_px = distance == 0 && !compact ? 22 : kCp0ChromeFontSize;
 
-    lv_obj_set_style_text_font(label, settings_fonts::mono(font_px), LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, settings_fonts::font(font_px), LV_PART_MAIN);
     lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
     lv_obj_set_style_opa(label, opa, LV_PART_MAIN);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -242,7 +234,7 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     }
     if (title) {
         lv_obj_set_style_text_color(title, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
-        lv_obj_set_style_text_font(title, settings_fonts::sans(11), LV_PART_MAIN);
+        lv_obj_set_style_text_font(title, settings_fonts::font(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
     if (content) {
@@ -258,7 +250,7 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     }
     if (message) {
         lv_obj_set_style_text_color(message, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
-        lv_obj_set_style_text_font(message, settings_fonts::sans(11), LV_PART_MAIN);
+        lv_obj_set_style_text_font(message, settings_fonts::font(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(message, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
     if (footer) {
@@ -281,7 +273,7 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
     }
     if (ok_label) {
         lv_obj_set_style_text_color(ok_label, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
-        lv_obj_set_style_text_font(ok_label, settings_fonts::sans(11), LV_PART_MAIN);
+        lv_obj_set_style_text_font(ok_label, settings_fonts::font(11), LV_PART_MAIN);
         lv_obj_set_style_text_align(ok_label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     }
 
@@ -796,7 +788,7 @@ void LvSettingRollerPage2::create_ui(lv_obj_t *parent)
     if (hint_) {
         lv_label_set_text(hint_, "");
         lv_obj_set_style_text_color(hint_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
-        lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+        lv_obj_set_style_text_font(hint_, settings_fonts::font(kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_update_layout(hint_);
         lv_obj_set_pos(hint_, metric(LayoutMetric::PanelX) + metric(LayoutMetric::PanelW) - 6 - lv_obj_get_width(hint_),
                        metric(LayoutMetric::PanelH) - lv_obj_get_height(hint_) - 1);

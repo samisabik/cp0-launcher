@@ -26,7 +26,6 @@ extern "C" {
 typedef enum {
     KBD_INPUT_CONTEXT_NAVIGATION = 0,
     KBD_INPUT_CONTEXT_TEXT = 1,
-    KBD_INPUT_CONTEXT_GAME = 2,
 } cp0_keyboard_input_context_t;
 
 // key state
@@ -70,7 +69,6 @@ int cp0_keyboard_get_lvgl_keypad_intercept(void);
 void cp0_keyboard_set_input_context(cp0_keyboard_input_context_t context);
 cp0_keyboard_input_context_t cp0_keyboard_get_input_context(void);
 const char *kbd_state_name(int state);
-void kbd_dump_keymap_table(void);
 #ifdef __cplusplus
 }
 #endif

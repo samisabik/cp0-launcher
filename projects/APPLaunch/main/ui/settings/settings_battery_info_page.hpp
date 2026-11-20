@@ -35,7 +35,6 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingBatteryInfoPage3();
     LvSettingBatteryInfoPage3(
         lv_obj_t *parent,
         const NodeIter &parent_node,

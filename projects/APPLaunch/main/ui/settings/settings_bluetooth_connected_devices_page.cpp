@@ -8,8 +8,6 @@
 
 #include <utility>
 
-LvSettingBluetoothConnectedPage3::LvSettingBluetoothConnectedPage3() = default;
-
 LvSettingBluetoothConnectedPage3::LvSettingBluetoothConnectedPage3(
     lv_obj_t *parent,
     const NodeIter &parent_node,

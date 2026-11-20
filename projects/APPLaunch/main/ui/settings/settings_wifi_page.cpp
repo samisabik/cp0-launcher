@@ -214,27 +214,10 @@ struct LvSettingWifiScanPage3::WifiData {
     WifiStatus status;
 };
 
-LvSettingWifiScanPage3::LvSettingWifiScanPage3()
-    : wifi_data_(std::make_unique<WifiData>())
-{
-}
-
-LvSettingWifiScanPage3::LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback)
-    : LvSettingWifiScanPage3(parent, parent_node, std::move(back_callback), false, true)
-{
-}
-
 LvSettingWifiScanPage3::LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback,
-                           bool hidden_network)
-    : LvSettingWifiScanPage3(parent, parent_node, std::move(back_callback), hidden_network, true)
-{
-}
-
-LvSettingWifiScanPage3::LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback,
-                           bool hidden_network, bool wifi_power_enabled)
+                           bool wifi_power_enabled)
     : parent_node_(parent_node),
       wifi_data_(std::make_unique<WifiData>()),
-      hidden_network_(hidden_network),
       wifi_power_enabled_(wifi_power_enabled)
 {
     LeaveSelfPage = std::move(back_callback);
@@ -343,11 +326,11 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
         }
 
         const int header_y = metric(LayoutMetric::HeaderY);
-        create_label(ComponensObj, "ssid", cp0::theme::kPadX, header_y, cp0::theme::kIdle, settings_fonts::sans(11));
+        create_label(ComponensObj, "ssid", cp0::theme::kPadX, header_y, cp0::theme::kIdle, settings_fonts::font(11));
         create_label(ComponensObj, "security", metric(LayoutMetric::SecurityX), header_y, cp0::theme::kIdle,
-                     settings_fonts::sans(11));
+                     settings_fonts::font(11));
         create_label(ComponensObj, "dBm", metric(LayoutMetric::SignalX), header_y, cp0::theme::kIdle,
-                     settings_fonts::sans(11));
+                     settings_fonts::font(11));
 
         for (int index = 0; index < metric(LayoutMetric::VisibleRows); ++index) {
             auto &row    = rows_[index];
@@ -359,11 +342,11 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
             if (row.background) lv_obj_add_flag(row.background, LV_OBJ_FLAG_HIDDEN);
 
             row.ssid = create_label(ComponensObj, "", cp0::theme::kPadX, ty, cp0::theme::kIdle,
-                                    settings_fonts::cjk_sans(11));
+                                    settings_fonts::font(11));
             row.security = create_label(ComponensObj, "", metric(LayoutMetric::SecurityX), ty, cp0::theme::kIdle,
-                                        settings_fonts::sans(11));
+                                        settings_fonts::font(11));
             row.signal = create_label(ComponensObj, "", metric(LayoutMetric::SignalX), ty, cp0::theme::kIdle,
-                                      settings_fonts::mono(11));
+                                      settings_fonts::font(11));
             if (row.ssid) {
                 lv_obj_set_width(row.ssid, metric(LayoutMetric::SsidW));
                 lv_label_set_long_mode(row.ssid, LV_LABEL_LONG_CLIP);
@@ -375,7 +358,7 @@ void LvSettingWifiScanPage3::create_ui(lv_obj_t *parent){
 
         empty_ = create_label(ComponensObj, "", cp0::theme::kPadX,
                               metric(LayoutMetric::RowY) + metric(LayoutMetric::RowH) + 8, cp0::theme::kDim,
-                              settings_fonts::sans(11));
+                              settings_fonts::font(11));
         if (empty_) lv_obj_set_width(empty_, metric(LayoutMetric::ScreenW) - 2 * cp0::theme::kPadX);
         hint_ = cp0::ui::footer(ComponensObj);
         create_password_panel();
@@ -519,10 +502,6 @@ lv_obj_t *LvSettingWifiScanPage3::create_label(lv_obj_t *parent, const char *tex
         return label;
     }
 
-const lv_font_t *LvSettingWifiScanPage3::input_font(uint16_t size){
-        return settings_fonts::cjk_sans(size);
-    }
-
 const char *LvSettingWifiScanPage3::scan_error_message(int result){
         switch (result) {
             case CP0_WIFI_ERROR_RADIO_OFF:
@@ -610,7 +589,7 @@ void LvSettingWifiScanPage3::create_password_panel(){
         password_title_        = title_row.title;
         password_title_status_ = title_row.status;
         password_network_ = create_label(password_panel_, "", cp0::theme::kPadX, 22, cp0::theme::kText,
-                                         settings_fonts::cjk_sans(11));
+                                         settings_fonts::font(11));
         password_input_   = create_hidden_input(password_panel_, 40, metric(LayoutMetric::MaxPasswordBytes));
         if (password_input_) {
             lv_obj_set_pos(password_input_, metric(LayoutMetric::PasswordTextX), 40);
@@ -624,9 +603,9 @@ void LvSettingWifiScanPage3::create_password_panel(){
             lv_obj_set_style_border_color(password_input_, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
         }
         password_value_  = create_label(password_panel_, "", cp0::theme::kPadX, 42, cp0::theme::kIdle,
-                                        settings_fonts::sans(11));
+                                        settings_fonts::font(11));
         password_status_ = create_label(password_panel_, "", cp0::theme::kPadX, 66, cp0::theme::kDanger,
-                                        settings_fonts::sans(11));
+                                        settings_fonts::font(11));
         password_hint_   = cp0::ui::footer(password_panel_);
 
         const int body_w = metric(LayoutMetric::ScreenW) - 2 * cp0::theme::kPadX;
@@ -660,7 +639,7 @@ lv_obj_t *LvSettingWifiScanPage3::create_hidden_input(lv_obj_t *parent, int y, u
         lv_textarea_set_one_line(input, true);
         lv_textarea_set_max_length(input, max_length);
         lv_textarea_set_text(input, "");
-        lv_obj_set_style_text_font(input, input_font(11), LV_PART_MAIN);
+        lv_obj_set_style_text_font(input, settings_fonts::font(11), LV_PART_MAIN);
         lv_obj_set_style_text_letter_space(input, metric(LayoutMetric::HiddenInputLetterSpace), LV_PART_MAIN);
         lv_obj_set_style_text_color(input, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
         lv_obj_set_style_bg_color(input, lv_color_hex(cp0::theme::kLine), LV_PART_MAIN);
@@ -694,8 +673,8 @@ void LvSettingWifiScanPage3::create_hidden_network_panel(){
         lv_obj_remove_flag(hidden_panel_, LV_OBJ_FLAG_SCROLLABLE);
 
         cp0::ui::title_row(hidden_panel_, "settings/wi-fi/hidden");
-        create_label(hidden_panel_, "ssid", cp0::theme::kPadX, 26, cp0::theme::kIdle, settings_fonts::sans(11));
-        create_label(hidden_panel_, "password", cp0::theme::kPadX, 54, cp0::theme::kIdle, settings_fonts::sans(11));
+        create_label(hidden_panel_, "ssid", cp0::theme::kPadX, 26, cp0::theme::kIdle, settings_fonts::font(11));
+        create_label(hidden_panel_, "password", cp0::theme::kPadX, 54, cp0::theme::kIdle, settings_fonts::font(11));
 
         hidden_ssid_input_     = create_hidden_input(hidden_panel_, 22, metric(LayoutMetric::MaxSsidBytes));
         hidden_password_input_ = create_hidden_input(hidden_panel_, 50, metric(LayoutMetric::MaxPasswordBytes));
@@ -848,7 +827,7 @@ void LvSettingWifiScanPage3::show_power_warning(){
         }
         if (title) {
             lv_obj_set_style_text_color(title, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
-            lv_obj_set_style_text_font(title, settings_fonts::sans(11), LV_PART_MAIN);
+            lv_obj_set_style_text_font(title, settings_fonts::font(11), LV_PART_MAIN);
         }
         if (content) {
             lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);
@@ -859,7 +838,7 @@ void LvSettingWifiScanPage3::show_power_warning(){
         }
         if (message) {
             lv_obj_set_style_text_color(message, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
-            lv_obj_set_style_text_font(message, settings_fonts::sans(11), LV_PART_MAIN);
+            lv_obj_set_style_text_font(message, settings_fonts::font(11), LV_PART_MAIN);
         }
         if (footer) {
             lv_obj_set_height(footer, 28);
@@ -883,7 +862,7 @@ void LvSettingWifiScanPage3::show_power_warning(){
         }
         if (ok_label) {
             lv_obj_set_style_text_color(ok_label, lv_color_hex(cp0::theme::kAccent), LV_PART_MAIN);
-            lv_obj_set_style_text_font(ok_label, settings_fonts::sans(11), LV_PART_MAIN);
+            lv_obj_set_style_text_font(ok_label, settings_fonts::font(11), LV_PART_MAIN);
         }
         DComponens::lvgl_bind_event(power_warning_, LV_EVENT_KEY, nullptr,
                                     std::bind(&LvSettingWifiScanPage3::handle_key_event, this, std::placeholders::_1));

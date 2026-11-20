@@ -58,8 +58,6 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingBrightnessPage3();
-    LvSettingBrightnessPage3(lv_obj_t *parent, const NodeIter &parent_node);
     LvSettingBrightnessPage3(lv_obj_t *parent,
                              const NodeIter &parent_node,
                              std::function<void()> back_callback);

@@ -25,12 +25,12 @@ const Presentation &presentation(Action action)
     return kReboot;
 }
 
-const char *process_command(Operation operation) noexcept
+const char *process_command(Action action) noexcept
 {
-    switch (operation) {
-    case Operation::Reboot:
+    switch (action) {
+    case Action::Reboot:
         return "Reboot";
-    case Operation::Shutdown:
+    case Action::Shutdown:
         return "Shutdown";
     }
     return nullptr;

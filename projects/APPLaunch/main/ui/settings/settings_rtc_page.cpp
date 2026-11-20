@@ -149,9 +149,7 @@ bool RtcStateModel::is_valid(const Values &values) noexcept
 
 std::string_view factory_build_date() noexcept
 {
-#ifdef LAUNCHER_BUILD_DATE
-    return LAUNCHER_BUILD_DATE;
-#elif defined(LAUNCHER_BUILD_DATE_RAW)
+#ifdef LAUNCHER_BUILD_DATE_RAW
     return SETTINGS_RTC_STRINGIFY(LAUNCHER_BUILD_DATE_RAW);
 #else
     return {};

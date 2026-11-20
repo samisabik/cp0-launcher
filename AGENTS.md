@@ -221,7 +221,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Home icon files | `APPLaunch/share/images/line/<slug>.png` | 24x24 white alpha masks, recoloured at runtime; slugs listed in `kKnown`; sources and licences in the `*-LICENSE.txt` / `*-NOTICE.txt` files beside them |
 | Home-screen keys | `main/ui/ui_launch_page_input.cpp` | `handle_home_key`, `fzxc_to_arrow` |
 | Icon pre-decode cache | `main/ui/home_icon_buffer_pool.cpp` | `rebuild`, `find` |
-| Default placeholder icon | `main/ui/home_icon_fallback.c` | 50×50 ARGB8888; constrained by `tests/test_home_icon_fallback_contract.py` |
+| Fallback home icon | `main/ui/home_icon_buffer_pool.cpp` | falls back to `line/app.png`; constrained by `tests/test_home_icon_fallback_contract.py` |
 | Add a built-in page | `main/ui/page_app/` + `builtin_app_registry.cpp` | see §6 |
 | Page base class / top bar | `ext_components/cp0_lvgl/include/ui_app_page.hpp` (**not in `main/ui/`**) | `AppPageRoot`, `AppPage`, `cp0_lvgl_start_app_page` |
 | Return-home state machine | `main/ui/model/launcher_navigation_model.hpp` | `LauncherPageLifecycleModel` |

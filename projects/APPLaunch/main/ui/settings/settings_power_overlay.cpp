@@ -75,9 +75,7 @@ void close_overlay()
 
 void start_request(Overlay *overlay)
 {
-    const char *command = settings_t12b::boot_actions::process_command(
-        overlay->action == Action::Reboot ? settings_t12b::boot_actions::Operation::Reboot
-                                          : settings_t12b::boot_actions::Operation::Shutdown);
+    const char *command = settings_t12b::boot_actions::process_command(overlay->action);
     auto result = overlay->result;
     try {
         std::thread([result, command = std::string(command ? command : "")]() {

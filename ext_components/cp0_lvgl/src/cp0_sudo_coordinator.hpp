@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "cp0_lvgl_app.h"
-
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -18,6 +16,24 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+typedef enum {
+    CP0_SUDO_RESULT_SUCCESS = 0,
+    CP0_SUDO_RESULT_AUTH_FAILED,
+    CP0_SUDO_RESULT_EXEC_FAILED,
+    CP0_SUDO_RESULT_CANCELLED,
+    CP0_SUDO_RESULT_TIMED_OUT,
+} cp0_sudo_result_t;
+
+typedef enum {
+    CP0_SUDO_CALLBACK_LVGL = 0,
+    CP0_SUDO_CALLBACK_WORKER,
+} cp0_sudo_callback_thread_t;
+
+/* Output is delivered in order before completion. LVGL delivery uses bounded
+ * backpressure, so callbacks should return promptly to avoid stalling the command. */
+typedef void (*cp0_sudo_output_cb_t)(const char *data, size_t size, void *user);
+typedef void (*cp0_sudo_complete_cb_t)(cp0_sudo_result_t result, int exit_code, void *user);
 
 namespace cp0_sudo {
 
@@ -30,7 +46,6 @@ struct Request {
     uint64_t id = 0;
     State state = State::QUEUED;
     std::vector<std::string> argv;
-    bool use_login_shell = false;
     cp0_sudo_callback_thread_t callback_thread = CP0_SUDO_CALLBACK_LVGL;
     cp0_sudo_output_cb_t output_cb = nullptr;
     cp0_sudo_complete_cb_t complete_cb = nullptr;

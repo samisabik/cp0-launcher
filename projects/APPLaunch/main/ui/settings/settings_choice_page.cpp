@@ -63,7 +63,7 @@ LvSettingChoicePage3::LvSettingChoicePage3(lv_obj_t *parent, const NodeIter &par
         if (status_label_) {
             lv_obj_set_width(status_label_, 200);
             lv_label_set_long_mode(status_label_, LV_LABEL_LONG_CLIP);
-            lv_obj_set_style_text_font(status_label_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+            lv_obj_set_style_text_font(status_label_, settings_fonts::font(kCp0ChromeFontSize), LV_PART_MAIN);
             lv_obj_set_pos(status_label_, 4, metric(LayoutMetric::ScreenH) - 14);
             lv_label_set_text(status_label_, "");
         }

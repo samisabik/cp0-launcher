@@ -129,9 +129,6 @@ lv_timer_t *g_timer = nullptr;
 std::shared_ptr<Request> g_prompt_request;
 std::string g_password;
 cp0_sudo::PromptConfirmKeyGate g_confirm_key_gate;
-std::mutex g_queued_password_mutex;
-std::string g_queued_password;
-int64_t g_queued_password_deadline_ms = 0;
 
 int64_t now_ms()
 {
@@ -151,14 +148,6 @@ struct UserIdentity {
     uint32_t uid = UINT32_MAX, gid = UINT32_MAX;
 };
 
-std::string config_get_string(const char *key)
-{
-    std::string value;
-    cp0_signal_config_api({"GetStr", key ? std::string(key) : std::string(), value},
-        [&](int code, std::string data) { if (code == 0) value = std::move(data); });
-    return value;
-}
-
 bool is_nologin_shell(const char *shell)
 {
     return !shell || !shell[0] || std::strstr(shell, "nologin") ||
@@ -168,8 +157,7 @@ bool is_nologin_shell(const char *shell)
 bool resolve_run_user(UserIdentity &identity)
 {
     std::string configured;
-    if (geteuid() == 0) configured = config_get_string("run_as_user");
-    else {
+    if (geteuid() != 0) {
         passwd *current = getpwuid(geteuid());
         if (current && current->pw_name) configured = current->pw_name;
     }
@@ -214,30 +202,6 @@ void key_event_cb(lv_event_t *event);
 void prompt_object_delete_cb(lv_event_t *event);
 void execute_actions(std::vector<Action> actions);
 void submit_password();
-void apply_queued_password(void *);
-bool schedule_apply_queued_password();
-
-void clear_queued_password()
-{
-    std::lock_guard<std::mutex> lock(g_queued_password_mutex);
-    secure_clear(g_queued_password);
-    g_queued_password_deadline_ms = 0;
-}
-
-bool take_queued_password(std::string &password)
-{
-    std::lock_guard<std::mutex> lock(g_queued_password_mutex);
-    if (g_queued_password.empty()) return false;
-    if (g_queued_password_deadline_ms > 0 && now_ms() > g_queued_password_deadline_ms) {
-        secure_clear(g_queued_password);
-        g_queued_password_deadline_ms = 0;
-        return false;
-    }
-    password = std::move(g_queued_password);
-    g_queued_password.clear();
-    g_queued_password_deadline_ms = 0;
-    return true;
-}
 
 void destroy_prompt()
 {
@@ -262,7 +226,6 @@ void destroy_prompt()
     g_prompt_request.reset();
     g_confirm_key_gate.reset();
     secure_clear(g_password);
-    clear_queued_password();
 }
 
 void prompt_object_delete_cb(lv_event_t *event)
@@ -445,9 +408,6 @@ void create_prompt(const std::shared_ptr<Request> &request)
     lv_group_add_obj(g_prompt_group, g_overlay);
     lv_group_set_default(g_prompt_group);
     if (lv_indev_t *indev = lv_indev_get_next(nullptr)) lv_indev_set_group(indev, g_prompt_group);
-    const bool dispatched = schedule_apply_queued_password();
-    cp0_testable::run_on_dispatch_failure(
-        dispatched, [] { apply_queued_password(nullptr); });
 }
 
 void show_auth_error(const std::shared_ptr<Request> &request)
@@ -561,12 +521,7 @@ void run_worker(std::shared_ptr<Request> request, std::string password)
     auto authenticated = g_coordinator.worker_authenticated(request->id);
     if (!authenticated.empty() && !post_actions(authenticated))
         g_coordinator.requeue_actions(std::move(authenticated));
-    std::vector<std::string> command = request->argv;
-    if (request->use_login_shell) {
-        const char *shell = std::getenv("SHELL");
-        command = {shell ? shell : "/bin/sh", "-c", request->argv.front()};
-    }
-    auto execution = cp0_runner::run(std::move(command), nullptr,
+    auto execution = cp0_runner::run(request->argv, nullptr,
         [request](const char *data, size_t size) { stream_output(request, data, size); },
         &request->cancel_requested, request->exec_timeout_ms);
     exit_code = execution.exit_code;
@@ -630,9 +585,7 @@ void run_worker(std::shared_ptr<Request> request, std::string password)
         if (!authenticated.empty() && !post_actions(authenticated))
             g_coordinator.requeue_actions(std::move(authenticated));
 
-        auto command = cp0_sudo::execution_command(
-            request->argv, request->use_login_shell, identity.shell);
-        auto execution = cp0_runner::run(std::move(command), &execution_input,
+        auto execution = cp0_runner::run(cp0_sudo::execution_command(request->argv), &execution_input,
             [request](const char *data, size_t size) { stream_output(request, data, size); },
             &request->cancel_requested, request->exec_timeout_ms, kMaxCapturedOutputBytes,
             identity.uid, identity.gid, identity.name, identity.home, identity.shell,
@@ -723,48 +676,6 @@ void submit_password()
 {
     if (!g_prompt_request) return;
     execute_actions(g_coordinator.submit_password(g_prompt_request->id));
-}
-
-void apply_queued_password_impl()
-{
-    if (!g_prompt_request || g_coordinator.state(g_prompt_request->id) != cp0_sudo::State::PROMPT)
-        return;
-    std::string password;
-    if (!take_queued_password(password)) return;
-    secure_clear(g_password);
-    g_password = std::move(password);
-    update_password_label();
-    submit_password();
-}
-
-void apply_queued_password(void *)
-{
-    cp0::callback::invoke_direct(apply_queued_password_impl);
-}
-
-struct QueuedPasswordHolder {
-    cp0::dispatch::ShutdownGate::Reservation reservation;
-};
-
-void apply_queued_password_dispatch(void *user)
-{
-    std::unique_ptr<QueuedPasswordHolder> holder(
-        static_cast<QueuedPasswordHolder *>(user));
-    auto lease = g_dispatch_gate.acquire(std::move(holder->reservation));
-    if (!lease) return;
-    DispatchScope dispatch_scope;
-    apply_queued_password(nullptr);
-}
-
-bool schedule_apply_queued_password()
-{
-    auto reservation = g_dispatch_gate.reserve();
-    if (!reservation) return false;
-    auto *holder = new (std::nothrow) QueuedPasswordHolder{std::move(*reservation)};
-    if (!holder) return false;
-    if (lv_async_call(apply_queued_password_dispatch, holder) == LV_RESULT_OK) return true;
-    delete holder;
-    return false;
 }
 
 void key_event_impl(lv_event_t *event)
@@ -893,9 +804,7 @@ bool run_passwordless(std::vector<std::string> argv, int exec_timeout_ms, std::f
 #endif
 }
 
-} // namespace
-
-extern "C" int cp0_sudo_run_argv_async_ex(const char *const *argv,
+int run_argv_async(const char *const *argv,
     cp0_sudo_callback_thread_t callback_thread, cp0_sudo_output_cb_t output_cb,
     cp0_sudo_complete_cb_t complete_cb, void *user, int auth_timeout_ms,
     int exec_timeout_ms, uint64_t *request_id)
@@ -911,7 +820,7 @@ extern "C" int cp0_sudo_run_argv_async_ex(const char *const *argv,
     });
 }
 
-extern "C" int cp0_sudo_cancel(uint64_t request_id)
+int cancel_request(uint64_t request_id)
 {
     return cp0_sudo::invoke_c_api([&] {
         if (!sudo_running()) return -ESHUTDOWN;
@@ -922,6 +831,8 @@ extern "C" int cp0_sudo_cancel(uint64_t request_id)
         return 0;
     });
 }
+
+} // namespace
 
 extern "C" void init_sudo_signals(void)
 {
@@ -960,14 +871,14 @@ extern "C" void init_sudo_signals(void)
             return;
         }
         uint64_t request_id = 0;
-        int ret = cp0_sudo_run_argv_async_ex(argv.data(), CP0_SUDO_CALLBACK_LVGL, nullptr,
+        int ret = run_argv_async(argv.data(), CP0_SUDO_CALLBACK_LVGL, nullptr,
             signal_request_complete, context, auth_timeout_ms, exec_timeout_ms, &request_id);
         if (ret != 0) delete context;
         if (started) started(ret, request_id);
     }),
         cp0::bind_signal(cp0_signal_sudo_cancel,
             [](uint64_t request_id, std::function<void(int)> done) {
-        int ret = cp0_sudo_cancel(request_id);
+        int ret = cancel_request(request_id);
         if (done) done(ret);
     }),
         cp0::bind_signal(cp0_signal_system_admin_async,
@@ -1105,7 +1016,6 @@ extern "C" void deinit_sudo(void) noexcept
             g_timer = nullptr;
         }
         destroy_prompt();
-        clear_queued_password();
         {
             std::lock_guard<std::mutex> lifecycle_lock(g_sudo_lifecycle_mutex);
             if (g_workers == workers) g_workers.reset();

@@ -13,8 +13,6 @@
 
 eventpp::CallbackList<void(std::list<std::string>, std::function<void(int, std::string)>)>
     cp0_signal_pty_api;
-eventpp::CallbackList<void(std::list<std::string>, std::function<void(int, std::string)>)>
-    cp0_signal_config_api;
 
 extern "C" void init_pty(void);
 extern "C" void deinit_pty(void) noexcept;

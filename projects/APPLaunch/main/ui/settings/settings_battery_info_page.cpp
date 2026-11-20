@@ -172,11 +172,6 @@ struct LvSettingBatteryInfoPage3::State {
     std::string read_time = "--";
 };
 
-LvSettingBatteryInfoPage3::LvSettingBatteryInfoPage3()
-    : state_(std::make_unique<State>(this))
-{
-}
-
 LvSettingBatteryInfoPage3::LvSettingBatteryInfoPage3(
     lv_obj_t *parent,
     const NodeIter &parent_node,

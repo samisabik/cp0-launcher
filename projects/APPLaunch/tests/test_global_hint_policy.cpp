@@ -14,12 +14,6 @@
 #ifndef KEY_RIGHTSHIFT
 #define KEY_RIGHTSHIFT 54
 #endif
-#ifndef KEY_COMPOSE
-#define KEY_COMPOSE 127
-#endif
-#ifndef KEY_FN
-#define KEY_FN 0x1d0
-#endif
 #ifndef KEY_MUTE
 #define KEY_MUTE 113
 #endif
@@ -40,47 +34,40 @@ int main()
 {
     const GlobalHintPolicy policy;
 
-    assert(policy.action_for({KEY_BRIGHTNESSDOWN, nullptr, true}) ==
+    assert(policy.action_for({KEY_BRIGHTNESSDOWN, true}) ==
            GlobalHintAction::BRIGHTNESS_DOWN);
-    assert(policy.action_for({KEY_VOLUMEUP, nullptr, false, true}) ==
+    assert(policy.action_for({KEY_VOLUMEUP, false, true}) ==
            GlobalHintAction::VOLUME_UP);
-    assert(policy.action_for({KEY_MUTE, nullptr, false, true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_MUTE, nullptr, true}) == GlobalHintAction::TOGGLE_MUTE);
+    assert(policy.action_for({KEY_MUTE, false, true}) == GlobalHintAction::NONE);
+    assert(policy.action_for({KEY_MUTE, true}) == GlobalHintAction::TOGGLE_MUTE);
 
-    assert(policy.action_for({KEY_S, nullptr, true, false, true, true}) ==
+    assert(policy.action_for({KEY_S, true, false, true, true}) ==
            GlobalHintAction::TAKE_SCREENSHOT);
-    assert(policy.action_for({KEY_S, nullptr, true, false, true, false}) ==
+    assert(policy.action_for({KEY_S, true, false, true, false}) ==
            GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_S, nullptr, false, true, true, true}) ==
+    assert(policy.action_for({KEY_S, false, true, true, true}) ==
            GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_SYSRQ, "Print", true}) ==
+    assert(policy.action_for({KEY_SYSRQ, true}) ==
            GlobalHintAction::TAKE_SCREENSHOT);
-    assert(policy.action_for({KEY_PRINT, "Print", true}) ==
+    assert(policy.action_for({KEY_PRINT, true}) ==
            GlobalHintAction::TAKE_SCREENSHOT);
-    assert(policy.action_for({KEY_SYSRQ, "Print", false}) == GlobalHintAction::NONE);
+    assert(policy.action_for({KEY_SYSRQ, false}) == GlobalHintAction::NONE);
 
-    assert(policy.action_for({KEY_F10, nullptr, true, false, false, false, true}) ==
+    assert(policy.action_for({KEY_F10, true, false, false, false, true}) ==
            GlobalHintAction::RESET_LCD);
-    assert(policy.action_for({KEY_F10, nullptr, true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_F10, nullptr, false, true, false, false, true}) ==
+    assert(policy.action_for({KEY_F10, true}) == GlobalHintAction::NONE);
+    assert(policy.action_for({KEY_F10, false, true, false, false, true}) ==
            GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_F10, nullptr, false, false, false, false, true}) ==
+    assert(policy.action_for({KEY_F10, false, false, false, false, true}) ==
            GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_F10, nullptr, true, false, true, false, true}) ==
+    assert(policy.action_for({KEY_F10, true, false, true, false, true}) ==
            GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_F10, nullptr, true, false, false, true, true}) ==
+    assert(policy.action_for({KEY_F10, true, false, false, true, true}) ==
            GlobalHintAction::NONE);
 
-    assert(policy.action_for({KEY_LEFTSHIFT, nullptr, true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_RIGHTSHIFT, nullptr, true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_COMPOSE, nullptr, true}) ==
-           GlobalHintAction::SHOW_LOCK_HINT);
-    assert(policy.action_for({999, "Multi_key", true}) == GlobalHintAction::SHOW_LOCK_HINT);
-    assert(policy.action_for({999, "SYM", true}) == GlobalHintAction::SHOW_LOCK_HINT);
-    assert(policy.action_for({999, "sym", true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({999, "SYM", false}) == GlobalHintAction::NONE);
-    assert(policy.action_for({KEY_FN, "SYM", true}) == GlobalHintAction::NONE);
-    assert(policy.action_for({999, nullptr, true}) == GlobalHintAction::NONE);
+    assert(policy.action_for({KEY_LEFTSHIFT, true}) == GlobalHintAction::NONE);
+    assert(policy.action_for({KEY_RIGHTSHIFT, true}) == GlobalHintAction::NONE);
+    assert(policy.action_for({999, true}) == GlobalHintAction::NONE);
 
     assert(GlobalHintScreenshotPolicy::should_save(0));
     assert(!GlobalHintScreenshotPolicy::should_save(-1));

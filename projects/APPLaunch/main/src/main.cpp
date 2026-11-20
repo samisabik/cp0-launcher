@@ -10,15 +10,8 @@
 #include "ui/ui.h"
 #include "ui/ui_lockscreen.h"
 
-#include <cstdlib>
 #include <string>
 #include <utility>
-
-#if CONFIG_BACKWARD_CPP_ENABLED
-#define BACKWARD_HAS_DW 1
-#include "backward.hpp"
-#include "backward.h"
-#endif
 
 int main(void)
 {

@@ -34,8 +34,6 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingStaticInfoPage3();
-
     LvSettingStaticInfoPage3(lv_obj_t *parent,
                              const NodeIter &page_node,
                              std::function<void()> back_callback,

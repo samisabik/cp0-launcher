@@ -219,14 +219,6 @@ bool LvSettingBrightnessPage3::BrightnessWriteResult::succeeded() const noexcept
     return status == BrightnessWriteStatus::Ok;
 }
 
-LvSettingBrightnessPage3::LvSettingBrightnessPage3() = default;
-
-LvSettingBrightnessPage3::LvSettingBrightnessPage3(lv_obj_t *parent, const NodeIter &parent_node)
-    : LvSettingValuePage3Base(parent_node, {})
-{
-    initialize_page(parent, {});
-}
-
 LvSettingBrightnessPage3::LvSettingBrightnessPage3(lv_obj_t *parent,
                                                    const NodeIter &parent_node,
                                                    std::function<void()> back_callback)
@@ -319,7 +311,7 @@ void LvSettingBrightnessPage3::create_status_label()
     lv_obj_set_width(status_label_, metric(LayoutMetric::StatusLabelW));
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(
-        status_label_, settings_fonts::sans(11), LV_PART_MAIN);
+        status_label_, settings_fonts::font(11), LV_PART_MAIN);
     lv_obj_set_style_text_color(status_label_, lv_color_hex(cp0::theme::kWarn), LV_PART_MAIN);
     lv_obj_set_pos(status_label_, metric(LayoutMetric::StatusLabelX), metric(LayoutMetric::StatusLabelY));
     lv_label_set_text(status_label_, "");

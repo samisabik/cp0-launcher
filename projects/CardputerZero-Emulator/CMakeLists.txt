@@ -38,14 +38,6 @@ endif()
 # ---------------------------------------------------------------------------
 # SDL2 + Freetype
 # ---------------------------------------------------------------------------
-if(APPLE)
-    if(EXISTS "/opt/homebrew/opt/sdl2")
-        list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/sdl2")
-    elseif(EXISTS "/usr/local/opt/sdl2")
-        list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/sdl2")
-    endif()
-endif()
-
 find_package(SDL2 QUIET)
 if(NOT SDL2_FOUND)
     find_package(PkgConfig REQUIRED)
@@ -116,8 +108,6 @@ endif()
 # Targets
 # ===========================================================================
 
-option(EMU_SKIP_APPLAUNCH "Skip APPLaunch" OFF)
-
 file(GLOB_RECURSE APPLAUNCH_UI_C CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.c)
 file(GLOB_RECURSE APPLAUNCH_UI_CPP CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.cpp)
 file(GLOB CP0_LVGL_COMMON_SRCS CONFIGURE_DEPENDS
@@ -136,8 +126,6 @@ file(GLOB CP0_LVGL_SDL_SRCS CONFIGURE_DEPENDS
 # ---------------------------------------------------------------------------
 # APP: APPLaunch shared lib
 # ---------------------------------------------------------------------------
-if(NOT EMU_SKIP_APPLAUNCH)
-
 add_library(APPLaunch SHARED
     ${APPLAUNCH_UI_C}
     ${APPLAUNCH_UI_CPP}
@@ -157,33 +145,17 @@ target_include_directories(APPLaunch PRIVATE
 )
 target_compile_definitions(APPLaunch PRIVATE HAL_PLATFORM_SDL=1)
 target_compile_options(APPLaunch PRIVATE -Wno-c++11-narrowing)
-if(APPLE)
-    target_link_options(APPLaunch PRIVATE -undefined dynamic_lookup)
-else()
-    target_link_options(APPLaunch PRIVATE -Wl,--unresolved-symbols=ignore-all)
-endif()
-endif() # NOT EMU_SKIP_APPLAUNCH
+target_link_options(APPLaunch PRIVATE -Wl,--unresolved-symbols=ignore-all)
 
 # ---------------------------------------------------------------------------
 # Emulator executable
 # ---------------------------------------------------------------------------
 add_executable(cardputer-zero-emu src/main.cpp)
-add_dependencies(cardputer-zero-emu lvgl lvgl_thorvg)
-if(TARGET APPLaunch)
-    add_dependencies(cardputer-zero-emu APPLaunch)
-endif()
-if(APPLE OR UNIX)
-    set_target_properties(cardputer-zero-emu PROPERTIES ENABLE_EXPORTS ON)
-endif()
-if(APPLE)
-    target_link_libraries(cardputer-zero-emu PRIVATE util)
-endif()
-# The SDL keyboard implementation depends on Linux headers (linux/input.h).
-if(UNIX AND NOT APPLE)
-    target_sources(cardputer-zero-emu PRIVATE ${CP0_LVGL_SDL_SRCS})
-    target_compile_definitions(cardputer-zero-emu PRIVATE HAL_PLATFORM_SDL=1)
-    target_link_options(cardputer-zero-emu PRIVATE -Wl,--allow-multiple-definition)
-endif()
+add_dependencies(cardputer-zero-emu lvgl lvgl_thorvg APPLaunch)
+set_target_properties(cardputer-zero-emu PROPERTIES ENABLE_EXPORTS ON)
+target_sources(cardputer-zero-emu PRIVATE ${CP0_LVGL_SDL_SRCS})
+target_compile_definitions(cardputer-zero-emu PRIVATE HAL_PLATFORM_SDL=1)
+target_link_options(cardputer-zero-emu PRIVATE -Wl,--allow-multiple-definition)
 
 target_include_directories(cardputer-zero-emu PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -197,16 +169,9 @@ target_include_directories(cardputer-zero-emu PRIVATE
 target_compile_options(cardputer-zero-emu PRIVATE -Wno-c++11-narrowing)
 
 # Force-load LVGL for dlopen'd apps
-if(APPLE)
-    target_link_libraries(cardputer-zero-emu PRIVATE
-        -Wl,-force_load,$<TARGET_FILE:lvgl>
-        -Wl,-force_load,$<TARGET_FILE:lvgl_thorvg>
-    )
-else()
-    target_link_libraries(cardputer-zero-emu PRIVATE
-        -Wl,--whole-archive $<TARGET_FILE:lvgl> $<TARGET_FILE:lvgl_thorvg> -Wl,--no-whole-archive
-    )
-endif()
+target_link_libraries(cardputer-zero-emu PRIVATE
+    -Wl,--whole-archive $<TARGET_FILE:lvgl> $<TARGET_FILE:lvgl_thorvg> -Wl,--no-whole-archive
+)
 
 # SDL2
 if(TARGET SDL2::SDL2)
@@ -230,7 +195,6 @@ if(SDL2_IMAGE_FOUND)
     target_link_libraries(cardputer-zero-emu PRIVATE ${SDL2_IMAGE_LINK_LIBRARIES})
     target_link_directories(cardputer-zero-emu PRIVATE ${SDL2_IMAGE_LIBRARY_DIRS})
 else()
-    target_link_directories(cardputer-zero-emu PRIVATE /opt/homebrew/lib)
     target_link_libraries(cardputer-zero-emu PRIVATE SDL2_image)
 endif()
 
@@ -239,7 +203,6 @@ if(FREETYPE_FOUND AND FREETYPE_LINK_LIBRARIES)
     target_link_libraries(cardputer-zero-emu PRIVATE ${FREETYPE_LINK_LIBRARIES})
     target_link_directories(cardputer-zero-emu PRIVATE ${FREETYPE_LIBRARY_DIRS})
 else()
-    target_link_directories(cardputer-zero-emu PRIVATE /opt/homebrew/lib)
     target_link_libraries(cardputer-zero-emu PRIVATE freetype)
 endif()
 
@@ -262,10 +225,8 @@ add_custom_command(TARGET cardputer-zero-emu POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/assets/device_skin.png $<TARGET_FILE_DIR:cardputer-zero-emu>/assets/device_skin.png
     COMMENT "Copying apps and resources"
 )
-if(TARGET APPLaunch)
-    add_custom_command(TARGET APPLaunch POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/apps
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:APPLaunch> ${CMAKE_CURRENT_BINARY_DIR}/apps/
-        COMMENT "Copying APPLaunch"
-    )
-endif()
+add_custom_command(TARGET APPLaunch POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/apps
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:APPLaunch> ${CMAKE_CURRENT_BINARY_DIR}/apps/
+    COMMENT "Copying APPLaunch"
+)

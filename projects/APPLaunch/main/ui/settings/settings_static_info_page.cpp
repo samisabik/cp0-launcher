@@ -59,8 +59,6 @@ const char *build_commit()
 
 } // namespace
 
-LvSettingStaticInfoPage3::LvSettingStaticInfoPage3() = default;
-
 LvSettingStaticInfoPage3::LvSettingStaticInfoPage3(
     lv_obj_t *parent,
     const NodeIter &,
@@ -193,7 +191,7 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
                 lv_label_set_long_mode(body_label, LV_LABEL_LONG_WRAP);
                 lv_label_set_text(body_label, body_text.c_str());
                 lv_obj_set_style_text_color(body_label, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
-                lv_obj_set_style_text_font(body_label, settings_fonts::cjk_sans(11), LV_PART_MAIN);
+                lv_obj_set_style_text_font(body_label, settings_fonts::font(11), LV_PART_MAIN);
                 lv_obj_update_layout(body_label);
                 lv_obj_update_layout(scroll_body_);
             }
@@ -206,7 +204,7 @@ void LvSettingStaticInfoPage3::create_ui(lv_obj_t *parent)
                                         metric(LayoutMetric::ContentX),
                                         y,
                                         cp0::theme::kText,
-                                        settings_fonts::cjk_sans(11),
+                                        settings_fonts::font(11),
                                         true);
             if (!label) break;
             line_labels_.push_back(label);

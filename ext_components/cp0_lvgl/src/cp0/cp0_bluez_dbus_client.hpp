@@ -15,7 +15,6 @@
 namespace cp0_bluez_dbus {
 
 using Completion = std::function<void(int, const std::string &)>;
-using SnapshotListener = std::function<void()>;
 
 struct AgentRequest {
     uint64_t id = 0;
@@ -31,7 +30,6 @@ using AgentListener = std::function<void(const AgentRequest &)>;
 
 void initialize();
 void shutdown();
-void subscribe(SnapshotListener listener);
 void set_agent_listener(AgentListener listener);
 void agent_reply(uint64_t id, bool accepted, const std::string &text);
 

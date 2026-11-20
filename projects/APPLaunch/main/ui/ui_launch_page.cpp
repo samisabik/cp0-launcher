@@ -38,6 +38,7 @@ constexpr std::size_t kNameColumns = 9;
 constexpr lv_coord_t kFooterRuleY = 133;
 constexpr lv_coord_t kFooterY = 136;
 constexpr uint32_t kIconSize = 24;
+constexpr const char *kFallbackIcon = "app";
 
 UILaunchPage *active_launch_page = nullptr;
 lv_group_t *home_input_group = nullptr;
@@ -54,12 +55,12 @@ std::string app_slug(const std::string &name)
 std::string line_icon_path(const std::string &name)
 {
     static const std::set<std::string> kKnown = {
-        "adsb", "air", "audio", "cli", "files", "fox", "ip_panel", "ir", "keys", "micro",
+        "adsb", "air", "audio", "cli", "files", "fox", "ip_panel", "ir", "keys",
         "pins", "portal", "power", "python", "rec", "sat", "sdr", "sensors", "settings", "slime",
         "spectrum", "ssh", "tailnet", "tracker",
     };
     const std::string slug = app_slug(name);
-    return launcher_platform::path("line/" + (kKnown.count(slug) ? slug : std::string("app")) + ".png");
+    return launcher_platform::path("line/" + (kKnown.count(slug) ? slug : std::string(kFallbackIcon)) + ".png");
 }
 
 lv_obj_t *plain_obj(lv_obj_t *parent)
@@ -219,7 +220,7 @@ void UILaunchPage::reload_home_icons(const std::vector<std::string> &app_names)
         icon_paths_.push_back(line_icon_path(name));
 
     HomeIconBufferPool replacement;
-    replacement.rebuild(icon_paths_, kIconSize);
+    replacement.rebuild(icon_paths_, launcher_platform::path(std::string("line/") + kFallbackIcon + ".png"), kIconSize);
     // Detach the images before the old buffers are released.
     for (Tile &tile : tiles_)
         if (tile.icon) lv_image_set_src(tile.icon, nullptr);
