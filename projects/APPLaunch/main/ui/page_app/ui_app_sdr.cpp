@@ -185,6 +185,26 @@ void UISdrPage::create_ui()
         lv_obj_set_style_text_line_space(list_, 4, 0);
     }
 
+    menu_ = cp0::ui::panel(ui_APP_Container, 4, 19, 312, 132).box;
+    if (menu_) {
+        cp0::ui::set_text(cp0::ui::label(menu_, 8, 4, cp0::theme::kDim), "bands  MHz", cp0::theme::kDim);
+        for (int i = 0; i < kMenuCount; ++i) {
+            menu_rows_[i] = cp0::ui::box(menu_, 6 + (i / kMenuRows) * 152, 22 + (i % kMenuRows) * 18, 148, 15,
+                                         cp0::theme::kSelect);
+            if (!menu_rows_[i]) continue;
+            menu_names_[i] = cp0::ui::label(menu_rows_[i], 4, 2, kColorText);
+            menu_ranges_[i] = cp0::ui::label(menu_rows_[i], 62, 2, kColorIdle);
+            if (menu_ranges_[i]) {
+                lv_obj_set_width(menu_ranges_[i], 82);
+                lv_obj_set_style_text_align(menu_ranges_[i], LV_TEXT_ALIGN_RIGHT, 0);
+            }
+            const sdr::Band &band = sdr::kBands[static_cast<std::size_t>(i)];
+            const std::string name = (i < 9 ? std::to_string(i + 1) : std::string(" ")) + " " + band.label;
+            if (menu_names_[i]) lv_label_set_text(menu_names_[i], name.c_str());
+            if (menu_ranges_[i]) lv_label_set_text(menu_ranges_[i], sdr::band_range(band).c_str());
+        }
+        lv_obj_add_flag(menu_, LV_OBJ_FLAG_HIDDEN);
+    }
 
     hint_ = cp0::ui::footer(ui_APP_Container);
 }
@@ -377,6 +397,53 @@ void UISdrPage::retune()
     render();
 }
 
+void UISdrPage::jump_to_band(int index)
+{
+    if (index < 0 || index >= kMenuCount) return;
+    const sdr::Band &band = sdr::kBands[static_cast<std::size_t>(index)];
+    center_hz_ = band.hz;
+    demod_ = band.demod;
+    span_hz_ = band.span_hz;
+    step_index_ = band.step_index;
+    menu_open_ = false;
+    show_message(std::string(band.label) + " " + sdr::format_hz(center_hz_));
+    retune();
+}
+
+void UISdrPage::render_menu()
+{
+    if (!menu_) return;
+    if (menu_open_)
+        lv_obj_remove_flag(menu_, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(menu_, LV_OBJ_FLAG_HIDDEN);
+    if (!menu_open_) return;
+    for (int i = 0; i < kMenuCount; ++i) {
+        if (!menu_rows_[i]) continue;
+        const bool on = i == menu_selection_;
+        const lv_opa_t opa = on ? LV_OPA_COVER : LV_OPA_TRANSP;
+        if (lv_obj_get_style_bg_opa(menu_rows_[i], LV_PART_MAIN) != opa) lv_obj_set_style_bg_opa(menu_rows_[i], opa, 0);
+        if (menu_names_[i]) cp0::ui::set_text_color(menu_names_[i], on ? kColorAccent : kColorText);
+    }
+}
+
+void UISdrPage::handle_menu_key(uint32_t key)
+{
+    if (key == KEY_TAB || key == KEY_ESC) {
+        menu_open_ = false;
+    } else if (key == KEY_ENTER || key == KEY_KPENTER) {
+        jump_to_band(menu_selection_);
+        return;
+    } else if (key == KEY_UP || key == KEY_DOWN) {
+        menu_selection_ = (menu_selection_ + (key == KEY_DOWN ? 1 : kMenuCount - 1)) % kMenuCount;
+    } else if (key == KEY_LEFT || key == KEY_RIGHT) {
+        menu_selection_ = (menu_selection_ + kMenuRows) % kMenuCount;
+    } else {
+        return;
+    }
+    render();
+}
+
 void UISdrPage::set_mode(Mode mode)
 {
     if (mode == mode_) return;
@@ -503,13 +570,17 @@ void UISdrPage::render()
         lv_label_set_text(list_, body.c_str());
     }
 
-    if (!present_)
-        cp0::ui::set_footer(hint_, {{"tab", "mode"}});
+    render_menu();
+    if (menu_open_)
+        cp0::ui::set_footer(hint_, {{"arrows", "pick"}, {"ent", "jump"}, {"1-9", "direct"}, {"tab", "close"}});
+    else if (!present_)
+        cp0::ui::set_footer(hint_, {{"tab", "bands"}, {"d", scope ? "decode" : "scope"}});
     else if (scope)
-        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"m", "demod"}, {"o", audio_out_ ? "mute" : "unmute"},
-                                    {"up/dn", "step"}, {"s", "span"}, {"g", "gain"}});
+        cp0::ui::set_footer(hint_, {{"tab", "bands"}, {"< >", "tune"}, {"m", "demod"},
+                                    {"o", audio_out_ ? "mute" : "unmute"}, {"s", "span"}, {"g", "gain"}});
     else
-        cp0::ui::set_footer(hint_, {{"< >", "tune"}, {"ent", "start"}, {"s", "save"}, {"tab", "mode"}});
+        cp0::ui::set_footer(hint_, {{"tab", "bands"}, {"ent", decoding_ ? "stop" : "start"}, {"s", "save"},
+                                    {"d", "scope"}});
 }
 
 void UISdrPage::timer_cb(lv_timer_t *timer) noexcept
@@ -575,11 +646,25 @@ void UISdrPage::event_cb(lv_event_t *event) noexcept
 void UISdrPage::handle_key(uint32_t key, bool repeat)
 {
     if (repeat && key != KEY_LEFT && key != KEY_RIGHT) return;
+    if (key >= KEY_1 && key <= KEY_9) {
+        jump_to_band(static_cast<int>(key - KEY_1));
+        return;
+    }
+    if (menu_open_) {
+        if (!repeat) handle_menu_key(key);
+        return;
+    }
     if (key == KEY_ESC) {
         if (navigate_home) navigate_home();
         return;
     }
     if (key == KEY_TAB) {
+        menu_selection_ = sdr::band_near(center_hz_);
+        menu_open_ = true;
+        render();
+        return;
+    }
+    if (key == KEY_D) {
         set_mode(mode_ == Mode::Scope ? Mode::Decode : Mode::Scope);
         return;
     }
@@ -605,19 +690,6 @@ void UISdrPage::handle_key(uint32_t key, bool repeat)
         render();
         return;
     }
-    if (key >= KEY_1 && key <= KEY_6) {
-        const std::size_t index = key - KEY_1;
-        if (index < sdr::kPresets.size()) {
-            const sdr::Preset &preset = sdr::kPresets[index];
-            center_hz_ = preset.hz;
-            demod_ = preset.demod;
-            span_hz_ = preset.span_hz;
-            show_message(std::string(preset.label) + " " + sdr::format_hz(center_hz_));
-            retune();
-        }
-        return;
-    }
-
     if (mode_ == Mode::Scope) {
         if (key == KEY_S) {
             span_hz_ = span_hz_ >= 2000000u ? 1000000u : span_hz_ >= 1000000u ? 500000u : span_hz_ >= 500000u ? 250000u : 2000000u;

@@ -28,7 +28,7 @@ The home screen lists the app types in a rail on the left and shows the apps of 
 
 ### Radio
 
-- **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker.
+- **SDR**: RTL-SDR scope and waterfall with in-app WFM/NFM/AM demodulation to the speaker. `tab` opens a band menu that jumps to FM, AM, air, marine and other bands.
 - **ADSB**: aircraft scope and flight list decoded from `rtl_adsb` on 1090 MHz. Range and bearing use the position in `~/.config/cp0/location` (one line, `lat,lon`).
 - **Sat**: pass predictor and sky plot from Celestrak TLEs, for the ISS and Meteor-M by default and anything named in `~/sat/watch.txt`; records a pass as FM audio with `rtl_fm`. The orbit model is a simplified one, not SGP4.
 - **Sensors**: dashboard of the 433 and 868 MHz temperature and humidity sensors that `rtl_433` decodes. `r` picks the radio: the CC1101 (default, OOK sensors) or an RTL-SDR dongle (also FSK sensors).

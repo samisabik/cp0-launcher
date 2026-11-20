@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
-#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -57,6 +57,31 @@ uint32_t clamp_hz(int64_t hz)
     if (hz < kMinHz) return kMinHz;
     if (hz > kMaxHz) return kMaxHz;
     return static_cast<uint32_t>(hz);
+}
+
+int band_near(uint32_t hz)
+{
+    int best = 0;
+    uint32_t best_gap = UINT32_MAX;
+    for (std::size_t i = 0; i < kBands.size(); ++i) {
+        const Band &band = kBands[i];
+        const uint32_t gap = hz < band.low_hz ? band.low_hz - hz : hz > band.high_hz ? hz - band.high_hz : 0;
+        if (gap < best_gap) {
+            best_gap = gap;
+            best = static_cast<int>(i);
+        }
+    }
+    return best;
+}
+
+std::string band_range(const Band &band)
+{
+    char text[32];
+    if (band.low_hz == band.high_hz)
+        std::snprintf(text, sizeof(text), "%g", band.low_hz / 1e6);
+    else
+        std::snprintf(text, sizeof(text), "%g-%g", band.low_hz / 1e6, band.high_hz / 1e6);
+    return text;
 }
 
 std::string format_mhz(uint32_t hz)
