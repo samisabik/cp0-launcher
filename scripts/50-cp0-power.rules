@@ -1,0 +1,12 @@
+// Let members of sudo power off and reboot from the launcher.  APPLaunch runs
+// as a systemd user service without an active seat session, so logind's
+// default policy asks for interactive authentication and refuses.
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.reboot" ||
+         action.id == "org.freedesktop.login1.reboot-multiple-sessions") &&
+        subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+});
