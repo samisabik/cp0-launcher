@@ -91,7 +91,6 @@ void test_refresh_is_asynchronous()
     assert(!state.pending);
     assert(state.known);
     assert(state.connected);
-    assert(state.last_request_succeeded);
     assert(!controller.request_refresh());
     assert(controller.snapshot().connected);
 }
@@ -108,7 +107,6 @@ void test_failed_refresh_is_unknown()
     assert(!state.pending);
     assert(!state.known);
     assert(!state.connected);
-    assert(!state.last_request_succeeded);
 }
 
 void test_toggle_is_asynchronous_and_rejects_duplicates()
@@ -151,7 +149,6 @@ void test_toggle_is_asynchronous_and_rejects_duplicates()
     assert(!complete.pending);
     assert(complete.connected);
     assert(complete.known);
-    assert(complete.last_request_succeeded);
     assert((operations == std::vector<Operation>{Operation::Connect, Operation::QueryState}));
 }
 
@@ -179,7 +176,6 @@ void test_failed_action_rolls_back_to_verified_state()
     assert(!state.connected);
     assert(state.known);
     assert(!state.pending);
-    assert(!state.last_request_succeeded);
 }
 
 void test_unknown_verification_fails_closed()
@@ -204,7 +200,6 @@ void test_unknown_verification_fails_closed()
     assert(!state.pending);
     assert(!state.known);
     assert(!state.connected);
-    assert(!state.last_request_succeeded);
 }
 
 void test_failed_verification_is_unknown()
@@ -229,7 +224,6 @@ void test_failed_verification_is_unknown()
     assert(!state.connected);
     assert(!state.known);
     assert(!state.pending);
-    assert(!state.last_request_succeeded);
 }
 
 void test_failed_action_and_verification_are_unknown()
@@ -258,7 +252,6 @@ void test_failed_action_and_verification_are_unknown()
     assert(!state.connected);
     assert(!state.known);
     assert(!state.pending);
-    assert(!state.last_request_succeeded);
 }
 
 void test_verified_actual_state_wins()
@@ -282,7 +275,6 @@ void test_verified_actual_state_wins()
     assert(query_count == 2);
     assert(!state.connected);
     assert(state.known);
-    assert(!state.last_request_succeeded);
 }
 
 void test_destructor_joins_an_active_worker()

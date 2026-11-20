@@ -42,16 +42,6 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ:
     DEFINITIONS_PRIVATE = []
     LDFLAGS = []
     LINK_SEARCH_PATH = []
-    services = ['AUDIO', 'BATTERY', 'BQ27220', 'CONFIG', 'FILESYSTEM', 'OSINFO', 'PROCESS', 'PTY',
-                'SCREENSHOT', 'SETTINGS', 'WIFI', 'SUDO', 'BLUETOOTH', 'SAVED_SETTINGS']
-
-    def service_enabled(name):
-        return 'CONFIG_CP0_LVGL_INIT_' + name in os.environ
-
-    for name in services:
-        if service_enabled(name):
-            DEFINITIONS += ['-DCONFIG_CP0_LVGL_INIT_' + name + '=1']
-
     SRCS += Glob('src/*.c*')
     if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
         DEFINITIONS += ['-DHAL_PLATFORM_SDL=1']
@@ -71,10 +61,7 @@ if "CONFIG_CP0_LVGL_COMPONENT_ENABLED" in os.environ:
         PRIVATE_INCLUDE += [toolchain_path('usr', 'include', 'dbus-1.0'),
                             toolchain_path('usr', 'lib', env.get('GCC_DUMPMACHINE', ''), 'dbus-1.0', 'include')]
 
-    for source in platform_srcs:
-        if 'audio' in str(source).lower() and not service_enabled('AUDIO'):
-            continue
-        SRCS.append(source)
+    SRCS += platform_srcs
 
     env["COMPONENTS"].append(
         {

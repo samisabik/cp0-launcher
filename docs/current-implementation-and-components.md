@@ -76,11 +76,10 @@ and `src/sdl/sdl_lvgl_keyboard.c` in simulation, before APPLaunch setup.
 The setup callback does not register another event. Native navigation uses
 `LV_EVENT_KEY`; text, modifiers and press/release/repeat use the custom event.
 
-## Optional services
+## Platform services
 
-`ext_components/cp0_lvgl/Kconfig` lists the optional services as
-`CP0_LVGL_INIT_*` options. The SConstruct file maps enabled services to
-compile definitions. Native builds additionally use
+`ext_components/cp0_lvgl` always builds every service; `src/cp0_init_plan.h`
+lists them in start order. Native builds additionally use
 DBus/GIO/GLib, NetworkManager, BlueZ, udev and xkbcommon; SDL builds
 select the SDL platform sources.
 

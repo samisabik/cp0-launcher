@@ -136,14 +136,6 @@ public:
         return count;
     }
 
-    void subscribe(cp0_bluez_dbus::SnapshotListener listener)
-    {
-        if (!ensure_started())
-            return;
-        std::lock_guard<std::mutex> lock(listener_mutex_);
-        listeners_.push_back(std::move(listener));
-    }
-
     void command(const char *kind, const char *value, cp0_bluez_dbus::Completion completion)
     {
         if (!ensure_started()) {
@@ -247,8 +239,6 @@ private:
     std::atomic<uint64_t> command_generation_{1};
     GCancellable *command_cancellable_ = g_cancellable_new();
     bool resetting_ = false;
-    std::mutex listener_mutex_;
-    std::vector<cp0_bluez_dbus::SnapshotListener> listeners_;
 
     static const GDBusInterfaceVTable &agent_vtable()
     {
@@ -473,7 +463,6 @@ private:
                 self->manager_ = nullptr;
             }
             self->clear_cache();
-            self->publish();
             return;
         }
         if (!self->manager_ || !self->agent_registered_)
@@ -498,7 +487,6 @@ private:
         for (GList *node = interfaces; node; node = node->next)
             self->update_interface(G_DBUS_OBJECT_PROXY(object), G_DBUS_PROXY(node->data));
         g_list_free_full(interfaces, g_object_unref);
-        self->publish();
     }
 
     static void object_removed(GDBusObjectManager *, GDBusObject *object, GDBusInterface *interface, gpointer user_data)
@@ -527,7 +515,6 @@ private:
                 self->snapshot_.status = {};
             }
         }
-        self->publish();
     }
 
     void sync_objects()
@@ -542,7 +529,6 @@ private:
             g_list_free_full(interfaces, g_object_unref);
         }
         g_list_free_full(objects, g_object_unref);
-        publish();
     }
 
     void update_interface(GDBusObjectProxy *, GDBusProxy *proxy)
@@ -588,7 +574,6 @@ private:
                 }
             }
         }
-        publish();
     }
 
     void connect_proxy(GDBusProxy *proxy)
@@ -615,7 +600,6 @@ private:
                     self->read_device(proxy, found->second.value);
             }
         }
-        self->publish();
     }
 
     static std::string string_property(GDBusProxy *proxy, const char *name)
@@ -669,17 +653,6 @@ private:
         device.paired = int_property(proxy, "Paired");
         device.trusted = int_property(proxy, "Trusted");
         device.rssi = int_property(proxy, "RSSI", 0);
-    }
-
-    void publish()
-    {
-        std::vector<cp0_bluez_dbus::SnapshotListener> listeners;
-        {
-            std::lock_guard<std::mutex> lock(listener_mutex_);
-            listeners = listeners_;
-        }
-        for (auto &listener : listeners)
-            if (listener) listener();
     }
 
     void clear_cache()
@@ -1259,7 +1232,6 @@ namespace cp0_bluez_dbus {
 
 void initialize() { worker().start(); }
 void shutdown() { worker().stop(); }
-void subscribe(SnapshotListener listener) { worker().subscribe(std::move(listener)); }
 void set_agent_listener(AgentListener listener) { worker().set_agent_listener(std::move(listener)); }
 void agent_reply(uint64_t id, bool accepted, const std::string &text) { worker().agent_reply(id, accepted, text); }
 cp0_bt_status_t status() { return worker().status(); }

@@ -15,7 +15,6 @@ struct SettingsStorageInfo {
     bool valid = false;
     std::uintmax_t total_bytes = 0;
     std::uintmax_t available_bytes = 0;
-    std::string mount_path;
 };
 
 enum class SettingsMmcDeviceType : std::uint8_t {

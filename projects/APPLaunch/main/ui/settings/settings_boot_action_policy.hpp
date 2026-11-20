@@ -16,17 +16,12 @@ enum class Action {
     Shutdown,
 };
 
-enum class Operation {
-    Reboot,
-    Shutdown,
-};
-
 struct Presentation
 {
     std::string_view label;
 };
 
 const Presentation &presentation(Action action);
-const char *process_command(Operation operation) noexcept;
+const char *process_command(Action action) noexcept;
 
 } // namespace settings_t12b::boot_actions

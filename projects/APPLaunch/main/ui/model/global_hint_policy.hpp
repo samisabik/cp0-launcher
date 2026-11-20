@@ -18,12 +18,10 @@ enum class GlobalHintAction {
     TOGGLE_MUTE,
     TAKE_SCREENSHOT,
     RESET_LCD,
-    SHOW_LOCK_HINT,
 };
 
 struct GlobalHintKeyInput {
     uint32_t key_code = 0;
-    const char *symbol_name = nullptr;
     bool pressed = false;
     bool repeated = false;
     bool control = false;

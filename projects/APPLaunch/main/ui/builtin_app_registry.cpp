@@ -15,8 +15,6 @@
 #include "launcher_platform.hpp"
 #include "python_terminal_help.hpp"
 #include "settings/settings_page.hpp"
-#include <array>
-#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -115,17 +113,6 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
 #endif
 };
 
-bool is_first_registration(std::size_t index)
-{
-    const char *id = BUILTIN_APPS[index].desc.config_key;
-    if (!id || !id[0]) return false;
-    for (std::size_t previous = 0; previous < index; ++previous) {
-        const char *previous_id = BUILTIN_APPS[previous].desc.config_key;
-        if (previous_id && std::strcmp(id, previous_id) == 0) return false;
-    }
-    return true;
-}
-
 } // namespace
 
 const AppDescriptor *launcher_app_registry_entries(std::size_t *count)
@@ -133,8 +120,7 @@ const AppDescriptor *launcher_app_registry_entries(std::size_t *count)
     static const std::vector<AppDescriptor> descriptors = [] {
         std::vector<AppDescriptor> result;
         result.reserve(sizeof(BUILTIN_APPS) / sizeof(BUILTIN_APPS[0]));
-        for (std::size_t index = 0; index < sizeof(BUILTIN_APPS) / sizeof(BUILTIN_APPS[0]); ++index)
-            if (is_first_registration(index)) result.push_back(BUILTIN_APPS[index].desc);
+        for (const auto &registration : BUILTIN_APPS) result.push_back(registration.desc);
         return result;
     }();
     if (count) *count = descriptors.size();
@@ -143,11 +129,8 @@ const AppDescriptor *launcher_app_registry_entries(std::size_t *count)
 
 void launcher_append_enabled_builtin_apps(std::list<app> &apps)
 {
-    for (std::size_t index = 0; index < sizeof(BUILTIN_APPS) / sizeof(BUILTIN_APPS[0]); ++index) {
-        if (!is_first_registration(index)) continue;
-        const auto &registration = BUILTIN_APPS[index];
+    for (const auto &registration : BUILTIN_APPS)
         if (launcher_app_registry_is_enabled(registration.desc)) append_builtin_app(apps, registration);
-    }
 }
 
 void launcher_sort_app_display_order(std::list<app> &apps)

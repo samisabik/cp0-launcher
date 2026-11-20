@@ -62,7 +62,6 @@ int main()
     const SettingsStorageInfo mixed = SettingsStorageModel::read_from_mount_table(
         mixed_mmc_mounts, probe_from(mixed_spaces), type_probe_from(mixed_types));
     assert(mixed.valid);
-    assert(mixed.mount_path == "/media/SD Card");
     assert(mixed.total_bytes == 32768);
     assert(mixed.available_bytes == 24576);
 
@@ -85,7 +84,6 @@ int main()
     const SettingsStorageInfo separate = SettingsStorageModel::read_from_mount_table(
         partitioned_sd_mounts, probe_from(separate_spaces), type_probe_from(sd_types));
     assert(separate.valid);
-    assert(separate.mount_path == "/media/SD Data");
     assert(separate.total_bytes == 32768);
     assert(separate.available_bytes == 24576);
 

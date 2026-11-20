@@ -108,43 +108,6 @@ const char *kbd_state_name(int state)
     }
 }
 
-/* ============================================================
- *  Debug: dump all ASCII printable + letter + digit mappings once
- *  Call on startup so we can see how each key_code maps to utf8.
- * ============================================================ */
-#ifdef __linux__
-void kbd_dump_keymap_table(void)
-{
-    /* Linux evdev KEY_* values we care about: 2..53 covers 1..0 qwerty zxcvbnm */
-    static const struct { uint32_t code; const char *name; } keys[] = {
-        {KEY_1,"1"},{KEY_2,"2"},{KEY_3,"3"},{KEY_4,"4"},{KEY_5,"5"},
-        {KEY_6,"6"},{KEY_7,"7"},{KEY_8,"8"},{KEY_9,"9"},{KEY_0,"0"},
-        {KEY_Q,"q"},{KEY_W,"w"},{KEY_E,"e"},{KEY_R,"r"},{KEY_T,"t"},
-        {KEY_Y,"y"},{KEY_U,"u"},{KEY_I,"i"},{KEY_O,"o"},{KEY_P,"p"},
-        {KEY_A,"a"},{KEY_S,"s"},{KEY_D,"d"},{KEY_F,"f"},{KEY_G,"g"},
-        {KEY_H,"h"},{KEY_J,"j"},{KEY_K,"k"},{KEY_L,"l"},
-        {KEY_Z,"z"},{KEY_X,"x"},{KEY_C,"c"},{KEY_V,"v"},{KEY_B,"b"},
-        {KEY_N,"n"},{KEY_M,"m"},
-        {KEY_MINUS,"-"},{KEY_EQUAL,"="},{KEY_LEFTBRACE,"["},{KEY_RIGHTBRACE,"]"},
-        {KEY_SEMICOLON,";"},{KEY_APOSTROPHE,"'"},{KEY_GRAVE,"`"},
-        {KEY_BACKSLASH,"\\"},{KEY_COMMA,","},{KEY_DOT,"."},{KEY_SLASH,"/"},
-        {KEY_SPACE,"SPACE"},{KEY_ENTER,"ENTER"},{KEY_ESC,"ESC"},
-        {KEY_BACKSPACE,"BS"},{KEY_TAB,"TAB"},
-        {KEY_UP,"UP"},{KEY_DOWN,"DOWN"},{KEY_LEFT,"LEFT"},{KEY_RIGHT,"RIGHT"},
-        {KEY_HOME,"HOME"},{KEY_END,"END"},{KEY_DELETE,"DEL"},{KEY_INSERT,"INS"},
-        {KEY_LEFTSHIFT,"LSHIFT"},{KEY_LEFTCTRL,"LCTRL"},{KEY_LEFTALT,"LALT"},
-    };
-    SLOGD("[KBD] ==== evdev key_code -> label table ====");
-    for (size_t i = 0; i < sizeof(keys)/sizeof(keys[0]); i++) {
-        SLOGD("[KBD]   code=%3u  %s", keys[i].code, keys[i].name);
-    }
-    SLOGD("[KBD] ==== end ====");
-    fflush(stdout);
-}
-#else
-void kbd_dump_keymap_table(void) {}
-#endif
-
 static const char *getenv_default(const char *name, const char *dflt)
 {
     const char *value = getenv(name);
@@ -162,7 +125,7 @@ static atomic_uint keyboard_input_context_generation = 1;
 
 void cp0_keyboard_set_input_context(cp0_keyboard_input_context_t context)
 {
-    if (context < KBD_INPUT_CONTEXT_NAVIGATION || context > KBD_INPUT_CONTEXT_GAME)
+    if (context < KBD_INPUT_CONTEXT_NAVIGATION || context > KBD_INPUT_CONTEXT_TEXT)
         context = KBD_INPUT_CONTEXT_NAVIGATION;
     const int previous = atomic_exchange_explicit(
         &keyboard_input_context, context, memory_order_acq_rel);

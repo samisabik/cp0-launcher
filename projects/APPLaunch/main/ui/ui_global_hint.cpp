@@ -9,17 +9,9 @@
  *
  * Global shortcut dispatcher and transient on-screen hints.
  *
- * Behavior:
- *   (a) ESC held continuously for >= 0.5s -> show
- *       "Hold ESC 3s to return home". Short taps (released
- *       before 0.5s) show nothing, so a quick "back" press inside
- *       an app no longer flashes the return-home toast.
- *   (b) Single press of SYM (physical "SYM" key on the M5
- *       CardputerZero; currently best-effort mapped) -> show
- *       "Double-tap to lock" for ~1.5s. Synthetic Shift events are
- *       ignored because they do not identify the physical key gesture.
- *
- *   Fn key is intentionally NOT hinted (no lock feature yet).
+ * ESC held continuously for >= 0.5s shows "Hold ESC 3s to return home".
+ * Short taps show nothing, so a quick "back" press inside an app does not
+ * flash the toast.
  *
  * The toast object is created lazily on first call as a child of
  * lv_layer_top(), so it floats above any screen. It is never deleted
@@ -86,7 +78,6 @@ void on_key(const struct key_item *elm) noexcept
     static const GlobalHintPolicy policy;
     const GlobalHintAction action = policy.action_for({
         elm->key_code,
-        elm->sym_name,
         elm->key_state == KBD_KEY_PRESSED,
         elm->key_state == KBD_KEY_REPEATED,
         (elm->mods & KBD_MOD_CTRL) != 0,
@@ -142,9 +133,6 @@ void on_key(const struct key_item *elm) noexcept
             }
             return;
         }
-        case GlobalHintAction::SHOW_LOCK_HINT:
-            show_hint("Double-tap to lock");
-            return;
         case GlobalHintAction::NONE:
         default:
             return;
@@ -154,9 +142,4 @@ void on_key(const struct key_item *elm) noexcept
 }
 
 } // namespace ui_global_hint
-
-extern "C" void ui_global_hint_on_key(const struct key_item *elm) noexcept
-{
-    ui_global_hint::on_key(elm);
-}
 

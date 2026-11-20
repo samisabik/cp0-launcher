@@ -11,6 +11,7 @@ on:
       - '.github/workflows/launcher-build.yml'
       - 'scripts/50-cp0-wifi-scan.rules'
       - 'scripts/device_install.sh'
+      - 'scripts/make_sysroot.sh'
       - 'scripts/package_release.sh'
   pull_request:
     branches: [main]
@@ -162,8 +163,7 @@ jobs:
     - name: Install cross-compilation toolchain
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-          libfreetype-dev libpng-dev
+        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
     - name: Install Python build dependencies
       run: pip install scons parse requests tqdm

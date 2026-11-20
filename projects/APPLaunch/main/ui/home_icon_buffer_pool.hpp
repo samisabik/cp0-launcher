@@ -21,7 +21,10 @@ public:
     HomeIconBufferPool(const HomeIconBufferPool &) = delete;
     HomeIconBufferPool &operator=(const HomeIconBufferPool &) = delete;
 
-    void rebuild(const std::vector<std::string> &icon_paths, uint32_t size);
+    // Decodes every icon at size x size pixels. find() returns the icon at
+    // fallback_path for a path that failed to decode, or nullptr when the
+    // fallback failed too.
+    void rebuild(const std::vector<std::string> &icon_paths, const std::string &fallback_path, uint32_t size);
     const lv_image_dsc_t *find(const std::string &path) const;
     void swap(HomeIconBufferPool &other) noexcept;
 
@@ -37,4 +40,5 @@ private:
     static const lv_image_dsc_t *as_image(const DrawBufferPtr &buffer);
 
     std::unordered_map<std::string, DrawBufferPtr> icons_;
+    std::string fallback_path_;
 };

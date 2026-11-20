@@ -102,27 +102,6 @@ void wait_for_lvgl()
 #endif
 }
 
-void stop_audio() noexcept
-{
-#ifdef CONFIG_CP0_LVGL_INIT_AUDIO
-    deinit_audio();
-#endif
-}
-
-void stop_pty() noexcept
-{
-#ifdef CONFIG_CP0_LVGL_INIT_PTY
-    deinit_pty();
-#endif
-}
-
-void stop_sudo() noexcept
-{
-#ifdef CONFIG_CP0_LVGL_INIT_SUDO
-    deinit_sudo();
-#endif
-}
-
 } // namespace
 
 extern "C" void cp0_lvgl_wake_from_c(void)
@@ -172,7 +151,7 @@ int cp0_lvgl_run(Cp0LvglRunOptions options)
         }
         lv_timer_handler_set_resume_cb(nullptr, nullptr);
         cp0::runner::shutdown_services(
-            stop_sudo, stop_audio, stop_pty,
+            deinit_sudo, deinit_audio, deinit_pty,
             deinit_input, deinit_wifi, deinit_battery, lv_deinit);
         std::lock_guard<std::mutex> lock(runner_mutex);
         semaphore_ready = false;
@@ -209,11 +188,9 @@ int cp0_lvgl_run(Cp0LvglRunOptions options)
         lv_obj_invalidate(lv_screen_active());
         lv_refr_now(nullptr);
 
-        while (!options.should_quit || !options.should_quit()) {
+        for (;;) {
             const bool input_pending = input_pump && input_pump();
             uint32_t milliseconds = lv_timer_handler();
-            if (options.should_quit && options.should_quit())
-                break;
             if (input_pending)
                 milliseconds = std::min<uint32_t>(milliseconds, kInputRetryMs);
             if (milliseconds == LV_NO_TIMER_READY)
@@ -221,8 +198,6 @@ int cp0_lvgl_run(Cp0LvglRunOptions options)
             else
                 wait_for_lvgl(milliseconds);
         }
-
-        return cleanup(true) ? 1 : 0;
     } catch (...) {
         std::fprintf(stderr, "cp0_lvgl: runner callback threw an exception\n");
         cleanup(setup_attempted);

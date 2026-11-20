@@ -6,10 +6,6 @@
 
 #include "cp0_process_commands.hpp"
 
-#include "cp0_lvgl_app.h"
-#include "hal_lvgl_bsp.h"
-#include "../cp0_sync_signal.hpp"
-
 #include <cerrno>
 #include <algorithm>
 #include <chrono>
@@ -62,17 +58,9 @@ bool is_nologin_shell(const char *shell)
            std::strstr(shell, "/bin/false") != nullptr;
 }
 
-std::string configured_run_user()
+std::string default_run_user()
 {
     std::string user;
-    cp0::signal::invoke_noexcept([&] { cp0_signal_config_api({"GetStr", "run_as_user", ""},
-                          [&](int code, std::string data) {
-                              if (code == 0)
-                                  user = std::move(data);
-                          }); });
-    if (!user.empty())
-        return user;
-
     struct passwd *pwd;
     setpwent();
     while ((pwd = getpwent()) != nullptr) {
@@ -206,7 +194,7 @@ void exec_shell_as_configured_user(const char *command)
 {
     if (!command || !command[0])
         _exit(127);
-    const std::string user = configured_run_user();
+    const std::string user = default_run_user();
     if (getuid() == 0 && user != "root") {
         struct passwd *pwd = getpwnam(user.c_str());
         if (!pwd || initgroups(pwd->pw_name, pwd->pw_gid) != 0 ||

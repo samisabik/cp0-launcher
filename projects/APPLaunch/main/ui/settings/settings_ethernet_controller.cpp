@@ -98,7 +98,6 @@ bool Controller::start_refresh(std::chrono::steady_clock::time_point now)
     std::lock_guard<std::mutex> lock(mutex_);
     if (generation_ == generation) {
         pending_ = false;
-        last_request_succeeded_ = false;
         next_refresh_allowed_ = std::chrono::steady_clock::now() + kRefreshCooldown;
     }
     return false;
@@ -119,7 +118,6 @@ void Controller::finish_refresh(std::uint64_t generation, CommandResult result) 
         known_ = false;
     }
     pending_ = false;
-    last_request_succeeded_ = succeeded;
     next_refresh_allowed_ = std::chrono::steady_clock::now() + kRefreshCooldown;
 }
 
@@ -139,16 +137,13 @@ bool Controller::toggle()
         desired = !connected_;
         connected_ = desired;
         pending_ = true;
-        last_request_succeeded_ = false;
         generation = ++generation_;
         if (generation_ == 0) generation = generation_ = 1;
     }
 
     if (tasks_.start([this, generation, desired] {
-            const CommandResult command_result =
-                execute(desired ? Operation::Connect : Operation::Disconnect);
-            const CommandResult state_result = execute(Operation::QueryState);
-            finish_toggle(generation, desired, command_result, state_result);
+            execute(desired ? Operation::Connect : Operation::Disconnect);
+            finish_toggle(generation, execute(Operation::QueryState));
         }))
         return true;
 
@@ -162,10 +157,7 @@ bool Controller::toggle()
     return false;
 }
 
-void Controller::finish_toggle(std::uint64_t generation,
-                               bool desired,
-                               CommandResult command_result,
-                               CommandResult state_result) noexcept
+void Controller::finish_toggle(std::uint64_t generation, CommandResult state_result) noexcept
 {
     bool actual = false;
     const bool state_verified =
@@ -181,15 +173,13 @@ void Controller::finish_toggle(std::uint64_t generation,
         known_ = false;
     }
     pending_ = false;
-    last_request_succeeded_ =
-        command_result.code == 0 && state_verified && actual == desired;
     next_refresh_allowed_ = std::chrono::steady_clock::now() + kRefreshCooldown;
 }
 
 Snapshot Controller::snapshot() const noexcept
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    return {connected_, known_, pending_, last_request_succeeded_, generation_};
+    return {connected_, known_, pending_, generation_};
 }
 
 void Controller::wait_for_idle() noexcept

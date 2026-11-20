@@ -7,7 +7,6 @@
 #include "home_icon_buffer_pool.hpp"
 
 #include "lvgl/src/draw/lv_image_decoder_private.h"
-#include "home_icon_fallback.h"
 #include "sample_log.h"
 
 #include <algorithm>
@@ -77,10 +76,14 @@ void HomeIconBufferPool::DrawBufferDeleter::operator()(lv_draw_buf_t *buffer) co
     if (buffer) lv_draw_buf_destroy(buffer);
 }
 
-void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths, uint32_t size)
+void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths, const std::string &fallback_path,
+                                 uint32_t size)
 {
     icons_.clear();
-    icons_.reserve(icon_paths.size());
+    icons_.reserve(icon_paths.size() + 1);
+    fallback_path_ = fallback_path;
+    if (DrawBufferPtr fallback = decode_and_prepare(fallback_path, size))
+        icons_.emplace(fallback_path, std::move(fallback));
 
     for (const std::string &path : icon_paths) {
         if (path.empty() || icons_.find(path) != icons_.end()) continue;
@@ -96,13 +99,15 @@ void HomeIconBufferPool::rebuild(const std::vector<std::string> &icon_paths, uin
 
 const lv_image_dsc_t *HomeIconBufferPool::find(const std::string &path) const
 {
-    const auto found = icons_.find(path);
-    return found == icons_.end() ? &home_icon_fallback : as_image(found->second);
+    auto found = icons_.find(path);
+    if (found == icons_.end()) found = icons_.find(fallback_path_);
+    return found == icons_.end() ? nullptr : as_image(found->second);
 }
 
 void HomeIconBufferPool::swap(HomeIconBufferPool &other) noexcept
 {
     icons_.swap(other.icons_);
+    fallback_path_.swap(other.fallback_path_);
 }
 
 HomeIconBufferPool::DrawBufferPtr

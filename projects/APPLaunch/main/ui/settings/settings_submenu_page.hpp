@@ -60,10 +60,7 @@ public:
 
     void LeaveNextPage() override;
 
-    LvSettingRollerPage2();
     ~LvSettingRollerPage2();
-
-    LvSettingRollerPage2(lv_obj_t *parent, const NodeIter &parent_node);
 
     LvSettingRollerPage2(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback);
 

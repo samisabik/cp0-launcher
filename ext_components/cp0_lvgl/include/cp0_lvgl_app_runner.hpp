@@ -16,7 +16,6 @@ struct Cp0LvglRunOptions
 {
     std::function<void()> after_resource_init;
     std::function<bool()> setup;
-    std::function<bool()> should_quit;
     std::function<void()> teardown;
 };
 

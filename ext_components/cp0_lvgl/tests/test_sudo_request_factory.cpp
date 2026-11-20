@@ -39,7 +39,6 @@ int main()
     assert(built.request->auth_timeout_ms == 1200);
     assert(built.request->exec_timeout_ms == 3400);
     assert(built.request->queue_timeout_ms == cp0_sudo::kDefaultQueueTimeoutMs);
-    assert(!built.request->use_login_shell);
 
     auto defaults = factory.create_argv(argv, CP0_SUDO_CALLBACK_LVGL,
         nullptr, nullptr, nullptr, 0, 0);

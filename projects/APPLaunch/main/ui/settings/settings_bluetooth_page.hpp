@@ -267,8 +267,6 @@ public:
         CursorHeight = 18,
     };
 
-    LvSettingBluetoothAliasPage3();
-
     // Writes the hostname on a worker thread; returns an empty string or an error.
     using DeviceNameWriter = std::function<std::string(const std::string &)>;
 
@@ -308,8 +306,6 @@ private:
                                   int width,
                                   uint32_t color,
                                   const lv_font_t *font);
-
-    static const lv_font_t *input_font(uint16_t size);
 
     static std::size_t previous_utf8_start(const std::string &value, std::size_t cursor);
 

@@ -33,7 +33,6 @@ struct Snapshot {
     bool connected = false;
     bool known = false;
     bool pending = false;
-    bool last_request_succeeded = false;
     std::uint64_t generation = 0;
 };
 
@@ -60,17 +59,13 @@ private:
     CommandResult execute(Operation operation) noexcept;
     bool start_refresh(std::chrono::steady_clock::time_point now);
     void finish_refresh(std::uint64_t generation, CommandResult result) noexcept;
-    void finish_toggle(std::uint64_t generation,
-                       bool desired,
-                       CommandResult command_result,
-                       CommandResult state_result) noexcept;
+    void finish_toggle(std::uint64_t generation, CommandResult state_result) noexcept;
 
     Executor executor_;
     mutable std::mutex mutex_;
     bool connected_ = false;
     bool known_ = false;
     bool pending_ = false;
-    bool last_request_succeeded_ = false;
     std::uint64_t generation_ = 1;
     std::chrono::steady_clock::time_point next_refresh_allowed_{};
     SettingsAsyncTaskRegistry tasks_;

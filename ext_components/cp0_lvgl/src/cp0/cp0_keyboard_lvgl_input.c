@@ -38,11 +38,6 @@ static void keypad_delete_cb(lv_event_t *event)
         &keypad_lifecycle, lv_event_get_user_data(event));
 }
 
-__attribute__((weak)) void ui_global_hint_on_key(const struct key_item *item)
-{
-    (void)item;
-}
-
 __attribute__((weak)) int ui_lockscreen_filter_key(const struct key_item *item)
 {
     (void)item;
@@ -132,8 +127,6 @@ static void keypad_read(lv_indev_t *indev, lv_indev_data_t *data)
                 lv_obj_send_event(root, (lv_event_code_t)LV_EVENT_KEYBOARD, item);
             if (global_key_handler)
                 global_key_handler(item);
-            else
-                ui_global_hint_on_key(item);
 
             if (!intercept) {
                 const uint32_t semantic_key = item->semantic_key

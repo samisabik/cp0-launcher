@@ -59,10 +59,6 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingDarkTimePage3();
-
-    LvSettingDarkTimePage3(lv_obj_t *parent, const NodeIter &parent_node);
-
     LvSettingDarkTimePage3(lv_obj_t *parent,
                            const NodeIter &parent_node,
                            std::function<void()> back_callback);

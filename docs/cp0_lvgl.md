@@ -8,13 +8,13 @@ Important headers:
 
 - `include/hal_lvgl_bsp.h`: C++ signal declarations and `cp0_file_path`.
 - `include/signal_register_plan.h`: the complete `cp0_signal_*` signature list.
-- `include/cp0_lvgl_app.h`: C ABI for resource paths, network, Wi-Fi, shutdown, sudo, battery, backlight, and time text.
+- `include/cp0_lvgl_app.h`: C ABI for resource paths, network, Wi-Fi, shutdown, battery, backlight, and time text.
 - `include/cp0_lvgl_app_runner.hpp`: LVGL runner.
 - `include/ui_app_page.hpp`: page bases and page startup.
 
 Signals are global eventpp `CallbackList` objects. Request signals normally take `std::list<std::string>`: element zero is the command and the final argument is usually `std::function<void(int, std::string)>`. A callback receives `(code, data)`; `code == 0` is success and a negative code is an error. `data` may be empty, text, line records, or binary struct bytes. Do not assume the callback runs on the calling thread, and do not let callback exceptions escape.
 
-Call `cp0_lvgl_init()` before using services; `cp0_lvgl_run()` does this automatically. Kconfig options named `CONFIG_CP0_LVGL_INIT_*` select services and `cp0_init_plan` controls their order. A disabled service has no usable implementation.
+Call `cp0_lvgl_init()` before using services; `cp0_lvgl_run()` does this automatically. Every service is initialized in the order of `cp0_init_step_t` in `src/cp0_init_plan.h`.
 
 ```cpp
 cp0_signal_wifi_api({"Status"}, [](int code, std::string payload) {
@@ -31,13 +31,12 @@ Prefer the C wrappers in `cp0_lvgl_app.h` when one exists; they validate argumen
 struct Cp0LvglRunOptions {
     std::function<void()> after_resource_init;
     std::function<bool()> setup;
-    std::function<bool()> should_quit;
     std::function<void()> teardown;
 };
 int cp0_lvgl_run(Cp0LvglRunOptions options = {});
 ```
 
-The runner supports one successful run per process. Its order is `lv_init`, `cp0_lvgl_init`, `after_resource_init`, `setup`, the LVGL timer loop, `teardown`, and service cleanup. A false `setup`, an exception, or a missing display returns 1. `should_quit` ends the loop.
+The runner supports one successful run per process. Its order is `lv_init`, `cp0_lvgl_init`, `after_resource_init`, `setup`, the LVGL timer loop, `teardown`, and service cleanup. A false `setup`, an exception, or a missing display returns 1. The loop runs until the process exits; `teardown` runs when `setup` fails or a callback throws.
 
 `AppPageRoot` owns an LVGL screen and input group. `AppPage` adds the standard content container `ui_APP_Container` and top bar; `reclaim_top_bar()` hides the bar and grows the container to the full screen. Load a page with `cp0_lvgl_start_app_page(AppPageRoot&)`. Create and destroy page objects on the LVGL thread. The standard top bar is 20 px high.
 
@@ -75,12 +74,6 @@ int cp0_wifi_radio_set_enabled(int enabled);
 
 `cp0_system_shutdown` requests a power-off through the `Shutdown` process command. `cp0_desktop_exec_is_safe(exec, reason, reason_size)` returns 1 when a desktop entry's `Exec` passes the launch policy and otherwise 0 with a reason. Processes are started and stopped through `cp0_signal_process_api`.
 
-### Sudo C API
-
-`cp0_sudo_run_argv_async_ex` accepts an argv, a callback-thread selection, output callback, completion callback, user pointer, `auth_timeout_ms`, `exec_timeout_ms`, and an output `request_id`. `cp0_sudo_cancel(request_id)` is idempotent while the id is retained; unknown or expired ids return `-ENOENT`.
-
-`CP0_SUDO_CALLBACK_LVGL` delivers output and completion on the LVGL thread; `CP0_SUDO_CALLBACK_WORKER` calls them on a worker. Output is ordered and LVGL delivery has bounded backpressure, so callbacks must return quickly. Completion results are `CP0_SUDO_RESULT_SUCCESS`, `AUTH_FAILED`, `EXEC_FAILED`, `CANCELLED`, or `TIMED_OUT`, together with the process exit code.
-
 ### Battery, backlight, and time
 
 `cp0_battery_read` reads the latest background snapshot and performs no hardware I/O; use it only when `valid == 1`. Battery units are mV, mA, 0.1 C, mAh, and percent SOC. `cp0_backlight_write` writes a raw brightness value and returns the value written or -1. `cp0_time_str` writes the current time as `HH:MM`.
@@ -95,7 +88,7 @@ All `args` below are `std::list<std::string>` with the command at element zero. 
 
 ### PTY
 
-`cp0_signal_pty_api` commands are `Open executable [columns] [rows] [argv...]` (default 80x24, returns a numeric handle), `Read handle [max_read]` (default 4096, max 1 MiB; code is byte count), `Write handle data` (code is byte count), `CheckChild handle` (code 0 running, 1 exited; data is exit code), and `Close handle`. Handles are not PIDs. Linux children use `TERM=vt100` and may drop privileges according to `run_as_user`; teardown kills remaining children.
+`cp0_signal_pty_api` commands are `Open executable [columns] [rows] [argv...]` (default 80x24, returns a numeric handle), `Read handle [max_read]` (default 4096, max 1 MiB; code is byte count), `Write handle data` (code is byte count), `CheckChild handle` (code 0 running, 1 exited; data is exit code), and `Close handle`. Handles are not PIDs. Linux children use `TERM=vt100` and, when the launcher runs as root, drop to the first regular user; teardown kills remaining children.
 
 ### Configuration
 
@@ -134,7 +127,7 @@ Commands are `Status`, `Scan [0..32]`, `Connect ssid [password]`, `ConnectHidden
 
 ### Sudo signals
 
-`cp0_signal_sudo_argv_async` takes `(argv, auth_timeout_ms, exec_timeout_ms, complete, started)`. `started(ret, request_id)` arrives first; on success `ret == 0` and the id is nonzero. `complete(result_code, exit_code)` then arrives once. Cancel with `cp0_signal_sudo_cancel(request_id, done)`; `done(0)` means cancellation was accepted.
+`cp0_signal_sudo_argv_async` takes `(argv, auth_timeout_ms, exec_timeout_ms, complete, started)`. `complete` runs on the LVGL thread with a result of 0 success, 1 authentication failed, 2 execution failed, 3 cancelled, or 4 timed out, plus the process exit code. `started(ret, request_id)` arrives first; on success `ret == 0` and the id is nonzero. `complete(result_code, exit_code)` then arrives once. Cancel with `cp0_signal_sudo_cancel(request_id, done)`; `done(0)` means cancellation was accepted.
 
 `cp0_signal_system_admin_async` has the same signature but only accepts `NtpSet 0|1`, `TimezoneSet zone`, `TailscaleSet 0|1`, `SshSet 0|1` (`systemctl enable|disable --now ssh`), `HostnameSet name` (1..63 of `A-Za-z0-9-`, no leading or trailing `-`; also rewrites the `127.0.1.1` line of `/etc/hosts`), `MicGainSet 0..14`, and `TimeSet YYYY-MM-DD HH:MM:SS`. The allow-list lives in `src/cp0_admin_command.hpp`. Invalid arguments call only `started(-EINVAL, 0)` and do not produce a completion callback. Keep request ids and cancel them when a UI workflow leaves or times out.
 

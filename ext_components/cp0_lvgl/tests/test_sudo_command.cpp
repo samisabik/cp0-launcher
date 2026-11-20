@@ -24,18 +24,12 @@ int main()
     }));
 
     const std::vector<std::string> arguments = {"/usr/bin/fixed-helper", "install"};
-    const auto execution = cp0_sudo::execution_command(arguments, false, "/bin/sh");
+    const auto execution = cp0_sudo::execution_command(arguments);
     assert((execution == std::vector<std::string>{
         "/usr/bin/sudo", "-S", "--",
         "/usr/bin/fixed-helper", "install",
     }));
     assert(std::find(execution.begin(), execution.end(), "-n") == execution.end());
-
-    const auto shell = cp0_sudo::execution_command({"fixed command"}, true, "/bin/bash");
-    assert((shell == std::vector<std::string>{
-        "/usr/bin/sudo", "-S", "--",
-        "/bin/bash", "-c", "fixed command",
-    }));
 
     assert((cp0_sudo::passwordless_probe_command() == std::vector<std::string>{"/usr/bin/sudo", "-n", "true"}));
     assert((cp0_sudo::passwordless_command({"tailscale", "down"}) ==

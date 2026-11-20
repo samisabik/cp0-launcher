@@ -60,15 +60,8 @@ public:
         return static_cast<int>(value);
     }
 
-    LvSettingWifiScanPage3();
-
-    LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback);
-
     LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback,
-                           bool hidden_network);
-
-    LvSettingWifiScanPage3(lv_obj_t *parent, const NodeIter &parent_node, std::function<void()> back_callback,
-                           bool hidden_network, bool wifi_power_enabled);
+                           bool wifi_power_enabled);
 
     void AnimateNextIn(std::function<void()> animate_over_func) override;
     void AnimateNextOut(std::function<void()> animate_over_func) override;
@@ -133,8 +126,6 @@ private:
 
     static lv_obj_t *create_label(lv_obj_t *parent, const char *text, int x, int y, uint32_t color,
                                   const lv_font_t *font);
-
-    static const lv_font_t *input_font(uint16_t size);
 
     static const char *scan_error_message(int result);
 

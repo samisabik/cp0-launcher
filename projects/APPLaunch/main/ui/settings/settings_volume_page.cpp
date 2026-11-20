@@ -194,14 +194,6 @@ public:
 
 } // namespace
 
-LvSettingVolumePage3::LvSettingVolumePage3() = default;
-
-LvSettingVolumePage3::LvSettingVolumePage3(lv_obj_t *parent, const NodeIter &parent_node)
-    : LvSettingValuePage3Base(parent_node, {})
-{
-    initialize_page(parent, {});
-}
-
 LvSettingVolumePage3::LvSettingVolumePage3(lv_obj_t *parent,
                                            const NodeIter &parent_node,
                                            std::function<void()> back_callback)

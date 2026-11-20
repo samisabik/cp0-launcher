@@ -8,8 +8,6 @@
 
 #include <utility>
 
-LvSettingBluetoothScanPage3::LvSettingBluetoothScanPage3() = default;
-
 LvSettingBluetoothScanPage3::LvSettingBluetoothScanPage3(
     lv_obj_t *parent,
     const NodeIter &parent_node,

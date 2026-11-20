@@ -13,10 +13,9 @@
 int main()
 {
     using settings_t12b::boot_actions::Action;
-    using settings_t12b::boot_actions::Operation;
     assert(settings_t12b::boot_actions::presentation(Action::Reboot).label == "reboot");
     assert(settings_t12b::boot_actions::presentation(Action::Shutdown).label == "shutdown");
-    assert(std::string(settings_t12b::boot_actions::process_command(Operation::Reboot)) == "Reboot");
+    assert(std::string(settings_t12b::boot_actions::process_command(Action::Reboot)) == "Reboot");
 
     const auto credit = settings_t12b::about_help::credit();
     assert(credit.title == "licenses");

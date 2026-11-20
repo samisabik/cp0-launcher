@@ -10,20 +10,10 @@
 
 namespace settings_fonts {
 
-// Settings text uses the launcher UI font.
-inline const lv_font_t *sans(uint16_t size)
-{
-    return cp0_fonts().get_chrome(size);
-}
-
-inline const lv_font_t *mono(uint16_t size)
-{
-    return cp0_fonts().get_chrome(size);
-}
-
-// User strings (SSIDs, device names) also use the pixel font, falling back to
-// DejaVu Sans. No CJK font ships, so CJK glyphs do not render.
-inline const lv_font_t *cjk_sans(uint16_t size)
+// Settings text, including user strings (SSIDs, device names), uses the
+// launcher UI font, falling back to DejaVu Sans. No CJK font ships, so CJK
+// glyphs do not render.
+inline const lv_font_t *font(uint16_t size)
 {
     return cp0_fonts().get_chrome(size);
 }

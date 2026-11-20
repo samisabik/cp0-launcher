@@ -37,18 +37,10 @@ inline std::vector<std::string> passwordless_command(const std::vector<std::stri
     return command;
 }
 
-inline std::vector<std::string> execution_command(const std::vector<std::string> &arguments,
-                                                  bool use_login_shell,
-                                                  const std::string &shell)
+inline std::vector<std::string> execution_command(const std::vector<std::string> &arguments)
 {
     std::vector<std::string> command = {"/usr/bin/sudo", "-S", "--"};
-    if (use_login_shell) {
-        command.push_back(shell);
-        command.push_back("-c");
-        command.push_back(arguments.front());
-    } else {
-        command.insert(command.end(), arguments.begin(), arguments.end());
-    }
+    command.insert(command.end(), arguments.begin(), arguments.end());
     return command;
 }
 

@@ -180,7 +180,6 @@ SettingsStorageInfo SettingsStorageModel::read_from_mount_table(
                 true,
                 capacity,
                 available,
-                mount.path,
             };
             if (!best.valid || candidate.total_bytes > best.total_bytes ||
                 (candidate.total_bytes == best.total_bytes &&

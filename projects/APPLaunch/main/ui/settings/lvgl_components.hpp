@@ -428,16 +428,6 @@ private:
     bool async_dispatch_unavailable_ = false;
 };
 
-#if defined(LVGL_COMPONENTS_ENABLE_EXAMPLES)
-
-#endif
-
-#if defined(LVGL_COMPONENTS_ENABLE_EXAMPLES)
-#endif
-
-#if defined(LVGL_COMPONENTS_ENABLE_EXAMPLES)
-#endif
-
 class LvSettingValuePage3Base : public DComponens::LvglComponensBase {
 public:
     struct ActivationSink {
@@ -479,8 +469,6 @@ public:
     }
 
     int32_t selected_index = 0;
-
-    LvSettingValuePage3Base() = default;
 
     void AnimateNextIn(std::function<void()> animate_over_func) override
     {
@@ -526,7 +514,7 @@ public:
         }
 
         lv_obj_set_style_text_font(
-            label, settings_fonts::mono(distance == 0 ? 22 : kCp0ChromeFontSize), LV_PART_MAIN);
+            label, settings_fonts::font(distance == 0 ? 22 : kCp0ChromeFontSize), LV_PART_MAIN);
         lv_obj_set_style_text_color(label, lv_color_hex(color), LV_PART_MAIN);
         lv_obj_set_style_opa(label, distance >= 3 ? LV_OPA_50 : LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -859,7 +847,7 @@ protected:
         title_label_ = lv_label_create(ComponensObj);
         if (title_label_) {
             lv_label_set_text(title_label_, parent_node_->label.c_str());
-            lv_obj_set_style_text_font(title_label_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+            lv_obj_set_style_text_font(title_label_, settings_fonts::font(kCp0ChromeFontSize), LV_PART_MAIN);
             lv_obj_set_style_text_color(title_label_, lv_color_hex(cp0::theme::kIdle), LV_PART_MAIN);
             lv_obj_set_style_text_align(title_label_, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
             update_title_position();
@@ -878,7 +866,7 @@ protected:
         if (hint_) {
             lv_label_set_text(hint_, "ent set");
             lv_obj_set_style_text_color(hint_, lv_color_hex(cp0::theme::kDim), LV_PART_MAIN);
-            lv_obj_set_style_text_font(hint_, settings_fonts::mono(kCp0ChromeFontSize), LV_PART_MAIN);
+            lv_obj_set_style_text_font(hint_, settings_fonts::font(kCp0ChromeFontSize), LV_PART_MAIN);
             lv_obj_update_layout(hint_);
             lv_obj_set_pos(hint_, metric(LayoutMetric::ScreenW) - 6 - lv_obj_get_width(hint_),
                            metric(LayoutMetric::ScreenH) - lv_obj_get_height(hint_) - 1);

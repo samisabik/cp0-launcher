@@ -1366,7 +1366,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
         if (reset_pending_) {
             create_label(ComponensObj, "restarting bluetooth...", cp0::theme::kPadX,
                          CP0_ENUM_CAST_INT(LayoutMetric::MessageY), text_w,
-                         cp0::theme::kAccent, settings_fonts::sans(11));
+                         cp0::theme::kAccent, settings_fonts::font(11));
             return;
         }
 
@@ -1380,7 +1380,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                          CP0_ENUM_CAST_INT(LayoutMetric::MessageY),
                          text_w,
                          cp0::theme::kAccent,
-                         settings_fonts::sans(11));
+                         settings_fonts::font(11));
             chips = pair_cleanup_pending_
                 ? std::vector<cp0::ui::Chip>{{"b", "reset"}}
                 : std::vector<cp0::ui::Chip>{{"b", "reset"}, {"esc", "back"}};
@@ -1406,7 +1406,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                              CP0_ENUM_CAST_INT(LayoutMetric::MessageY),
                              text_w,
                              error_message_.empty() ? cp0::theme::kIdle : cp0::theme::kWarn,
-                             settings_fonts::sans(11));
+                             settings_fonts::font(11));
                 if (message_label) {
                     lv_label_set_long_mode(message_label, LV_LABEL_LONG_WRAP);
                     lv_obj_set_height(message_label, 52);
@@ -1452,14 +1452,14 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                              y + 2,
                              216,
                              color,
-                             settings_fonts::cjk_sans(11));
+                             settings_fonts::font(11));
                 create_label(ComponensObj,
                              address.c_str(),
                              8,
                              y + 14,
                              216,
                              selected ? cp0::theme::kIdle : cp0::theme::kDim,
-                             settings_fonts::mono(11));
+                             settings_fonts::font(11));
 
                 std::string state;
                 if (device.connected)
@@ -1469,8 +1469,8 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                 else
                     state = std::to_string(device.rssi);
                 const lv_font_t *state_font = (device.connected || device.paired)
-                    ? settings_fonts::sans(11)
-                    : settings_fonts::mono(11);
+                    ? settings_fonts::font(11)
+                    : settings_fonts::font(11);
                 lv_obj_t *state_label = create_label(
                     ComponensObj,
                     state.c_str(),
@@ -1599,11 +1599,11 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                             : device_authorization ? "allow device connection?"
                             : service_authorization ? "allow bluetooth service?"
                             : passkey ? "bluetooth passkey" : "bluetooth pin code";
-        create_label(agent_overlay_, title, text_x, 22, text_w, cp0::theme::kText, settings_fonts::sans(11));
+        create_label(agent_overlay_, title, text_x, 22, text_w, cp0::theme::kText, settings_fonts::font(11));
         const std::string device = agent_request_.device.empty() ? action_address_ : agent_request_.device;
-        create_label(agent_overlay_, device.c_str(), text_x, 36, text_w, cp0::theme::kIdle, settings_fonts::mono(11));
+        create_label(agent_overlay_, device.c_str(), text_x, 36, text_w, cp0::theme::kIdle, settings_fonts::font(11));
         if (confirmation) {
-            create_label(agent_overlay_, "pairing code", text_x, 56, text_w, cp0::theme::kIdle, settings_fonts::sans(11));
+            create_label(agent_overlay_, "pairing code", text_x, 56, text_w, cp0::theme::kIdle, settings_fonts::font(11));
             const bool has_code = !agent_request_.hint.empty();
             create_label(agent_overlay_,
                          has_code ? agent_request_.hint.c_str() : "(not provided)",
@@ -1611,7 +1611,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                          70,
                          text_w,
                          has_code ? cp0::theme::kText : cp0::theme::kIdle,
-                         settings_fonts::mono(has_code ? 22 : 11));
+                         settings_fonts::font(has_code ? 22 : 11));
         } else if (authorization) {
             create_label(agent_overlay_,
                          device_authorization ? "allow this device to connect?" : "allow this bluetooth service?",
@@ -1619,12 +1619,12 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                          56,
                          text_w,
                          cp0::theme::kText,
-                         settings_fonts::sans(11));
+                         settings_fonts::font(11));
             if (service_authorization) {
                 const std::string service = agent_request_.hint.empty()
                     ? "service: (not specified)"
                     : "service: " + agent_request_.hint;
-                create_label(agent_overlay_, service.c_str(), text_x, 70, text_w, cp0::theme::kIdle, settings_fonts::mono(11));
+                create_label(agent_overlay_, service.c_str(), text_x, 70, text_w, cp0::theme::kIdle, settings_fonts::font(11));
             }
         } else {
             agent_input_textarea_ = lv_textarea_create(agent_overlay_);
@@ -1636,7 +1636,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
                 lv_textarea_set_accepted_chars(agent_input_textarea_, passkey ? "0123456789" : nullptr);
                 lv_textarea_set_text(agent_input_textarea_, agent_input_.c_str());
                 lv_textarea_set_cursor_pos(agent_input_textarea_, static_cast<int32_t>(agent_input_.size()));
-                lv_obj_set_style_text_font(agent_input_textarea_, settings_fonts::mono(22), LV_PART_MAIN);
+                lv_obj_set_style_text_font(agent_input_textarea_, settings_fonts::font(22), LV_PART_MAIN);
                 lv_obj_set_style_text_color(agent_input_textarea_, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
                 lv_obj_set_style_bg_color(agent_input_textarea_, lv_color_hex(cp0::theme::kLine), LV_PART_MAIN);
                 lv_obj_set_style_bg_opa(agent_input_textarea_, LV_OPA_COVER, LV_PART_MAIN);
@@ -1659,7 +1659,7 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
             }
         }
         if (!agent_error_.empty())
-            create_label(agent_overlay_, agent_error_.c_str(), text_x, 96, text_w, cp0::theme::kWarn, settings_fonts::sans(11));
+            create_label(agent_overlay_, agent_error_.c_str(), text_x, 96, text_w, cp0::theme::kWarn, settings_fonts::font(11));
         const std::vector<cp0::ui::Chip> chips = confirmation
             ? std::vector<cp0::ui::Chip>{{"ent", "confirm"}, {"esc", "reject"}}
             : authorization ? std::vector<cp0::ui::Chip>{{"ent", "allow"}, {"esc", "reject"}}
@@ -1804,9 +1804,9 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
         cp0::ui::set_text(header.status, "off", cp0::theme::kIdle);
         const int text_w = cp0::theme::kScreenW - 2 * cp0::theme::kPadX;
         create_label(overlay, "bluetooth power is off", cp0::theme::kPadX, 24, text_w,
-                     cp0::theme::kWarn, settings_fonts::sans(11));
+                     cp0::theme::kWarn, settings_fonts::font(11));
         create_label(overlay, "turn on power before continuing.", cp0::theme::kPadX, 40, text_w,
-                     cp0::theme::kText, settings_fonts::sans(11));
+                     cp0::theme::kText, settings_fonts::font(11));
         cp0::ui::set_footer(cp0::ui::footer(overlay), {{"ent", "ok"}, {"esc", "back"}});
     }
 
@@ -1929,10 +1929,6 @@ LvSettingBluetoothPage3::~LvSettingBluetoothPage3()
         lv_event_stop_processing(event);
     }
 
-
-LvSettingBluetoothAliasPage3::LvSettingBluetoothAliasPage3()
-    : api_dispatch_(std::make_shared<LvSettingBluetoothAliasPage3::ApiDispatchState>())
-{}
 
 
     LvSettingBluetoothAliasPage3::LvSettingBluetoothAliasPage3(lv_obj_t *parent,
@@ -2137,13 +2133,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
         return label;
     }
 
-
-    const lv_font_t *LvSettingBluetoothAliasPage3::input_font(uint16_t size)
-{
-        return settings_fonts::cjk_sans(size);
-    }
-
-
     std::size_t LvSettingBluetoothAliasPage3::previous_utf8_start(const std::string &value, std::size_t cursor)
 {
         if (cursor == 0 || cursor > value.size()) return 0;
@@ -2192,7 +2181,7 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
                      CP0_ENUM_CAST_INT(LayoutMetric::AliasLabelY),
                      CP0_ENUM_CAST_INT(LayoutMetric::AliasLabelWidth),
                      cp0::theme::kIdle,
-                     settings_fonts::sans(11));
+                     settings_fonts::font(11));
 
         alias_input_ = lv_textarea_create(ComponensObj);
         if (alias_input_) {
@@ -2213,7 +2202,7 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
                     ++cursor_chars;
             }
             lv_textarea_set_cursor_pos(alias_input_, static_cast<int32_t>(cursor_chars));
-            lv_obj_set_style_text_font(alias_input_, input_font(11), LV_PART_MAIN);
+            lv_obj_set_style_text_font(alias_input_, settings_fonts::font(11), LV_PART_MAIN);
             lv_obj_set_style_text_letter_space(alias_input_, CP0_ENUM_CAST_INT(LayoutMetric::AliasInputLetterSpace), LV_PART_MAIN);
             lv_obj_set_style_text_color(alias_input_, lv_color_hex(cp0::theme::kText), LV_PART_MAIN);
             lv_obj_set_style_text_color(alias_input_, lv_color_hex(cp0::theme::kText), LV_PART_CURSOR);
@@ -2247,7 +2236,7 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
                          CP0_ENUM_CAST_INT(LayoutMetric::AliasErrorY),
                          CP0_ENUM_CAST_INT(LayoutMetric::ScreenW) - 2 * cp0::theme::kPadX,
                          cp0::theme::kDanger,
-                         settings_fonts::sans(11));
+                         settings_fonts::font(11));
     }
 
 
@@ -2272,9 +2261,9 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
         cp0::ui::set_text(header.status, "off", cp0::theme::kIdle);
         const int text_w = cp0::theme::kScreenW - 2 * cp0::theme::kPadX;
         create_label(overlay, "bluetooth power is off", cp0::theme::kPadX, 24, text_w,
-                     cp0::theme::kWarn, settings_fonts::sans(11));
+                     cp0::theme::kWarn, settings_fonts::font(11));
         create_label(overlay, "turn on power before continuing.", cp0::theme::kPadX, 40, text_w,
-                     cp0::theme::kText, settings_fonts::sans(11));
+                     cp0::theme::kText, settings_fonts::font(11));
         cp0::ui::set_footer(cp0::ui::footer(overlay), {{"ent", "ok"}, {"esc", "back"}});
     }
 
