@@ -45,7 +45,7 @@ die() { echo "error: $1" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run as root"
 [ -f "$CONFIG" ] && [ -f "$CMDLINE" ] || die "$CONFIG or $CMDLINE not found: is this a Raspberry Pi image?"
 [ -x /boot/dietpi/func/dietpi-set_hardware ] || die "this is not DietPi"
-for file in cp0-usb-wifi 50-cp0-wifi-scan.rules 50-cp0-power.rules; do
+for file in cp0-usb-wifi cp0-panel-100m.dts 50-cp0-wifi-scan.rules 50-cp0-power.rules; do
     [ -f "$HERE/$file" ] || die "$HERE/$file is missing: copy the whole scripts/ folder"
 done
 
@@ -105,6 +105,11 @@ dtoverlay=gpio-ir,gpio_pin=13,gpio_pull=up
 dtoverlay=gpio-ir-tx,gpio_pin=12
 EOF
 fi
+# A faster panel clock than the board overlay asks for; remove the line to go
+# back if a panel shows glitches at this speed.
+dtc -@ -I dts -O dtb -o /boot/firmware/overlays/cp0-panel-100m.dtbo "$HERE/cp0-panel-100m.dts"
+grep -q "^dtoverlay=cp0-panel-100m" "$CONFIG" ||
+    sed -i "/^dtoverlay=cardputerzero-v5-overlay$/a dtoverlay=cp0-panel-100m" "$CONFIG"
 COUNTRY=$(sed -n 's/^AUTO_SETUP_NET_WIFI_COUNTRY_CODE=//p' /boot/dietpi.txt 2>/dev/null | head -1)
 for arg in fbcon=map:1 fbcon=font:VGA8x8 ${COUNTRY:+cfg80211.ieee80211_regdom=$COUNTRY}; do
     grep -qF -- "$arg" "$CMDLINE" || sed -i "s/\$/ $arg/" "$CMDLINE"

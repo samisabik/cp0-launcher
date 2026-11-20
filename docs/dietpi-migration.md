@@ -134,6 +134,16 @@ Things that differ from the stock image and are easy to miss:
   and adds a camera overlay; the overlay lines were added by hand instead.
   `vc4-kms-v3d` is left out: the LCD driver does not need it. The LCD is then
   `fb1` behind `/dev/fb_lcd`, with the firmware framebuffer as `fb0`.
+- **Panel clock.** `scripts/cp0-panel-100m.dts` raises the LCD's SPI clock
+  above what the board overlay asks for, which roughly doubles the full-frame
+  rate reaching the panel (compare `bytes_tx` in
+  `/sys/class/spi_master/spi0/statistics/` over a few seconds of redraws). It
+  must come after the board overlay in `config.txt`; removing the line
+  restores the vendor clock. Checked by eye on one device.
+- **Runtime directory.** The user's uid is not 1000 here. The launcher takes
+  `XDG_RUNTIME_DIR` from its environment (`commount.c`); a hardcoded
+  `/run/user/1000` made every page that keeps files there fail, which showed
+  as "scan timed out" in Air.
 - **Text console on the LCD.** With `fbcon=map:1` the boot log shows on the
   LCD, and the console stays bound to it afterwards, which shows as a blinking
   cursor through the launcher. `scripts/cp0-fbcon-release.service` unbinds it
