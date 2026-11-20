@@ -198,11 +198,6 @@ int clamp_bpm(int bpm)
     return std::clamp(bpm, kMinBpm, kMaxBpm);
 }
 
-int samples_per_row(int bpm)
-{
-    return kRate * 60 / (clamp_bpm(bpm) * kRowsPerBeat);
-}
-
 const std::array<uint8_t, 32> &wave_table(int index)
 {
     static const std::array<std::array<uint8_t, 32>, 4> tables = [] {

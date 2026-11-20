@@ -22,7 +22,7 @@ Paths in the evidence column are relative to the repository root.
 | nlohmann/json 3.11.3 | `projects/CardputerZero-Emulator/vendor/nlohmann/json.hpp` | [MIT](../LICENSES/nlohmann-json-MIT.txt), Niels Lohmann; original SPDX preserved |
 | Departure Mono | `projects/APPLaunch/APPLaunch/share/font` | [OFL-1.1](../projects/APPLaunch/APPLaunch/share/font/DepartureMono-OFL.txt) |
 
-LVGL embeds separately licensed codecs, renderers and fonts. Preserve its `src/libs/*/LICENSE*`, `src/stdlib/builtin/LICENSE*` and `scripts/built_in_font/font_license/` records when distributing those features. Generated font arrays retain the input font's license. Audio notices remain beside assets, including LaunchWizard `APPLaunch/share/audio/LICENSE-LAUNCH-WIZARD-AUDIO.txt`.
+LVGL embeds separately licensed codecs, renderers and fonts. Preserve its `src/libs/*/LICENSE*`, `src/stdlib/builtin/LICENSE*` and `scripts/built_in_font/font_license/` records when distributing those features. Generated font arrays retain the input font's license.
 
 ## Additional SDK downloads
 

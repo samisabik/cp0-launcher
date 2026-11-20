@@ -37,7 +37,6 @@ def test_storage_probe_macro_is_device_only():
     ) in block
     assert "\n    default y\n" in block
     assert "APPLAUNCH_LINUX_X86_SDL2" not in block
-    assert "APPLAUNCH_DARWIN_SDL" not in block
 
 
 def test_storage_macro_is_not_defined_independently_by_sconstruct():

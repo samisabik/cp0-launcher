@@ -13,7 +13,6 @@
 namespace setup_values {
 namespace {
 
-constexpr int kBrightnessPercentages[] = {100, 75, 50, 25};
 constexpr int kDarkTimes[] = {0, 10, 30, 60, 300};
 
 template <typename T, int N>
@@ -28,26 +27,6 @@ int clamp_index(int index, int count)
 }
 
 } // namespace
-
-int brightness_index(int value, int maximum)
-{
-    const int percent = maximum > 0
-                            ? static_cast<int>(static_cast<std::int64_t>(value) * 100 / maximum)
-                            : 100;
-    if (percent >= 87) return 0;
-    if (percent >= 62) return 1;
-    if (percent >= 37) return 2;
-    return 3;
-}
-
-int brightness_value(int index, int maximum)
-{
-    const int safe_maximum = std::max(1, maximum);
-    const int percentage = kBrightnessPercentages[
-        clamp_index(index, array_size(kBrightnessPercentages))];
-    return std::max(1, static_cast<int>(
-                           static_cast<std::int64_t>(safe_maximum) * percentage / 100));
-}
 
 int brightness_step_percent(int index)
 {

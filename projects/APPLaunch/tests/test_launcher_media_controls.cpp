@@ -258,7 +258,7 @@ int main()
     assert(configured_brightness == 178);
 
     // Restart after screen-off must restore the saved raw value, even when it
-    // comes from a legacy brightness level outside the current 10% steps.
+    // sits between the 10% steps.
     const int previous_config_writes = config_writes;
     configured_brightness = 64;
     backlight_value = 0;

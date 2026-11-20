@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "screensaver_model.hpp"
+#include "lockscreen_activity_model.hpp"
 
 #include "input_keys.h"
 
@@ -17,46 +17,46 @@ uint32_t elapsed_since(uint32_t now, uint32_t previous)
 
 } // namespace
 
-void ScreensaverModel::reset(uint32_t now)
+void LockscreenActivityModel::reset(uint32_t now)
 {
     active_ = false;
     clear_hold();
     last_activity_tick_ = now;
 }
 
-void ScreensaverModel::set_foreground(bool foreground, uint32_t now)
+void LockscreenActivityModel::set_foreground(bool foreground, uint32_t now)
 {
     foreground_ = foreground;
     reset(now);
 }
 
-bool ScreensaverModel::should_activate(uint32_t now, uint32_t timeout_ms, bool runtime_ready) const
+bool LockscreenActivityModel::should_activate(uint32_t now, uint32_t timeout_ms, bool runtime_ready) const
 {
     return foreground_ && runtime_ready && !active_ && timeout_ms > 0 &&
            elapsed_since(now, last_activity_tick_) >= timeout_ms;
 }
 
-void ScreensaverModel::activate()
+void LockscreenActivityModel::activate()
 {
     active_ = true;
     clear_hold();
 }
 
-void ScreensaverModel::deactivate()
+void LockscreenActivityModel::deactivate()
 {
     active_ = false;
     clear_hold();
 }
 
-void ScreensaverModel::note_activity(uint32_t now)
+void LockscreenActivityModel::note_activity(uint32_t now)
 {
     last_activity_tick_ = now;
 }
 
-ScreensaverHoldDecision ScreensaverModel::observe_hold_key(uint32_t key_code, bool released,
+LockscreenHoldDecision LockscreenActivityModel::observe_hold_key(uint32_t key_code, bool released,
                                                            uint32_t now)
 {
-    ScreensaverHoldDecision decision;
+    LockscreenHoldDecision decision;
     if (key_code != KEY_TAB) {
         /* A different key ends the gesture, but it still belongs to the page. */
         decision.hide_hint = hold_hint_shown_;
@@ -78,9 +78,9 @@ ScreensaverHoldDecision ScreensaverModel::observe_hold_key(uint32_t key_code, bo
     return decision;
 }
 
-ScreensaverHoldDecision ScreensaverModel::poll_hold(uint32_t now)
+LockscreenHoldDecision LockscreenActivityModel::poll_hold(uint32_t now)
 {
-    ScreensaverHoldDecision decision;
+    LockscreenHoldDecision decision;
     if (!hold_pending_ || hold_fired_) return decision;
 
     const uint32_t held = elapsed_since(now, hold_down_tick_);
@@ -95,7 +95,7 @@ ScreensaverHoldDecision ScreensaverModel::poll_hold(uint32_t now)
     return decision;
 }
 
-void ScreensaverModel::clear_hold()
+void LockscreenActivityModel::clear_hold()
 {
     hold_down_tick_ = 0;
     hold_pending_ = false;

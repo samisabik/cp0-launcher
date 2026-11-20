@@ -106,11 +106,6 @@ lv_color_t UISTPage::palette(uint32_t color)
     return lv_color_hex(COLORS[color < 16 ? color : DEFAULT_FG]);
 }
 
-const lv_font_t *UISTPage::terminal_font()
-{
-    return launcher_fonts().get_chrome(font_size(FontSize::Terminal));
-}
-
 uint32_t UISTPage::xterm256_to_palette(int color)
 {
     color = clamp(color, 0, 255);

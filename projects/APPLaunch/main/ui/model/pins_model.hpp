@@ -83,8 +83,6 @@ inline constexpr int kGridRows = 8;
 enum class Probe : uint8_t { Unknown, Empty, Found, InUse };
 using ProbeMap = std::array<Probe, 128>;
 
-// Row and column of an address in a 16-column grid. False outside the scanned range.
-bool grid_cell(int address, int &row, int &column);
 // Address shown in a cell, or -1 when the cell is outside the scanned range.
 int grid_address(int row, int column);
 int count(const ProbeMap &map, Probe state);

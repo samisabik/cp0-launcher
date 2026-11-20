@@ -59,7 +59,7 @@ extern volatile uint32_t LV_EVENT_KEYBOARD;
 
 void *keyboard_read_thread(void *argv);
 void cp0_keyboard_set_global_key_handler(cp0_keyboard_key_handler_t handler);
-/* LVGL thread only. After the screensaver filter, a nonzero result consumes the
+/* LVGL thread only. After the lock screen filter, a nonzero result consumes the
  * key before custom events, global shortcuts, and native keypad delivery.
  * The item is borrowed for this call only. NULL removes the filter. */
 void cp0_keyboard_set_key_filter(cp0_keyboard_key_filter_t filter);

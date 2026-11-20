@@ -79,8 +79,6 @@ std::string cell_text(const Cell &cell);
 const char *channel_name(int channel);
 const char *instrument_name(int channel, int inst);
 int clamp_bpm(int bpm);
-// Whole samples in one row; the player carries the remainder between rows.
-int samples_per_row(int bpm);
 const std::array<uint8_t, 32> &wave_table(int index);
 
 bool valid_position(int pattern, int row, int channel);

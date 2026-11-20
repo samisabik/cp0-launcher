@@ -29,13 +29,10 @@ bool connected_snapshot_matches(const std::string &requested_address,
 
 // Agent methods that require an outstanding invocation and a UI response.
 bool is_agent_request_method(const std::string &method);
-bool is_agent_display_method(const std::string &method);
 
 // Validate user-provided credentials at the Agent1 boundary. Rejections do
 // not carry text and are always valid terminal responses.
 bool agent_reply_valid(const std::string &method, bool accepted,
                        const std::string &text);
-bool agent_reply_requires_cleanup(const std::string &method, bool accepted,
-                                  const std::string &text);
 
 } // namespace cp0::bluetooth::policy

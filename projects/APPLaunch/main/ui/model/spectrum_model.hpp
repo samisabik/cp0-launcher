@@ -48,10 +48,6 @@ int rssi_dbm(uint8_t raw);
 // 0 .. kLevels-1 position of a level on the display scale.
 int level_index(int dbm);
 
-// RGB888 colour for a level index: black through the noise floor, then dark
-// green, launcher green and white.
-uint32_t level_color(int index);
-
 std::string format_mhz(uint32_t hz);
 
 std::string csv_header(const std::string &started_iso);

@@ -73,7 +73,6 @@ private:
     static SettingsInvoker settings_invoker();
     static ConfigInvoker config_invoker();
 
-    int option_count() const;
     void initialize_page(lv_obj_t *parent, std::function<void()> back_callback);
     void request_back();
     void restore_focus();

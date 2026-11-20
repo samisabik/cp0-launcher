@@ -432,11 +432,6 @@ void SpectrumScanner::toggle_capture(uint32_t hz)
     capture_request_.store(true);
 }
 
-void SpectrumScanner::adjust_threshold(int delta_db)
-{
-    threshold_dbm_.store(std::clamp(threshold_dbm_.load() + delta_db, -105, -40));
-}
-
 void SpectrumScanner::adjust_finder_threshold(int delta_db)
 {
     finder_threshold_.store(std::clamp(finder_threshold_.load() + delta_db,

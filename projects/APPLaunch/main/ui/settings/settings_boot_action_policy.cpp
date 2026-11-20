@@ -11,7 +11,6 @@ namespace {
 
 constexpr Presentation kReboot{"reboot", "reboot?"};
 constexpr Presentation kShutdown{"shutdown", "power off?"};
-constexpr Presentation kFactoryReset{"Factory Reset", {}};
 
 } // namespace
 
@@ -22,31 +21,8 @@ const Presentation &presentation(Action action)
         return kReboot;
     case Action::Shutdown:
         return kShutdown;
-    case Action::FactoryReset:
-        return kFactoryReset;
     }
     return kReboot;
-}
-
-std::vector<Operation> operation_plan(Action action)
-{
-    switch (action) {
-    case Action::Reboot:
-        return {Operation::Reboot};
-    case Action::Shutdown:
-        return {Operation::Shutdown};
-    case Action::FactoryReset:
-        return {Operation::RemoveLauncherSettings, Operation::Reboot};
-    }
-    return {};
-}
-
-bool may_continue(Operation completed_operation, bool succeeded)
-{
-    if (completed_operation == Operation::Reboot ||
-        completed_operation == Operation::Shutdown)
-        return false;
-    return succeeded;
 }
 
 const char *process_command(Operation operation) noexcept
@@ -56,20 +32,6 @@ const char *process_command(Operation operation) noexcept
         return "Reboot";
     case Operation::Shutdown:
         return "Shutdown";
-    case Operation::RemoveLauncherSettings:
-        return nullptr;
-    }
-    return nullptr;
-}
-
-const char *filesystem_alias(Operation operation) noexcept
-{
-    switch (operation) {
-    case Operation::RemoveLauncherSettings:
-        return "launcher_settings";
-    case Operation::Reboot:
-    case Operation::Shutdown:
-        return nullptr;
     }
     return nullptr;
 }

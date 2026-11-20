@@ -143,7 +143,6 @@ public:
     // ~/spectrum/capture-*.ook (rtl_433) and .sub (Flipper RAW).
     void toggle_capture(uint32_t hz);
     bool capturing() const { return capture_active_.load(); }
-    void adjust_threshold(int delta_db);
     CaptureStatus capture_status();
 
     // Listening holds a capture open on one frequency without writing files

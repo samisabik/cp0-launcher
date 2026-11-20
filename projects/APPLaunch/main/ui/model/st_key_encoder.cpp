@@ -50,8 +50,8 @@ int STKeyEncoder::scrollback_direction(uint32_t evdev_key, uint32_t modifiers,
                                        bool shift_down)
 {
     const bool shift = shift_down || (modifiers & KBD_MOD_SHIFT) != 0;
-    constexpr uint32_t LEGACY_MODIFIERS = KBD_MOD_CTRL | KBD_MOD_ALT;
-    const bool ctrl_alt = (modifiers & LEGACY_MODIFIERS) == LEGACY_MODIFIERS;
+    constexpr uint32_t CTRL_ALT = KBD_MOD_CTRL | KBD_MOD_ALT;
+    const bool ctrl_alt = (modifiers & CTRL_ALT) == CTRL_ALT;
     if (!shift && !ctrl_alt) return 0;
 
     if (evdev_key == KEY_PAGEUP) return 1;

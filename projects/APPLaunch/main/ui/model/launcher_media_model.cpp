@@ -37,22 +37,6 @@ int LauncherMediaControlsModel::clamp_percent(int value)
     return std::clamp(value, 0, 100);
 }
 
-int LauncherMediaControlsModel::percent_from_raw(int raw, int maximum)
-{
-    if (maximum <= 0) maximum = 100;
-    const int64_t percent = static_cast<int64_t>(raw) * 100 / maximum;
-    return clamp_percent(static_cast<int>(std::clamp<int64_t>(percent, 0, 100)));
-}
-
-int LauncherMediaControlsModel::raw_from_percent(int percent, int maximum)
-{
-    if (maximum <= 0) maximum = 100;
-    percent = clamp_percent(percent);
-    int raw = static_cast<int>(static_cast<int64_t>(maximum) * percent / 100);
-    if (percent > 0) raw = std::max(raw, 1);
-    return raw;
-}
-
 int LauncherMediaControlsModel::volume_or(int fallback) const
 {
     return volume_ >= 0 ? volume_ : clamp_percent(fallback);
@@ -71,11 +55,6 @@ void LauncherMediaControlsModel::set_volume(int percent)
 void LauncherMediaControlsModel::set_brightness(int percent)
 {
     brightness_ = clamp_percent(percent);
-}
-
-void LauncherMediaControlsModel::set_brightness_from_raw(int raw, int maximum)
-{
-    set_brightness(percent_from_raw(raw, maximum));
 }
 
 bool LauncherMediaControlsModel::toggle_mute()

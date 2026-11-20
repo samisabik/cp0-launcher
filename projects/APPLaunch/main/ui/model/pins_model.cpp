@@ -278,14 +278,6 @@ uint32_t i2c_clock_hz(const std::vector<Edge> &scl)
     return static_cast<uint32_t>((1000000000 + median / 2) / median);
 }
 
-bool grid_cell(int address, int &row, int &column)
-{
-    if (address < kI2cFirst || address > kI2cLast) return false;
-    row = address / kGridColumns;
-    column = address % kGridColumns;
-    return true;
-}
-
 int grid_address(int row, int column)
 {
     if (row < 0 || row >= kGridRows || column < 0 || column >= kGridColumns) return -1;

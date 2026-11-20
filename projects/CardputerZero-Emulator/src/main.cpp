@@ -10,21 +10,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#ifdef _WIN32
-#include <windows.h>
-#define usleep(us) Sleep((us)/1000)
-static void *emu_dlopen(const char *p) { return (void*)LoadLibraryA(p); }
-static void *emu_dlsym(void *h, const char *s) { return (void*)GetProcAddress((HMODULE)h,s); }
-static void  emu_dlclose(void *h) { FreeLibrary((HMODULE)h); }
-static const char *emu_dlerror() { static char b[256]; FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,0,GetLastError(),0,b,sizeof(b),0); return b; }
-#else
 #include <unistd.h>
 #include <dlfcn.h>
-#define emu_dlopen(p)   dlopen(p, RTLD_NOW | RTLD_GLOBAL)
-#define emu_dlsym(h,s)  dlsym(h,s)
-#define emu_dlclose(h)  dlclose(h)
-#define emu_dlerror()   dlerror()
-#endif
 
 // ── Layout from M5CardputerEmu.png (1280x840 RGBA) ─────────────
 static constexpr int SKIN_W = 1280;
@@ -248,7 +235,7 @@ static void render()
 typedef void (*ui_init_fn)(void);
 typedef void (*ui_deinit_fn)(void);
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(__APPLE__)
 extern "C" {
 void init_lvgl_env(void);
 void init_lvgl_event(void);
@@ -296,30 +283,11 @@ static void emu_init_cp0_runtime()
 }
 #endif
 
-#ifdef EMU_STATIC_APP
-extern "C" {
-    void ui_init(void);
-    void ui_deinit(void);
-    void lv_sdl_keyboard_handler(SDL_Event *event);
-}
-// APPLaunch's src/main.cpp defines LV_EVENT_BATTERY, but the Windows
-// static build doesn't compile that file — provide a stub here so the
-// UI code that references it links. (Never fired on emulator.)
-#if defined(_WIN32) && defined(EMU_STATIC_APP)
-#include <cstdint>
-extern "C" volatile uint32_t LV_EVENT_BATTERY = 0;
-#endif
-#endif
 
 // Set working directory to the exe's directory so relative paths work
 static void set_exe_dir()
 {
-#ifdef _WIN32
-    char path[MAX_PATH];
-    GetModuleFileNameA(NULL, path, MAX_PATH);
-    char *last = strrchr(path, '\\');
-    if (last) { *last = '\0'; SetCurrentDirectoryA(path); }
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     // macOS: SDL handles this, but just in case
     char path[1024];
     uint32_t size = sizeof(path);
@@ -353,17 +321,12 @@ int main(int argc, char *argv[])
     const unsigned test_quit_frame = emu_test_frame("EMU_TEST_QUIT_FRAME");
     const unsigned test_navigate_frame = emu_test_frame("EMU_TEST_NAVIGATE_FRAME");
 
-#ifdef EMU_STATIC_APP
-    // Windows: app statically linked, no dlopen
-    const char *app_path = "(static-linked APPLaunch)";
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     const char *app_path = "apps/libAPPLaunch.dylib";
 #else
     const char *app_path = "apps/libAPPLaunch.so";
 #endif
-#ifndef EMU_STATIC_APP
     if (argc > 1) app_path = argv[1];
-#endif
 
     printf("========================================\n");
     printf("  M5CardputerZero Emulator\n");
@@ -428,27 +391,19 @@ int main(int argc, char *argv[])
                            LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(__APPLE__)
     emu_init_cp0_runtime();
     g_kbd_handler = lv_sdl_keyboard_handler;
 #endif
 
-#ifdef EMU_STATIC_APP
-    // Static linked: APPLaunch overrides lv_sdl_keyboard_create/handler
-    lv_sdl_keyboard_create();
-    g_kbd_handler = lv_sdl_keyboard_handler;
-    printf("[EMU] App keyboard driver (static)\n");
-    printf("[EMU] Loaded: %s\n", app_path);
-    ui_init();
-#else
-    void *app = emu_dlopen(app_path);
-    if (!app) { fprintf(stderr, "[EMU] dlopen: %s\n", emu_dlerror()); return 1; }
+    void *app = dlopen(app_path, RTLD_NOW | RTLD_GLOBAL);
+    if (!app) { fprintf(stderr, "[EMU] dlopen: %s\n", dlerror()); return 1; }
     printf("[EMU] Loaded: %s\n", app_path);
 
-    auto kbd_create = (sdl_kbd_create_fn)emu_dlsym(app, "lv_sdl_keyboard_create");
-    g_kbd_handler = (sdl_kbd_handler_fn)emu_dlsym(app, "lv_sdl_keyboard_handler");
+    auto kbd_create = (sdl_kbd_create_fn)dlsym(app, "lv_sdl_keyboard_create");
+    g_kbd_handler = (sdl_kbd_handler_fn)dlsym(app, "lv_sdl_keyboard_handler");
     if (!g_kbd_handler)
-        g_kbd_handler = (sdl_kbd_handler_fn)emu_dlsym(RTLD_DEFAULT, "lv_sdl_keyboard_handler");
+        g_kbd_handler = (sdl_kbd_handler_fn)dlsym(RTLD_DEFAULT, "lv_sdl_keyboard_handler");
 
     if (kbd_create) {
         kbd_create();
@@ -461,13 +416,11 @@ int main(int argc, char *argv[])
         printf("[EMU] Built-in keyboard driver\n");
     }
 
-    ui_init_fn app_init = (ui_init_fn)emu_dlsym(app, "ui_init");
+    ui_init_fn app_init = (ui_init_fn)dlsym(app, "ui_init");
     if (!app_init) { fprintf(stderr, "[EMU] ui_init missing\n"); return 1; }
-    ui_deinit_fn app_deinit = (ui_deinit_fn)emu_dlsym(app, "ui_deinit");
-    if (!app_deinit)
-        printf("[EMU] ui_deinit unavailable; legacy app compatibility mode\n");
+    ui_deinit_fn app_deinit = (ui_deinit_fn)dlsym(app, "ui_deinit");
+    if (!app_deinit) { fprintf(stderr, "[EMU] ui_deinit missing\n"); return 1; }
     app_init();
-#endif
     printf("[EMU] Running.\n");
 
     unsigned frame_count = 0;
@@ -499,17 +452,9 @@ int main(int argc, char *argv[])
                     if (btn == 1) {
                         printf("[EMU] POWER — resetting\n");
                         memset(g_lcd_buf, 0, LCD_W * LCD_H * sizeof(uint32_t));
-#ifdef EMU_STATIC_APP
-                        ui_deinit();
+                        app_deinit();
                         printf("[EMU] App deinitialized\n");
-                        ui_init();
-#else
-                        if (app_deinit) {
-                            app_deinit();
-                            printf("[EMU] App deinitialized\n");
-                        }
                         app_init();
-#endif
                         printf("[EMU] App initialized\n");
                     }
                     g_side_pr = -1;
@@ -553,17 +498,9 @@ int main(int argc, char *argv[])
         if (!test_reset_done && test_reset_frame && frame_count >= test_reset_frame) {
             printf("[EMU] TEST reset at frame %u\n", frame_count);
             memset(g_lcd_buf, 0, LCD_W * LCD_H * sizeof(uint32_t));
-#ifdef EMU_STATIC_APP
-            ui_deinit();
+            app_deinit();
             printf("[EMU] App deinitialized\n");
-            ui_init();
-#else
-            if (app_deinit) {
-                app_deinit();
-                printf("[EMU] App deinitialized\n");
-            }
             app_init();
-#endif
             printf("[EMU] App initialized\n");
             test_reset_done = true;
         }
@@ -575,25 +512,16 @@ int main(int argc, char *argv[])
     }
 
 done:
-#ifdef EMU_STATIC_APP
-    ui_deinit();
+    app_deinit();
     printf("[EMU] App deinitialized\n");
-#else
-    if (app_deinit) {
-        app_deinit();
-        printf("[EMU] App deinitialized\n");
-    }
-#endif
     free(g_lcd_buf);
-#ifndef EMU_STATIC_APP
-    emu_dlclose(app);
-#endif
+    dlclose(app);
     SDL_DestroyTexture(g_lcd_tex);
     SDL_DestroyTexture(g_skin_tex);
     SDL_DestroyRenderer(g_ren);
     SDL_DestroyWindow(g_win);
     IMG_Quit();
-#if !defined(_WIN32) && !defined(__APPLE__)
+#if !defined(__APPLE__)
     // The saved-settings init starts a volume restore worker; join it before
     // the audio backend's statics go away. This host never calls deinit_audio.
     cp0_saved_volume_restore_stop();

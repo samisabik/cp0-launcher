@@ -234,21 +234,6 @@ bool LvSettingVolumePage3::ready() const
     return ready_;
 }
 
-bool LvSettingVolumePage3::request_pending() const
-{
-    return active_request_.has_value();
-}
-
-int LvSettingVolumePage3::backend_volume() const
-{
-    return backend_volume_;
-}
-
-int LvSettingVolumePage3::original_volume() const
-{
-    return original_volume_;
-}
-
 const std::string &LvSettingVolumePage3::last_error() const
 {
     return last_error_;

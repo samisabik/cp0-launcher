@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-struct ScreensaverHoldDecision
+struct LockscreenHoldDecision
 {
     /* The hold matured past the hint delay: announce what the gesture will do. */
     bool show_hint = false;
@@ -21,7 +21,7 @@ struct ScreensaverHoldDecision
     bool fire = false;
 };
 
-class ScreensaverModel
+class LockscreenActivityModel
 {
 public:
     enum class ScreenOffMetric : uint32_t {
@@ -47,8 +47,8 @@ public:
     void activate();
     void deactivate();
 
-    /* Keys belong to the lock-screen state machine once the screensaver is up.
-     * While it is idle the screensaver only needs to know that something
+    /* Keys belong to the lock-screen state machine once the lock screen is up.
+     * While it is idle this model only needs to know that something
      * happened, so the next automatic activation is measured from here. */
     void note_activity(uint32_t now);
 
@@ -56,8 +56,8 @@ public:
      * It never reports a consume decision: the press and release must keep
      * reaching the page underneath, which owns the short-tap meaning of the
      * same key.  poll_hold() reports the hint maturing and the gesture firing. */
-    ScreensaverHoldDecision observe_hold_key(uint32_t key_code, bool released, uint32_t now);
-    ScreensaverHoldDecision poll_hold(uint32_t now);
+    LockscreenHoldDecision observe_hold_key(uint32_t key_code, bool released, uint32_t now);
+    LockscreenHoldDecision poll_hold(uint32_t now);
 
     bool active() const { return active_; }
     bool hold_pending() const { return hold_pending_; }

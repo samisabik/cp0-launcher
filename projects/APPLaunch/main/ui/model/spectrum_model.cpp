@@ -36,33 +36,6 @@ int level_index(int dbm)
     return (clamped - kMinDbm) * (kLevels - 1) / (kMaxDbm - kMinDbm);
 }
 
-uint32_t level_color(int index)
-{
-    struct Stop { int at; int r, g, b; };
-    static constexpr Stop kStops[] = {
-        // Black up to the typical noise floor so only signals show colour.
-        {0, 0x00, 0x00, 0x00},
-        {12, 0x00, 0x00, 0x00},
-        {28, 0x13, 0x26, 0x1B},
-        {46, 0x3D, 0xDC, 0x84},
-        {63, 0xFF, 0xFF, 0xFF},
-    };
-    index = std::clamp(index, 0, kLevels - 1);
-    for (std::size_t i = 1; i < sizeof(kStops) / sizeof(kStops[0]); ++i) {
-        const Stop &a = kStops[i - 1];
-        const Stop &b = kStops[i];
-        if (index <= b.at) {
-            const int span = b.at - a.at;
-            const int t = index - a.at;
-            const int r = a.r + (b.r - a.r) * t / span;
-            const int g = a.g + (b.g - a.g) * t / span;
-            const int bl = a.b + (b.b - a.b) * t / span;
-            return static_cast<uint32_t>((r << 16) | (g << 8) | bl);
-        }
-    }
-    return 0xFFFFFF;
-}
-
 std::string format_mhz(uint32_t hz)
 {
     char text[16];

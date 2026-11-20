@@ -8,7 +8,7 @@
 #include "sample_log.h"
 #include "ui/launcher_media_controls.h"
 #include "ui/ui.h"
-#include "ui/ui_screensaver.h"
+#include "ui/ui_lockscreen.h"
 
 #include <cstdlib>
 #include <string>
@@ -38,7 +38,7 @@ int main(void)
     options.setup = []() {
         SLOGI("[BOOT] cp0_lvgl initialized");
         launcher_ui::init();
-        ui_screensaver_init();
+        ui_lockscreen_init();
         return true;
     };
     options.teardown = []() { launcher_ui::deinit(); };

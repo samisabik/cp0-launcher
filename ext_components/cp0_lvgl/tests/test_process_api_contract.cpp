@@ -26,14 +26,6 @@ int main()
     assert(cp0_process_api_contract::invoke_c_api(
         []() -> int { throw 1; }) == -EIO);
     cp0_process_api_contract::invoke_c_api_void([] { throw 1; });
-    const char *argv[] = {"apt-get", "install", "package with spaces", nullptr};
-    assert(cp0_process_api_contract::make_run_sudo_request("secret", argv) ==
-           (std::list<std::string>{"RunSudo", "secret", "apt-get", "install",
-                                   "package with spaces"}));
-
-    assert(cp0_process_api_contract::make_run_sudo_request(nullptr, nullptr) ==
-           (std::list<std::string>{"RunSudo", ""}));
-
     using namespace cp0_process_api_contract;
     const std::list<std::string> request = {"Kill", "42", "1000"};
     assert(has_exact_arguments(request, 3));

@@ -16,13 +16,11 @@
 #include <cstdlib>
 #include <thread>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <linux/input.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
 
 extern "C" void __attribute__((weak)) keyboard_pause(void) {}
 extern "C" void __attribute__((weak)) keyboard_resume(void) {}
@@ -48,11 +46,6 @@ std::uint64_t monotonic_ms()
 
 int run(const char *command, bool keep_root)
 {
-#if defined(_WIN32)
-    (void)command;
-    (void)keep_root;
-    return -1;
-#else
     keyboard_pause();
     const bool subreaper = cp0_process_group::enable_subreaper();
 
@@ -133,7 +126,6 @@ int run(const char *command, bool keep_root)
     std::printf("[cp0] Returned to launcher\n");
     std::fflush(stdout);
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-#endif
 }
 
 } // namespace cp0_external_app_runner

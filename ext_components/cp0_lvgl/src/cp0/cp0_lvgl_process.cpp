@@ -92,12 +92,6 @@ public:
                 return invalid(callback);
             report(callback, cp0_process_commands::run_argv(
                                  cp0_process_api_contract::arguments_from(arg, 2), background), "");
-        } else if (cmd == "RunSudo") {
-            if (!cp0_process_api_contract::has_at_least_arguments(arg, 3))
-                return invalid(callback);
-            report(callback, cp0_process_commands::run_sudo(
-                                 *cp0_process_api_contract::argument_at(arg, 1),
-                                 cp0_process_api_contract::arguments_from(arg, 2)), "");
         } else if (cmd == "CaptureArgv") {
             if (!cp0_process_api_contract::has_at_least_arguments(arg, 2))
                 return invalid(callback);
@@ -155,11 +149,6 @@ public:
 
     int system_shutdown(std::string &reason)
     {
-#if defined(_WIN32)
-        (void)reason;
-        std::printf("[CP0] shutdown (emulator exit)\n");
-        std::exit(0);
-#else
         std::printf("[CP0] shutdown\n");
         const int result = request_power_state("poweroff", reason);
         // Only darken the panel once logind has accepted the request; a refused
@@ -167,19 +156,12 @@ public:
         // looks switched off.
         if (result == 0) cp0_backlight_write(0);
         return result;
-#endif
     }
 
     int system_reboot(std::string &reason)
     {
-#if defined(_WIN32)
-        (void)reason;
-        std::printf("[CP0] reboot (emulator exit)\n");
-        std::exit(0);
-#else
         std::printf("[CP0] reboot\n");
         return request_power_state("reboot", reason);
-#endif
     }
 
 private:
@@ -285,17 +267,6 @@ extern "C" int cp0_process_capture_argv(const char *const *argv, char *out, int 
         int ret = ProcessSystem::api_simple(args, &data);
         if (out && out_size > 0) cp0_copy_string(out, out_size, data);
         return ret;
-    });
-}
-
-// Run argv via `sudo -S`, feeding password to stdin.
-// password: null-terminated sudo password string.
-// argv: null-terminated array of command + args (must not include "sudo").
-extern "C" int cp0_process_run_sudo(const char *password, const char *const *argv)
-{
-    return cp0_process_api_contract::invoke_c_api([&] {
-        return ProcessSystem::api_simple(
-            cp0_process_api_contract::make_run_sudo_request(password, argv));
     });
 }
 

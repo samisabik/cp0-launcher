@@ -12,7 +12,7 @@
 #include <cstdint>
 
 /*
- * Lock-screen state machine layered on top of the screensaver.
+ * Lock-screen state machine.
  *
  *   Locked        (1) black screen
  *   PendingUnlock (2) visible screen waiting for the unlock gesture

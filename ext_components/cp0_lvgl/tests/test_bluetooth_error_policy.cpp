@@ -54,9 +54,6 @@ int main()
     assert(is_agent_request_method("RequestAuthorization"));
     assert(is_agent_request_method("AuthorizeService"));
     assert(!is_agent_request_method("Cancel"));
-    assert(is_agent_display_method("DisplayPinCode"));
-    assert(is_agent_display_method("DisplayPasskey"));
-    assert(!is_agent_display_method("RequestPasskey"));
 
     assert(agent_reply_valid("RequestPinCode", true, "1234"));
     assert(agent_reply_valid("RequestPinCode", true, "a b"));
@@ -70,7 +67,4 @@ int main()
     assert(agent_reply_valid("RequestAuthorization", true, ""));
     assert(agent_reply_valid("AuthorizeService", true, ""));
     assert(agent_reply_valid("RequestPasskey", false, ""));
-    assert(agent_reply_requires_cleanup("RequestPasskey", false, ""));
-    assert(agent_reply_requires_cleanup("RequestPasskey", true, "12345"));
-    assert(!agent_reply_requires_cleanup("RequestPasskey", true, "012345"));
 }

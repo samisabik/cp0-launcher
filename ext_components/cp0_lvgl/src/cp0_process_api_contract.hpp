@@ -142,15 +142,4 @@ inline void invoke_callback_safely(
     }
 }
 
-inline std::list<std::string> make_run_sudo_request(const char *password,
-                                                    const char *const *argv)
-{
-    std::list<std::string> request = {"RunSudo", password ? password : ""};
-    if (argv) {
-        for (int index = 0; argv[index]; ++index)
-            request.emplace_back(argv[index]);
-    }
-    return request;
-}
-
 } // namespace cp0_process_api_contract

@@ -85,11 +85,6 @@ bool is_agent_request_method(const std::string &method)
            method == "AuthorizeService";
 }
 
-bool is_agent_display_method(const std::string &method)
-{
-    return method == "DisplayPinCode" || method == "DisplayPasskey";
-}
-
 bool agent_reply_valid(const std::string &method, bool accepted,
                        const std::string &text)
 {
@@ -103,12 +98,6 @@ bool agent_reply_valid(const std::string &method, bool accepted,
                    return character >= '0' && character <= '9';
                });
     return is_agent_request_method(method);
-}
-
-bool agent_reply_requires_cleanup(const std::string &method, bool accepted,
-                                  const std::string &text)
-{
-    return !accepted || !agent_reply_valid(method, accepted, text);
 }
 
 } // namespace cp0::bluetooth::policy

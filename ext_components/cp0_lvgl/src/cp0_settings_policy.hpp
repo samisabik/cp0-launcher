@@ -49,7 +49,6 @@ bool parse_integer_file_line(std::string_view text,
                              int minimum,
                              int maximum,
                              int &value);
-bool parse_switch_response(std::string_view text, int &value);
 std::string gpiochip_path_from_debug_line(std::string_view line,
                                           std::string_view controller_name);
 

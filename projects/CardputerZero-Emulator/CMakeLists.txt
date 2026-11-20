@@ -75,10 +75,8 @@ set(LV_CONF_BUILD_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(LV_CONF_BUILD_DISABLE_THORVG OFF CACHE BOOL "" FORCE)
 set(LV_BUILD_CONF_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "" FORCE)
 add_definitions(-DLV_CONF_INCLUDE_SIMPLE)
-if(EMSCRIPTEN OR WIN32)
-    add_definitions(-DLV_USE_FREETYPE=0)
-endif()
 if(EMSCRIPTEN)
+    add_definitions(-DLV_USE_FREETYPE=0)
     add_compile_options(-sUSE_SDL=2 -pthread)
 endif()
 
@@ -163,7 +161,7 @@ set(CP0_LVGL_APP_COMMON_SRCS
 
 if(NOT EMSCRIPTEN)
 
-option(EMU_SKIP_APPLAUNCH "Skip APPLaunch (Unix-only deps)" OFF)
+option(EMU_SKIP_APPLAUNCH "Skip APPLaunch" OFF)
 
 file(GLOB_RECURSE APPLAUNCH_UI_C CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.c)
 file(GLOB_RECURSE APPLAUNCH_UI_CPP CONFIGURE_DEPENDS ${APPLAUNCH}/ui/*.cpp)
@@ -184,16 +182,11 @@ file(GLOB CP0_LVGL_SDL_SRCS CONFIGURE_DEPENDS
     ${CP0_LVGL}/src/sdl/*.c
     ${CP0_LVGL}/src/sdl/*.cpp
 )
-set(CP0_LVGL_WIN32_SRCS
-    src/cp0_web_runtime.cpp
-    ${CP0_LVGL_APP_COMMON_SRCS}
-    ${CP0_LVGL}/src/win32/cp0_hal_stubs_win32.c
-)
 
 # ---------------------------------------------------------------------------
-# APP: APPLaunch shared lib (Unix only)
+# APP: APPLaunch shared lib
 # ---------------------------------------------------------------------------
-if(NOT EMU_SKIP_APPLAUNCH AND NOT WIN32)
+if(NOT EMU_SKIP_APPLAUNCH)
 
 add_library(APPLaunch SHARED
     ${APPLAUNCH_UI_C}
@@ -218,11 +211,7 @@ target_include_directories(APPLaunch PRIVATE
     ${APPLAUNCH}
     ${APPLAUNCH}/hal
 )
-if(NOT WIN32)
-    target_include_directories(APPLaunch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/compat_stubs)
-else()
-    target_include_directories(APPLaunch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/compat)
-endif()
+target_include_directories(APPLaunch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/compat_stubs)
 target_compile_definitions(APPLaunch PRIVATE HAL_PLATFORM_SDL=1)
 if(SDL2_MIXER_FOUND)
     target_compile_definitions(APPLaunch PRIVATE EMU_HAS_AUDIO=1)
@@ -230,16 +219,9 @@ if(SDL2_MIXER_FOUND)
     target_link_libraries(APPLaunch PRIVATE ${SDL2_MIXER_LINK_LIBRARIES})
     target_link_directories(APPLaunch PRIVATE ${SDL2_MIXER_LIBRARY_DIRS})
 endif()
-if(WIN32)
-    target_include_directories(APPLaunch BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/compat)
-    target_compile_options(APPLaunch PRIVATE
-        "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat_win.h"
-        -Wno-c++11-narrowing)
-else()
-    target_compile_options(APPLaunch PRIVATE
-        "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat.h"
-        -Wno-c++11-narrowing)
-endif()
+target_compile_options(APPLaunch PRIVATE
+    "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat.h"
+    -Wno-c++11-narrowing)
 if(APPLE)
     target_link_options(APPLaunch PRIVATE -undefined dynamic_lookup)
 else()
@@ -250,32 +232,7 @@ endif() # NOT EMU_SKIP_APPLAUNCH
 # ---------------------------------------------------------------------------
 # Emulator executable
 # ---------------------------------------------------------------------------
-if(WIN32 AND NOT EMU_SKIP_APPLAUNCH)
-    add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp
-        ${APPLAUNCH_UI_C} ${APPLAUNCH_UI_CPP} ${APPLAUNCH_KBD}
-        ${APPLAUNCH_HAL_SDL_C} ${APPLAUNCH_HAL_SDL_CPP}
-        ${APPLAUNCH_EMU_ENTRY}
-        ${CP0_LVGL_WIN32_SRCS})
-    target_include_directories(cardputer-zero-emu PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/compat
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendor
-        ${CMAKE_CURRENT_SOURCE_DIR}/lib/lvgl
-        ${REPO_ROOT}/ext_components/cp0_lvgl/include
-        ${REPO_ROOT}/SDK/github_source/eventpp/include
-        ${REPO_ROOT}/SDK/components/utilities/include
-        ${REPO_ROOT}/ext_components/Miniaudio/include
-        ${APPLAUNCH_GENERATED_INCLUDE}
-        ${APPLAUNCH}/ui ${APPLAUNCH}/include ${APPLAUNCH} ${APPLAUNCH}/hal)
-    target_compile_options(cardputer-zero-emu PRIVATE
-        "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/src/emu_compat_win.h"
-        -Wno-c++11-narrowing)
-    target_compile_definitions(cardputer-zero-emu PRIVATE EMU_STATIC_APP=1 HAL_PLATFORM_SDL=1)
-    target_link_options(cardputer-zero-emu PRIVATE -Wl,--allow-multiple-definition)
-elseif(WIN32)
-    message(FATAL_ERROR "Windows builds link APPLaunch statically; EMU_SKIP_APPLAUNCH leaves no app to run")
-else()
-    add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp)
-endif()
+add_executable(cardputer-zero-emu src/main.cpp src/device_skin.cpp src/keyboard_map.cpp)
 add_dependencies(cardputer-zero-emu lvgl lvgl_thorvg)
 if(TARGET APPLaunch)
     add_dependencies(cardputer-zero-emu APPLaunch)
@@ -287,9 +244,7 @@ if(APPLE)
     target_link_libraries(cardputer-zero-emu PRIVATE util)
 endif()
 # The SDL keyboard implementation depends on Linux headers (linux/input.h).
-# Some MinGW/MSYS environments report UNIX-like properties even when the
-# target compiler is Windows, so use the system name as an additional guard.
-if(UNIX AND NOT APPLE AND NOT WIN32 AND NOT CMAKE_SYSTEM_NAME MATCHES "Windows|MSYS|MINGW")
+if(UNIX AND NOT APPLE)
     target_sources(cardputer-zero-emu PRIVATE ${CP0_LVGL_SDL_SRCS})
     target_compile_definitions(cardputer-zero-emu PRIVATE HAL_PLATFORM_SDL=1)
     target_link_options(cardputer-zero-emu PRIVATE -Wl,--allow-multiple-definition)
@@ -305,9 +260,7 @@ target_include_directories(cardputer-zero-emu PRIVATE
     ${REPO_ROOT}/SDK/github_source/eventpp/include
     ${REPO_ROOT}/ext_components/Miniaudio/include
 )
-if(NOT MSVC)
-    target_compile_options(cardputer-zero-emu PRIVATE -Wno-c++11-narrowing)
-endif()
+target_compile_options(cardputer-zero-emu PRIVATE -Wno-c++11-narrowing)
 
 # Force-load LVGL for dlopen'd apps
 if(APPLE)
@@ -315,12 +268,6 @@ if(APPLE)
         -Wl,-force_load,$<TARGET_FILE:lvgl>
         -Wl,-force_load,$<TARGET_FILE:lvgl_thorvg>
     )
-elseif(MSVC)
-    target_link_libraries(cardputer-zero-emu PRIVATE lvgl lvgl_thorvg)
-    target_link_options(cardputer-zero-emu PRIVATE
-        /WHOLEARCHIVE:lvgl /WHOLEARCHIVE:lvgl_thorvg)
-elseif(WIN32)
-    target_link_libraries(cardputer-zero-emu PRIVATE lvgl lvgl_thorvg)
 else()
     target_link_libraries(cardputer-zero-emu PRIVATE
         -Wl,--whole-archive $<TARGET_FILE:lvgl> $<TARGET_FILE:lvgl_thorvg> -Wl,--no-whole-archive
@@ -377,16 +324,9 @@ else()
 endif()
 
 # dl + threads
-if(NOT WIN32)
-    target_link_libraries(cardputer-zero-emu PRIVATE ${CMAKE_DL_LIBS})
-    find_package(Threads REQUIRED)
-    target_link_libraries(cardputer-zero-emu PRIVATE Threads::Threads)
-else()
-    # ui_app_hack.hpp calls gethostname() on Windows via <winsock2.h>.
-    find_package(Threads REQUIRED)
-    target_link_libraries(cardputer-zero-emu PRIVATE Threads::Threads)
-    target_link_libraries(cardputer-zero-emu PRIVATE ws2_32)
-endif()
+target_link_libraries(cardputer-zero-emu PRIVATE ${CMAKE_DL_LIBS})
+find_package(Threads REQUIRED)
+target_link_libraries(cardputer-zero-emu PRIVATE Threads::Threads)
 
 # ---------------------------------------------------------------------------
 # Post-build: copy apps and resources

@@ -5,7 +5,7 @@
  */
 
 #include "ui_low_battery.h"
-#include "ui_screensaver.h"
+#include "ui_lockscreen.h"
 
 #include "low_battery_flow.hpp"
 #include "cp0_font_service.hpp"
@@ -250,7 +250,7 @@ void create_overlay()
 void render(uint32_t now, bool force)
 {
     const LowBatteryWarning warning = flow.warning();
-    if (ui_screensaver_is_active()) {
+    if (ui_lockscreen_is_active()) {
         if (overlay)
             lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
         rendered_warning = LowBatteryWarning::None;

@@ -68,20 +68,6 @@ static int ensure_user_dir(const std::string &dir)
 
 namespace ui_global_hint {
 
-namespace {
-std::atomic<bool> g_external_esc_hint_visible{false};
-}
-
-bool external_esc_hint_visible() noexcept
-{
-    return g_external_esc_hint_visible.load(std::memory_order_acquire);
-}
-
-void reset_external_esc_hint() noexcept
-{
-    g_external_esc_hint_visible.store(false, std::memory_order_release);
-}
-
 void shutdown()
 {
     esc_hold_hint_controller().shutdown();
@@ -174,8 +160,3 @@ extern "C" void ui_global_hint_on_key(const struct key_item *elm) noexcept
     ui_global_hint::on_key(elm);
 }
 
-extern "C" void ui_external_esc_hint(int visible) noexcept
-{
-    ui_global_hint::g_external_esc_hint_visible.store(
-        visible != 0, std::memory_order_release);
-}

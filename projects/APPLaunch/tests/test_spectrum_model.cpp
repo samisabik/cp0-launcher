@@ -48,10 +48,6 @@ int main()
     assert(level_index(kMinDbm) == 0);
     assert(level_index(kMaxDbm) == kLevels - 1);
     assert(level_index(0) == kLevels - 1);
-    assert(level_color(0) == 0x000000);
-    assert(level_color(kLevels - 1) == 0xFFFFFF);
-    assert(level_color(12) == 0x000000);
-    assert(level_color(46) == 0x3DDC84);
 
     assert(format_mhz(433920000) == "433.920");
     assert(format_mhz(315000000) == "315.000");

@@ -45,14 +45,11 @@ std::string security_label(const std::string &nmcli_security);
 // Channels 1..14 are 2.4 GHz and 32..177 are 5 GHz. A channel number alone
 // cannot tell 6 GHz apart, so 6 GHz networks are filed under the same numbers.
 Band band_of(int channel);
-// Channel centre in MHz, or 0 for a channel outside both bands.
-int centre_mhz(int channel);
 const char *band_label(Band band);
 
 // Approximate conversion between a 0..100 signal and dBm: dBm = signal/2 - 100,
 // the inverse of the mapping the title-row Wi-Fi bars use.
 int percent_to_dbm(int percent);
-int dbm_to_percent(int dbm);
 
 std::vector<Network> in_band(const std::vector<Network> &networks, Band band);
 void sort_networks(std::vector<Network> &networks, Sort sort);

@@ -53,7 +53,7 @@ launcher/
 ├── projects/
 │   ├── APPLaunch/             # ★ core: on-device launcher (grid home + built-in pages + .desktop app management)
 │   │   ├── SConstruct         #   project entry: pick config → invoke SDK build
-│   │   ├── *_config_defaults.mk  # 5 build profiles (see §4.1)
+│   │   ├── *_config_defaults.mk  # 4 build profiles (see §4.1)
 │   │   ├── main/              #   main/{src,ui,ui/{model,page_app,settings},include}/ + main/SConstruct
 │   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share
 │   │   ├── tests/             #   C++ unit tests + Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
@@ -115,20 +115,19 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 
 ## 4. Build System
 
-### 4.1 Five profiles — select with `CONFIG_DEFAULT_FILE`, never hand-edit
+### 4.1 Four profiles — select with `CONFIG_DEFAULT_FILE`, never hand-edit
 
 | File | Target |
 | --- | --- |
 | `config_defaults.mk` | **Native build on device** (aarch64, FBDEV + EVDEV) |
 | `linux_x86_sdl2_config_defaults.mk` | **Linux host SDL2 simulator** (default for day-to-day work) |
 | `linux_x86_cross_cp0_config_defaults.mk` | Linux x86_64 → aarch64 cross-compile |
-| `darwin_config_defaults.mk` | macOS native SDL |
 | `mac_cross_cp0_config_defaults.mk` | macOS → aarch64 cross-compile |
 
 **Hard rules**:
 
 1. **You must run `scons` inside `projects/<project>/`.** Running it from the repo root fails — `CONFIG_DEFAULT_FILE` is a bare filename and the SDK resolves it with `resolve()` relative to the CWD.
-2. **Run `scons distclean` before switching profiles.** APPLaunch's `SConstruct` has no config-invalidation logic (other projects have a `selected-defaults.txt` mechanism). When `build/config/global_config.mk` already exists the SDK will not regenerate the config → you will compile arm64 while believing you are on SDL2.
+2. **Run `scons distclean` before switching profiles.** APPLaunch's `SConstruct` has no config-invalidation logic. When `build/config/global_config.mk` already exists the SDK will not regenerate the config → you will compile arm64 while believing you are on SDL2.
 3. **Do not run `scons save`**, which writes back into the shared `*_config_defaults.mk` — those are public profiles used by everyone.
 
 ### 4.2 Artifacts and directories
@@ -184,7 +183,7 @@ Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scri
 ```
 main/src/main.cpp  main()
   ├─ options.after_resource_init          # backlight to 0 → restore previous brightness
-  ├─ options.setup   → launcher_ui::init() [ui/ui.cpp:36] + ui_screensaver_init()
+  ├─ options.setup   → launcher_ui::init() [ui/ui.cpp:36] + ui_lockscreen_init()
   └─ cp0_lvgl_run(options)                # ★ the real main loop
         [ext_components/cp0_lvgl/src/cp0_lvgl_app_runner.cpp  cp0_lvgl_run()]
         lv_init() → cp0_lvgl_init() → setup() → first frame →
@@ -236,7 +235,7 @@ Screen geometry: **320×170**, a 20px top bar plus a 320×150 content area.
 | Volume/brightness OSD | `main/ui/launcher_media_osd.cpp` | `model/launcher_media_model.hpp` |
 | Toast styling | `main/ui/launcher_toast.cpp` | `kShowDurationMs` |
 | Loading overlay | `main/ui/ui_loading.cpp` | `show` / `hide` |
-| Lock screen (timeout/unlock/Game of Life/status card) | `main/ui/ui_screensaver.cpp` + `model/lockscreen_state_model.hpp`, `model/screensaver_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
+| Lock screen (timeout/unlock/Game of Life/status card) | `main/ui/ui_lockscreen.cpp` + `model/lockscreen_state_model.hpp`, `model/lockscreen_activity_model.hpp` | constrained by `tests/test_lockscreen_contract.py` |
 | Low-battery policy / appearance | `main/ui/low_battery_flow.hpp` / `ui_low_battery.cpp` | the policy is pure logic and unit-tested |
 | Settings menu structure | `main/ui/settings/settings_page.cpp` | `create_page_detail` (node order = menu order), `UISettingTreePage` |
 | Settings entry policy/gating | `main/ui/settings/settings_tree_types.hpp` | `SettingEntry`, `SettingActivationPolicy`, `activation_gate` |
@@ -364,7 +363,6 @@ Each runner lists the tests it builds; the three hardware or LVGL-dependent test
 Known **branch-dependent points** (never treat these as fixed facts):
 
 - **Whether CI publishes prereleases automatically**, and which workflow files exist, vary by branch.
-- **Whether `.workbuddy/` is git-ignored** varies by branch (some branches lack that line).
 
 ### 10.2 Semantic traps
 
@@ -425,7 +423,7 @@ Submodule pointers (`M SDK`, `M projects/CardputerZero-Emulator/lib/lvgl`) are o
 - **There is no CONTRIBUTING file, no PR template, and no issue template.**
 - **Licensing**: the root [`LICENSE`](LICENSE) is MIT (M5Stack code). [`LICENSES/`](LICENSES/) holds verbatim third-party texts plus provenance and **does not relicense this repo**.
   New third-party components must be registered following [`docs/OPEN_SOURCE_COMPONENTS.md`](docs/OPEN_SOURCE_COMPONENTS.md): the verbatim text in `LICENSES/` + a provenance row in `LICENSES/README.md` + a row in `OPEN_SOURCE_COMPONENTS.md` (plus `ext_components/THIRD_PARTY_NOTICES.md` if the component lives under `ext_components/`).
-- **Never commit**: `build/`, `dist/`, `compile_commands.json`, or `.workbuddy/`.
+- **Never commit**: `build/`, `dist/`, or `compile_commands.json`.
 - **Multi-agent / shared working tree**:
   1. run `git status --short` before touching anything;
   2. **never `git add -A`** — stage only the files you changed;
