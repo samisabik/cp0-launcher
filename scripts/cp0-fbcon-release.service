@@ -1,0 +1,10 @@
+[Unit]
+Description=Release the kernel text console from the LCD for the launcher
+After=systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for c in /sys/class/vtconsole/vtcon*; do grep -q "frame buffer" "$c/name" && echo 0 > "$c/bind"; done; true'
+
+[Install]
+WantedBy=multi-user.target

@@ -8,7 +8,9 @@
 #include "commount.h"
 #include "cp0_lvgl_app.h"
 #include "lvgl/lvgl.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 uint32_t lv_c_event[(2*CP0_C_EVENT_END)] = {0};
 
@@ -20,9 +22,20 @@ static const char *getenv_default(const char *name, const char *dflt)
 
 void init_lvgl_env()
 {
-    setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1);
-    setenv("PIPEWIRE_RUNTIME_DIR", "/run/user/1000", 1);
-    setenv("PULSE_SERVER", "unix:/run/user/1000/pulse/native", 1);
+    // The user manager sets XDG_RUNTIME_DIR for the service. Started by hand
+    // it can be missing, so fall back to the usual path for this user; the
+    // uid is not 1000 on every system.
+    char runtime[96];
+    const char *from_env = getenv("XDG_RUNTIME_DIR");
+    if (from_env && from_env[0])
+        snprintf(runtime, sizeof(runtime), "%s", from_env);
+    else
+        snprintf(runtime, sizeof(runtime), "/run/user/%u", (unsigned)getuid());
+    char pulse[128];
+    snprintf(pulse, sizeof(pulse), "unix:%s/pulse/native", runtime);
+    setenv("XDG_RUNTIME_DIR", runtime, 1);
+    setenv("PIPEWIRE_RUNTIME_DIR", runtime, 1);
+    setenv("PULSE_SERVER", pulse, 1);
 
 #if LV_USE_EVDEV
     const char *default_keyboard_device = cp0_file_path("keyboard_device");

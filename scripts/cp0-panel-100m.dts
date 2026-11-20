@@ -1,0 +1,14 @@
+/dts-v1/;
+/plugin/;
+/* Ask for a 100 MHz SPI clock for the LCD; the board overlay asks for 60 MHz.
+ * List it after cardputerzero-v5-overlay in config.txt. Measured on one device:
+ * 26 full frames per second reach the panel at 60 MHz, 59 at 100 MHz. */
+/ {
+	compatible = "brcm,bcm2835";
+	fragment@0 {
+		target-path = "/soc/spi@7e204000/st7789v@0";
+		__overlay__ {
+			spi-max-frequency = <100000000>;
+		};
+	};
+};

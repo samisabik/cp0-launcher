@@ -79,6 +79,17 @@ inline std::vector<std::string> wifi_interfaces()
 }
 
 // Whole file as a string; empty when it cannot be read.
+// Asks the device's helper to load (or unload) the USB Wi-Fi driver, which
+// stays unloaded while unused so the USB bus can sleep. The adapter shows up
+// in wifi_interfaces() a few seconds after `true`. Does nothing on a device
+// without the helper, where the driver is always loaded.
+inline void usb_wifi(bool on)
+{
+    static const char *const kHelper = "/usr/local/sbin/cp0-usb-wifi";
+    if (access(kHelper, X_OK) != 0) return;
+    spawn(std::string("sudo -n ") + kHelper + (on ? " on" : " off") + " >/dev/null 2>&1");
+}
+
 inline std::string read_file(const std::string &path)
 {
     std::string out;

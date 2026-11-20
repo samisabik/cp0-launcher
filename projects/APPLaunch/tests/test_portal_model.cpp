@@ -52,6 +52,11 @@ int main()
     const std::string stop = stop_script("/d");
     assert(stop.find("-D PREROUTING") != std::string::npos);
     assert(stop.find("managed yes") != std::string::npos);
+    // The USB adapter's driver is loaded for the AP and released after it.
+    assert(start.find("/usr/local/sbin/cp0-usb-wifi on\n") != std::string::npos);
+    assert(start.find("cp0-usb-wifi on") < start.find("/authorized"));
+    assert(stop.find("/usr/local/sbin/cp0-usb-wifi off\n") != std::string::npos);
+    assert(stop.find("cp0-usb-wifi off") > stop.find("hostapd"));
 
     // Run-log parsing: the rc marker, or -1 while it is still running.
     assert(parse_rc("line one\nline two\n") == -1);

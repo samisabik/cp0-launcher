@@ -104,9 +104,11 @@ UIAirPage::UIAirPage() : AppPage()
     ble_replies_ = std::make_shared<BleReplies>();
     pixels_.assign(static_cast<std::size_t>(kMapW) * kMapH, app_support::rgb565(cp0::theme::kPanel));
     nmcli_ok_ = app_support::tool_present("nmcli");
+    app_support::usb_wifi(true);
     cp0_signal_config_api({"GetStr", kAdapterConfigKey, ""}, [&](int code, std::string data) {
         if (code == 0) iface_ = data;
     });
+    preferred_iface_ = iface_;
     // A stored adapter that is unplugged falls back to the first one.
     const std::vector<std::string> adapters = app_support::wifi_interfaces();
     if (std::find(adapters.begin(), adapters.end(), iface_) == adapters.end())
@@ -127,6 +129,7 @@ UIAirPage::~UIAirPage()
     if (root_screen_) lv_obj_remove_event_cb_with_user_data(root_screen_, event_cb, this);
     leave_ble();
     cancel_job(scan_job_);
+    app_support::usb_wifi(false);
 }
 
 void UIAirPage::create_ui()
@@ -259,6 +262,19 @@ void UIAirPage::start_scan()
 {
     if (!nmcli_ok_ || scan_job_.pid > 0) return;
     last_scan_ = lv_tick_get();
+    const std::vector<std::string> adapters = app_support::wifi_interfaces();
+    const auto present = [&](const std::string &name) {
+        return std::find(adapters.begin(), adapters.end(), name) != adapters.end();
+    };
+    std::string use = iface_;
+    if (!preferred_iface_.empty() && present(preferred_iface_)) use = preferred_iface_;
+    else if (!present(use)) use = adapters.empty() ? std::string() : adapters.front();
+    if (use != iface_) {
+        iface_ = use;
+        wifi_known_ = false;
+        all_.clear();
+        rebuild_view();
+    }
     start_job(scan_job_, air::scan_cmd(iface_));
 }
 
@@ -271,6 +287,7 @@ void UIAirPage::next_adapter()
         return;
     }
     iface_ = next;
+    preferred_iface_ = next;
     cp0_signal_config_api({"SetStr", kAdapterConfigKey, iface_}, nullptr);
     cp0_signal_config_api({"Save"}, nullptr);
     cancel_job(scan_job_);

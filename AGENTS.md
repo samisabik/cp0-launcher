@@ -164,7 +164,7 @@ cd projects/APPLaunch && bear -- scons -j$(nproc)   # writes ./compile_commands.
 
 Release tarball (local equivalent): cross-build `projects/APPLaunch`, then `scripts/package_release.sh` → `release/cp0-launcher-arm64.tar.gz`, installed on the device by its `install.sh` (`scripts/device_install.sh`).
 
-`install.sh` also installs `scripts/50-cp0-wifi-scan.rules`, the polkit rule that lets the launcher scan and join Wi-Fi. `scripts/APPLaunch.service` is the user unit the launcher runs under; the stock image already has it, so the tarball does not install it.
+`install.sh` also installs `scripts/50-cp0-wifi-scan.rules`, the polkit rule that lets the launcher scan and join Wi-Fi. `scripts/APPLaunch.service` is the user unit the launcher runs under; the stock image already has it, so `install.sh` does not install it. On a device with no stock launcher, `bootstrap.sh` (`scripts/device_bootstrap.sh`) installs the unit, the rules and the launcher, after `scripts/dietpi_provision.sh` has prepared the system; see `docs/dietpi-migration.md`.
 
 ### 4.5 Other build notes
 

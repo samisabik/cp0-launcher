@@ -78,6 +78,9 @@ private:
     bool nmcli_ok_ = false;
     // Adapter the scan runs on; empty until one is found.
     std::string iface_;
+    // Adapter the user chose. A USB one appears a few seconds after the page
+    // asks for its driver, so the scan starts on another and moves to it.
+    std::string preferred_iface_;
     bool wifi_known_ = false;
     std::string wifi_error_;
     std::vector<air::Network> all_;
