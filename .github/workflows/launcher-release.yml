@@ -1,6 +1,6 @@
-name: Publish APPLauncher release
+name: Publish cp0-launcher release
 
-run-name: Publish APPLauncher ${{ inputs.version }}
+run-name: Publish cp0-launcher ${{ inputs.version }}
 
 # Reviewed release gate. Merges only build artifacts (launcher-build.yml); this
 # workflow is the single path that publishes a GitHub Release, and it can only be
