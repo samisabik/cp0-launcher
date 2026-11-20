@@ -194,7 +194,6 @@ private:
     static int clamp(int v, int lo, int hi);
     static std::string printable(uint32_t u);
     static lv_color_t palette(uint32_t color);
-    static const lv_font_t *terminal_font();
     static uint32_t xterm256_to_palette(int color);
     static uint32_t rgb_to_palette(int r, int g, int b);
 
@@ -212,7 +211,6 @@ private:
 
     void update_scrollbar();
     void update_hscrollbar();
-    void set_bottom_label(int index, const char *text);
     void update_big_mode_ui();
     void switch_big_mode(bool enable);
     void leave_scrollback();

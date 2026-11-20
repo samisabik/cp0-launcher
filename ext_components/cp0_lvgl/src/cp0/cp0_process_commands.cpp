@@ -19,7 +19,6 @@
 #include <thread>
 #include <utility>
 
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
@@ -27,7 +26,6 @@
 #include <poll.h>
 #include <signal.h>
 #include <unistd.h>
-#endif
 
 namespace cp0_process_commands {
 namespace {
@@ -42,7 +40,6 @@ std::vector<char *> make_argv(const std::vector<std::string> &argv)
     return raw;
 }
 
-#if !defined(_WIN32)
 int wait_for_child(pid_t pid, bool report_signal = true)
 {
     int status = 0;
@@ -55,22 +52,6 @@ int wait_for_child(pid_t pid, bool report_signal = true)
     if (report_signal && WIFSIGNALED(status))
         return 128 + WTERMSIG(status);
     return -1;
-}
-
-bool write_all(int fd, const char *data, size_t size)
-{
-    size_t offset = 0;
-    while (offset < size) {
-        const ssize_t written = ::write(fd, data + offset, size - offset);
-        if (written > 0) {
-            offset += static_cast<size_t>(written);
-            continue;
-        }
-        if (written < 0 && errno == EINTR)
-            continue;
-        return false;
-    }
-    return true;
 }
 
 void redirect_to_devnull()
@@ -116,17 +97,11 @@ std::string configured_run_user()
     endpwent();
     return user.empty() ? "pi" : user;
 }
-#endif
 
 } // namespace
 
 int run_argv(const std::vector<std::string> &argv, bool background)
 {
-#if defined(_WIN32)
-    (void)argv;
-    (void)background;
-    return -1;
-#else
     if (argv.empty() || argv[0].empty())
         return -EINVAL;
 
@@ -141,66 +116,11 @@ int run_argv(const std::vector<std::string> &argv, bool background)
         _exit(127);
     }
     return background ? 0 : wait_for_child(pid);
-#endif
-}
-
-int run_sudo(const std::string &password, const std::vector<std::string> &argv)
-{
-#if defined(_WIN32)
-    (void)password;
-    (void)argv;
-    return -1;
-#else
-    if (argv.empty() || argv[0].empty())
-        return -EINVAL;
-
-    std::vector<std::string> sudo_argv = {"sudo", "-k", "-S", "--"};
-    sudo_argv.insert(sudo_argv.end(), argv.begin(), argv.end());
-
-    int stdin_pipe[2];
-    if (pipe(stdin_pipe) != 0)
-        return -errno;
-    pid_t pid = fork();
-    if (pid < 0) {
-        close(stdin_pipe[0]);
-        close(stdin_pipe[1]);
-        return -errno;
-    }
-    if (pid == 0) {
-        close(stdin_pipe[1]);
-        dup2(stdin_pipe[0], STDIN_FILENO);
-        if (stdin_pipe[0] > STDIN_FILENO)
-            close(stdin_pipe[0]);
-        int devnull = open("/dev/null", O_WRONLY);
-        if (devnull >= 0) {
-            dup2(devnull, STDOUT_FILENO);
-            dup2(devnull, STDERR_FILENO);
-            if (devnull > STDERR_FILENO)
-                close(devnull);
-        }
-        auto raw = make_argv(sudo_argv);
-        execvp(raw[0], raw.data());
-        _exit(127);
-    }
-
-    close(stdin_pipe[0]);
-    const std::string password_line = password + "\n";
-    const bool password_written =
-        write_all(stdin_pipe[1], password_line.data(), password_line.size());
-    const int write_error = password_written ? 0 : errno;
-    close(stdin_pipe[1]);
-    const int child_result = wait_for_child(pid);
-    return password_written ? child_result : -(write_error ? write_error : EIO);
-#endif
 }
 
 int capture_argv(const std::vector<std::string> &argv, std::string &output)
 {
     output.clear();
-#if defined(_WIN32)
-    (void)argv;
-    return -1;
-#else
     if (argv.empty() || argv[0].empty())
         return -EINVAL;
 
@@ -236,7 +156,6 @@ int capture_argv(const std::vector<std::string> &argv, std::string &output)
         output.append(buffer, static_cast<size_t>(count));
     close(output_pipe[0]);
     return wait_for_child(pid, false);
-#endif
 }
 
 int capture_argv_with_timeout(const std::vector<std::string> &argv,
@@ -244,12 +163,6 @@ int capture_argv_with_timeout(const std::vector<std::string> &argv,
                               const std::atomic<bool> *cancel)
 {
     output.clear();
-#if defined(_WIN32)
-    (void)argv;
-    (void)timeout_ms;
-    (void)cancel;
-    return -1;
-#else
     if (argv.empty() || argv[0].empty() || timeout_ms <= 0)
         return -EINVAL;
     int output_pipe[2];
@@ -317,14 +230,10 @@ int capture_argv_with_timeout(const std::vector<std::string> &argv,
     if (WIFEXITED(status)) return WEXITSTATUS(status);
     if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
     return -EIO;
-#endif
 }
 
 void exec_shell_as_configured_user(const char *command)
 {
-#if defined(_WIN32)
-    (void)command;
-#else
     if (!command || !command[0])
         _exit(127);
     const std::string user = configured_run_user();
@@ -340,7 +249,6 @@ void exec_shell_as_configured_user(const char *command)
             _exit(126);
     }
     execlp("/bin/sh", "sh", "-c", command, static_cast<char *>(nullptr));
-#endif
 }
 
 } // namespace cp0_process_commands

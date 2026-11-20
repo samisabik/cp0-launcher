@@ -147,12 +147,6 @@ fi
 "$binary"
 
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
-    -I"$root/src/cp0" \
-    "$root/src/cp0/cp0_framebuffer_codec.cpp" \
-    "$root/tests/test_framebuffer_codec.cpp" -o "$binary"
-"$binary"
-
-"${CXX:-c++}" -std=c++17 -Wall -Wextra -Werror \
     -I"$root/src" "$root/src/cp0_alsa_parser.cpp" \
     "$root/tests/test_alsa_parser.cpp" -o "$binary"
 "$binary"

@@ -225,19 +225,6 @@ float median_db(std::vector<float> values)
     return values[mid];
 }
 
-std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const std::string &outpath)
-{
-    span_hz = std::clamp<uint32_t>(span_hz, 200000u, kMaxSpanHz);
-    const uint32_t low = clamp_hz(static_cast<int64_t>(center_hz) - span_hz / 2);
-    const uint32_t high = clamp_hz(static_cast<int64_t>(center_hz) + span_hz / 2);
-    const uint32_t bin = std::max<uint32_t>(1000u, span_hz / 320u);
-    std::string cmd = "rtl_power -f " + std::to_string(low) + ":" + std::to_string(high) + ":" +
-                      std::to_string(bin) + " -i 1";
-    if (gain_db >= 0) cmd += " -g " + std::to_string(gain_db);
-    cmd += " '" + outpath + "'";
-    return cmd;
-}
-
 std::string decode_cmd(uint32_t hz, int gain_db, const std::string &outpath)
 {
     std::string cmd = "rtl_433 -f " + std::to_string(hz) + " -F json";
@@ -263,41 +250,6 @@ Detect parse_detect(const std::string &output)
         detect.name = row;
     }
     return detect;
-}
-
-PowerRow parse_power_row(const std::string &line)
-{
-    PowerRow row;
-    std::stringstream stream(line);
-    std::string field;
-    std::vector<std::string> fields;
-    while (std::getline(stream, field, ',')) {
-        const std::size_t first = field.find_first_not_of(" \t");
-        fields.push_back(first == std::string::npos ? "" : field.substr(first));
-    }
-    // date, time, low, high, step, samples, then dB values.
-    if (fields.size() < 7) return row;
-    row.low_hz = static_cast<uint32_t>(std::strtoul(fields[2].c_str(), nullptr, 10));
-    row.step_hz = static_cast<uint32_t>(std::strtod(fields[4].c_str(), nullptr));
-    if (row.step_hz == 0) return row;
-    for (std::size_t i = 6; i < fields.size(); ++i) {
-        if (fields[i].empty()) continue;
-        row.db.push_back(static_cast<int>(std::lround(std::strtod(fields[i].c_str(), nullptr))));
-    }
-    row.valid = !row.db.empty();
-    return row;
-}
-
-std::vector<int> power_columns(const PowerRow &row, int width)
-{
-    std::vector<int> columns(width, -120);
-    if (!row.valid || width <= 0) return columns;
-    const int bins = static_cast<int>(row.db.size());
-    for (int x = 0; x < width; ++x) {
-        const int bin = bins == 1 ? 0 : x * (bins - 1) / (width - 1 > 0 ? width - 1 : 1);
-        columns[x] = row.db[std::clamp(bin, 0, bins - 1)];
-    }
-    return columns;
 }
 
 int level_index(int db, int floor_db, int ceil_db, int levels)

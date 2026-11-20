@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if !defined(_WIN32)
 
 #include <cerrno>
 #include <chrono>
@@ -126,4 +125,3 @@ inline bool terminate_and_reap(pid_t pgid, pid_t leader,
 
 } // namespace cp0_process_group
 
-#endif

@@ -11,18 +11,6 @@
 
 int main()
 {
-    assert(setup_values::brightness_index(100, 100) == 0);
-    assert(setup_values::brightness_index(86, 100) == 1);
-    assert(setup_values::brightness_index(61, 100) == 2);
-    assert(setup_values::brightness_index(36, 100) == 3);
-    assert(setup_values::brightness_index(20, 0) == 0);
-    assert(setup_values::brightness_value(0, 200) == 200);
-    assert(setup_values::brightness_value(2, 200) == 100);
-    assert(setup_values::brightness_value(99, 3) == 1);
-    assert(setup_values::brightness_value(-1, 0) == 1);
-    assert(setup_values::brightness_index(INT_MAX, INT_MAX) == 0);
-    assert(setup_values::brightness_value(2, INT_MAX) == INT_MAX / 2);
-
     assert(setup_values::kBrightnessStepCount == 10);
     assert(setup_values::brightness_step_percent(0) == 100);
     assert(setup_values::brightness_step_percent(9) == 10);

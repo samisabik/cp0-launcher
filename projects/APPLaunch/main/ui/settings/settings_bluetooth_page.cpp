@@ -1970,10 +1970,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
             lv_timer_delete(api_timer_);
             api_timer_ = nullptr;
         }
-        if (cursor_timer_) {
-            lv_timer_delete(cursor_timer_);
-            cursor_timer_ = nullptr;
-        }
         if (status_retry_timer_) {
             lv_timer_delete(status_retry_timer_);
             status_retry_timer_ = nullptr;
@@ -2044,9 +2040,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
                 this);
         }
         api_timer_ = lv_timer_create(api_result_timer_cb, 50, this);
-        // lv_textarea owns cursor rendering/blinking. Rebuilding it from a
-        // timer would drop focus and make editing appear to stutter.
-        cursor_timer_ = nullptr;
         // BlueZ may still be starting when the editor opens. Retry unresolved
         // status requests, while a powered-off adapter is handled by the
         // power warning below.
@@ -2357,17 +2350,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
     }
 
 
-    void LvSettingBluetoothAliasPage3::cursor_timer_cb(lv_timer_t *timer) noexcept
-{
-        auto *self = timer
-            ? static_cast<LvSettingBluetoothAliasPage3 *>(lv_timer_get_user_data(timer))
-            : nullptr;
-        if (!self || timer != self->cursor_timer_ || self->warning_active_ || self->saving_)
-            return;
-        self->cursor_visible_ = !self->cursor_visible_;
-        self->render();
-    }
-
 
     void LvSettingBluetoothAliasPage3::enter_text_input_mode()
 {
@@ -2409,7 +2391,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
             lv_textarea_add_text(alias_input_, text);
             sync_textarea_state();
             alias_edited_ = true;
-            cursor_visible_ = true;
             error_message_.clear();
             return;
         }
@@ -2419,7 +2400,6 @@ LvSettingBluetoothAliasPage3::~LvSettingBluetoothAliasPage3()
         alias_.insert(cursor_, text, length);
         cursor_ += length;
         alias_edited_ = true;
-        cursor_visible_ = true;
         error_message_.clear();
         render();
     }
@@ -2573,7 +2553,6 @@ void LvSettingBluetoothAliasPage3::save_device_name()
                     cursor_ = start;
                 }
                 alias_edited_ = true;
-                cursor_visible_ = true;
                 render();
             }
         } else if (key == LV_KEY_UP || key == LV_KEY_DOWN) {
@@ -2586,7 +2565,6 @@ void LvSettingBluetoothAliasPage3::save_device_name()
                 } else {
                     cursor_ = previous_utf8_start(alias_, cursor_);
                 }
-                cursor_visible_ = true;
                 render();
             }
         } else if (key == LV_KEY_RIGHT) {
@@ -2597,7 +2575,6 @@ void LvSettingBluetoothAliasPage3::save_device_name()
                 } else {
                     cursor_ = next_utf8_end(alias_, cursor_);
                 }
-                cursor_visible_ = true;
                 render();
             }
         } else if (key == LV_KEY_ENTER) {
@@ -2667,7 +2644,6 @@ void LvSettingBluetoothAliasPage3::save_device_name()
                 } else {
                     self->cursor_ = previous_utf8_start(self->alias_, self->cursor_);
                 }
-                self->cursor_visible_ = true;
                 self->render();
             }
         } else if (key == KEY_RIGHT) {
@@ -2678,7 +2654,6 @@ void LvSettingBluetoothAliasPage3::save_device_name()
                 } else {
                     self->cursor_ = next_utf8_end(self->alias_, self->cursor_);
                 }
-                self->cursor_visible_ = true;
                 self->render();
             }
         } else if (item->utf8[0]) {

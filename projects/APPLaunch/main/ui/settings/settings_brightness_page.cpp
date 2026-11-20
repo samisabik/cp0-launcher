@@ -14,7 +14,6 @@
 #include "hal_lvgl_bsp.h"
 
 #include <algorithm>
-#include <array>
 #include <climits>
 #include <condition_variable>
 #include <exception>
@@ -26,13 +25,6 @@
 #include <utility>
 
 namespace {
-
-int normalized_brightness_option_count(int count)
-{
-    return count >= setup_values::kBrightnessStepCount
-               ? setup_values::kBrightnessStepCount
-               : count >= 5 ? 5 : 4;
-}
 
 class settings_brightness_com {
     using Page = LvSettingBrightnessPage3;
@@ -101,46 +93,18 @@ class settings_brightness_com {
         return response.succeeded() && parse_nonnegative(response.data, value) && value >= minimum && value <= maximum;
     }
     static bool response_is_ok(const Response &response) { return response.succeeded() && response.data == "ok"; }
-    static int brightness_percent(int index, int count)
+    static int brightness_index(int value, int maximum)
     {
-        static constexpr std::array<int, 4> legacy{{100, 75, 50, 25}};
-        static constexpr std::array<int, 5> zero{{100, 75, 50, 25, 0}};
-        const int option_count = normalized_brightness_option_count(count);
-        if (option_count == setup_values::kBrightnessStepCount)
-            return setup_values::brightness_step_percent(index);
-        if (option_count == 5)
-            return zero[static_cast<std::size_t>(std::clamp(index, 0, 4))];
-        return legacy[static_cast<std::size_t>(std::clamp(index, 0, 3))];
+        return setup_values::brightness_step_index_from_raw(value, maximum);
     }
-    static int brightness_index(int value, int maximum, int count)
+    static int brightness_value(int index, int maximum)
     {
-        const int option_count = normalized_brightness_option_count(count);
-        if (option_count == 4) return setup_values::brightness_index(value, maximum);
-        if (option_count == setup_values::kBrightnessStepCount)
-            return setup_values::brightness_step_index_from_raw(value, maximum);
-        if (maximum <= 0) return 0;
-        const int percent = static_cast<int>(static_cast<std::int64_t>(value) * 100 / maximum);
-        if (percent >= 88) return 0;
-        if (percent >= 63) return 1;
-        if (percent >= 38) return 2;
-        if (percent >= 13) return 3;
-        return 4;
-    }
-    static int brightness_value(int index, int maximum, int count)
-    {
-        const int safe_maximum = std::max(1, maximum);
-        const int option_count = normalized_brightness_option_count(count);
-        if (option_count == 4)
-            return setup_values::brightness_value(index, safe_maximum);
-        if (option_count == setup_values::kBrightnessStepCount)
-            return setup_values::brightness_step_value(index, safe_maximum);
-        return static_cast<int>(static_cast<std::int64_t>(safe_maximum) *
-                                brightness_percent(index, option_count) / 100);
+        return setup_values::brightness_step_value(index, std::max(1, maximum));
     }
     static bool valid_value(int value, int maximum) { return maximum > 0 && value >= 0 && value <= maximum; }
-    static bool valid_index(int index, int count)
+    static bool valid_index(int index)
     {
-        return index >= 0 && index < normalized_brightness_option_count(count);
+        return index >= 0 && index < setup_values::kBrightnessStepCount;
     }
     static bool restore(const SettingsInvoker &settings, const ConfigInvoker &config, int value, int maximum, int config_value)
     {
@@ -153,7 +117,7 @@ class settings_brightness_com {
     }
 
 public:
-    static Page::BrightnessReadResult read(const SettingsInvoker &settings, const ConfigInvoker &config, int count)
+    static Page::BrightnessReadResult read(const SettingsInvoker &settings, const ConfigInvoker &config)
     {
         std::lock_guard<std::mutex> operation_lock(
             brightness_control::operation_mutex());
@@ -161,28 +125,28 @@ public:
         int maximum = 0;
         if (!parse_bounded(max_response, 1, INT_MAX, maximum))
             return {max_response.code == 0 ? Page::BrightnessReadStatus::InvalidPayload : Page::BrightnessReadStatus::BackendError,
-                    100, 75, brightness_index(75, 100, count), "backlight maximum read failed"};
+                    100, 75, brightness_index(75, 100), "backlight maximum read failed"};
         const Response value_response = invoke({"BacklightRead"}, settings);
         int value = 0;
         if (parse_bounded(value_response, 0, maximum, value))
-            return {Page::BrightnessReadStatus::Ok, maximum, value, brightness_index(value, maximum, count), {}};
+            return {Page::BrightnessReadStatus::Ok, maximum, value, brightness_index(value, maximum), {}};
         const Response config_response = get_int(config, maximum);
         int saved = 0;
         if (!parse_bounded(config_response, 0, maximum, saved))
             return {config_response.code == 0 ? Page::BrightnessReadStatus::InvalidPayload : Page::BrightnessReadStatus::BackendError,
-                    maximum, maximum, brightness_index(maximum, maximum, count), "backlight and saved brightness read failed"};
-        return {Page::BrightnessReadStatus::Defaulted, maximum, saved, brightness_index(saved, maximum, count),
+                    maximum, maximum, brightness_index(maximum, maximum), "backlight and saved brightness read failed"};
+        return {Page::BrightnessReadStatus::Defaulted, maximum, saved, brightness_index(saved, maximum),
                 "backlight read failed; using saved brightness"};
     }
     static Page::BrightnessWriteResult write(const SettingsInvoker &settings, const ConfigInvoker &config,
-                                             int index, int maximum, int previous, int count)
+                                             int index, int maximum, int previous)
     {
         std::lock_guard<std::mutex> operation_lock(
             brightness_control::operation_mutex());
         Page::BrightnessWriteResult result;
         result.previous_value = previous;
         result.previous_config = previous;
-        if (!valid_value(previous, maximum) || !valid_index(index, count)) {
+        if (!valid_value(previous, maximum) || !valid_index(index)) {
             result.status = Page::BrightnessWriteStatus::InvalidTarget;
             result.message = "invalid brightness value";
             return result;
@@ -193,7 +157,7 @@ public:
             result.message = "brightness config read failed";
             return result;
         }
-        const int requested = brightness_value(index, maximum, count);
+        const int requested = brightness_value(index, maximum);
         if (!valid_value(requested, maximum)) {
             result.status = Page::BrightnessWriteStatus::InvalidTarget;
             result.message = "invalid brightness target";
@@ -215,7 +179,7 @@ public:
             return result;
         }
         result.applied_value = applied;
-        result.applied_index = brightness_index(applied, maximum, count);
+        result.applied_index = brightness_index(applied, maximum);
         if (!response_is_ok(set_int(config, applied))) {
             result.status = Page::BrightnessWriteStatus::ConfigWriteFailed;
             result.rollback_attempted = true;
@@ -316,13 +280,6 @@ LvSettingBrightnessPage3::ConfigInvoker LvSettingBrightnessPage3::config_invoker
     };
 }
 
-int LvSettingBrightnessPage3::option_count() const
-{
-    int count = 0;
-    for (auto it = parent_node().begin(); it != parent_node().end(); ++it) ++count;
-    return count;
-}
-
 void LvSettingBrightnessPage3::initialize_page(lv_obj_t *parent, std::function<void()> back_callback)
 {
     back_callback_ = std::move(back_callback);
@@ -416,14 +373,13 @@ void LvSettingBrightnessPage3::begin_load()
     pending_ = true;
     loaded_ = false;
     const std::uint64_t request_generation = ++generation_;
-    const int page_option_count = option_count();
     set_status("Loading brightness", false);
 
     DComponens::LvglComponensBase::AsyncTaskCallbacks<BrightnessReadResult> callbacks;
     const SettingsInvoker settings = settings_invoker();
     const ConfigInvoker config = config_invoker();
-    callbacks.execute = [settings, config, page_option_count]() {
-        return settings_brightness_com::read(settings, config, page_option_count);
+    callbacks.execute = [settings, config]() {
+        return settings_brightness_com::read(settings, config);
     };
     callbacks.on_complete = [this, request_generation](
                                 DComponens::LvglComponensBase::AsyncTaskContext &,
@@ -485,9 +441,7 @@ void LvSettingBrightnessPage3::finish_write_failure()
 
 bool LvSettingBrightnessPage3::begin_write()
 {
-    const int page_option_count = option_count();
-    if (selected_index < 0 ||
-        selected_index >= normalized_brightness_option_count(page_option_count)) {
+    if (selected_index < 0 || selected_index >= setup_values::kBrightnessStepCount) {
         select(saved_index_);
         restore_focus();
         set_status("Invalid brightness target", true);
@@ -504,9 +458,9 @@ bool LvSettingBrightnessPage3::begin_write()
     const int target_index = selected_index;
     const int maximum = maximum_;
     const int previous_value = value_;
-    callbacks.execute = [settings, config, target_index, maximum, previous_value, page_option_count]() {
+    callbacks.execute = [settings, config, target_index, maximum, previous_value]() {
         return settings_brightness_com::write(
-            settings, config, target_index, maximum, previous_value, page_option_count);
+            settings, config, target_index, maximum, previous_value);
     };
     callbacks.on_complete = [this, request_generation](
                                 DComponens::LvglComponensBase::AsyncTaskContext &,

@@ -150,11 +150,7 @@ private:
         if (!value)
             return -1;
         const std::time_t now = std::time(nullptr);
-#ifdef _WIN32
-        return localtime_s(value, &now) == 0 ? 0 : -1;
-#else
         return localtime_r(&now, value) ? 0 : (errno ? -errno : -1);
-#endif
     }
 
     static std::string default_iface_from_route()

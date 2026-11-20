@@ -32,9 +32,6 @@ void cp0_keyboard_set_lvgl_keypad_intercept(int intercept)
 int cp0_keyboard_get_lvgl_keypad_intercept(void)
 { return lvgl_keypad_intercept; }
 
-int cp0_process_run_sudo(const char *password, const char *const *argv)
-{ (void)password; (void)argv; return -1; }
-
 int cp0_sudo_run_argv_async(const char *const *argv,
                             cp0_sudo_callback_thread_t callback_thread,
                             cp0_sudo_output_cb_t output_cb,

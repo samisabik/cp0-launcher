@@ -42,7 +42,7 @@ build_dir=$(mktemp -d "${TMPDIR:-/tmp}/applaunch-battery-ui-tests.XXXXXX")
 pids=()
 wait_for_compilers() {
     local status=0 pid
-    for pid in "${pids[@]}"; do
+    for pid in ${pids[@]+"${pids[@]}"}; do
         wait "$pid" || status=1
     done
     pids=()
@@ -56,7 +56,6 @@ trap cleanup EXIT
 
 common_flags=(
     -DLV_CONF_INCLUDE_SIMPLE -DLV_KCONFIG_IGNORE
-    "-DTEST_LOCKSCREEN_BACKGROUND=\"A:$project/APPLaunch/share/images/lockscreen.png\""
     "-I$test_dir" "-I$lvgl/.." "-I$lvgl" "-I$component/include"
     "-I$project/main/include" "-I$root/SDK/github_source/eventpp/include"
     "-I$root/SDK/components/utilities/include"
@@ -71,7 +70,7 @@ compile() {
         language_flags=(-std=c++17)
     fi
     mkdir -p -- "$(dirname -- "$object")"
-    "${compiler[@]}" "${language_flags[@]}" "${common_flags[@]}" \
+    "${compiler[@]}" ${language_flags[@]+"${language_flags[@]}"} "${common_flags[@]}" \
         "${sdl_cflags[@]}" "$@" -c "$source" -o "$object" &
     pids+=("$!")
     if ((${#pids[@]} >= jobs)); then
@@ -91,7 +90,8 @@ for name in cp0_keyboard_queue cp0_keyboard_text cp0_esc_state; do
     objects+=("$object")
     compile "$component/src/$name.c" "$object"
 done
-for name in model/screensaver_model.cpp \
+for name in model/lockscreen_activity_model.cpp model/lockscreen_status_model.cpp \
+            model/life_model.cpp settings/settings_page_battery_info_model.cpp \
             launcher_media_controls.cpp model/launcher_media_model.cpp \
             model/setup_value_policy.cpp; do
     object="$build_dir/ui/$name.o"
@@ -105,7 +105,7 @@ for backend in device sdl; do
         backend_flags=(-DTEST_SDL_BACKEND)
     fi
     for name in keyboard_backend.c test_low_battery_ui.cpp; do
-        compile "$test_dir/$name" "$build_dir/$backend/$name.o" "${backend_flags[@]}"
+        compile "$test_dir/$name" "$build_dir/$backend/$name.o" ${backend_flags[@]+"${backend_flags[@]}"}
     done
 done
 wait_for_compilers

@@ -266,9 +266,6 @@ public:
             self->top_in_group_ = true;
             lv_group_focus_obj(self->ComponensObj);
         }
-#if 0
-        self->AnimateNextOut(nullptr);
-#endif
     }
 
     /**

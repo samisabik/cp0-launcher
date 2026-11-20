@@ -28,12 +28,12 @@ std::pair<int, std::string> call(cp0cfg::ConfigService &service,
 
 int main()
 {
-    assert(cp0cfg::parse_legacy_integer("", 7) == 7);
-    assert(cp0cfg::parse_legacy_integer("garbage", 7) == 0);
-    assert(cp0cfg::parse_legacy_integer("12tail", 7) == 12);
-    assert(cp0cfg::parse_legacy_integer(" \t+12tail", 7) == 12);
-    assert(cp0cfg::parse_legacy_integer("999999999999999999999", 0) == INT_MAX);
-    assert(cp0cfg::parse_legacy_integer("-999999999999999999999", 0) == INT_MIN);
+    assert(cp0cfg::parse_config_integer("", 7) == 7);
+    assert(cp0cfg::parse_config_integer("garbage", 7) == 0);
+    assert(cp0cfg::parse_config_integer("12tail", 7) == 12);
+    assert(cp0cfg::parse_config_integer(" \t+12tail", 7) == 12);
+    assert(cp0cfg::parse_config_integer("999999999999999999999", 0) == INT_MAX);
+    assert(cp0cfg::parse_config_integer("-999999999999999999999", 0) == INT_MIN);
 
     cp0cfg::Entries persisted{{"count", "4"}, {"empty", ""}};
     cp0cfg::Entries saved;

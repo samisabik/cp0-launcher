@@ -10,10 +10,8 @@
 #include <cstdlib>
 #include <string>
 
-#if !defined(_WIN32)
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
 
 int main()
 {
@@ -30,7 +28,6 @@ int main()
     assert(evaluate("python3 app.py; reboot").reason == "Exec contains shell metacharacters");
     assert(!evaluate(std::string(513, 'a').c_str()).allowed);
 
-#if !defined(_WIN32)
     char path[] = "/tmp/cp0-exec-policy-XXXXXX";
     const int fd = mkstemp(path);
     assert(fd >= 0);
@@ -39,7 +36,6 @@ int main()
     assert(chmod(path, 0700) == 0);
     assert(evaluate(path).allowed);
     unlink(path);
-#endif
 
     return 0;
 }

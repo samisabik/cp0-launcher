@@ -76,13 +76,6 @@ void UISTPage::update_hscrollbar()
     lv_obj_move_foreground(hscrollbar_thumb_);
 }
 
-void UISTPage::set_bottom_label(int index, const char *text)
-{
-    if (index < 0 || index >= BOTTOM_BAR_SLOTS || !bottom_labels_[static_cast<size_t>(index)])
-        return;
-    lv_label_set_text(bottom_labels_[static_cast<size_t>(index)], text);
-}
-
 void UISTPage::update_big_mode_ui()
 {
     for (auto *label : bottom_labels_) {

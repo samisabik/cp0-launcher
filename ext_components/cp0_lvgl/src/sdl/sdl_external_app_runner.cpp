@@ -14,11 +14,9 @@
 #include <cstdio>
 #include <thread>
 
-#if !defined(_WIN32)
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
 
 namespace sdl_external_app_runner {
 
@@ -35,10 +33,6 @@ std::uint64_t monotonic_ms()
 
 int run(const char *command)
 {
-#if defined(_WIN32)
-    (void)command;
-    return -1;
-#else
     const bool subreaper = cp0_process_group::enable_subreaper();
     const pid_t pid = fork();
     if (pid < 0) return -1;
@@ -82,7 +76,6 @@ int run(const char *command)
                  static_cast<int>(pid), leader_reaped ? 1 : 0);
     cp0_esc_state_reset();
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-#endif
 }
 
 } // namespace sdl_external_app_runner

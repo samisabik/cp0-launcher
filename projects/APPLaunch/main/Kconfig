@@ -25,9 +25,6 @@ config APPLAUNCH_LINUX_CP0
 config APPLAUNCH_MAC_CROSS_CP0
     bool "macOS cross CP0"
 
-config APPLAUNCH_DARWIN_SDL
-    bool "Darwin SDL"
-
 endchoice
 
 # Product builds may inspect Linux MMC mounts for the SD card. Keep this

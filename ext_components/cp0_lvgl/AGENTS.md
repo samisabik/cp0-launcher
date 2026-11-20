@@ -31,5 +31,4 @@ For command details, argument counts, return encoding, and platform differences,
   `def_hal_fun(void(std::list<std::string>, std::function<void(int, std::string)>), cp0_signal_xxx_api)`
 
 - When changing an argument or return format, update `docs/cp0_lvgl.md`, the corresponding contract, C wrappers, all call sites, and tests.
-- Do not add new uses of deprecated `cp0_process_run_sudo` or `cp0_signal_process_api` `RunSudo`; use the asynchronous sudo signals.
 - Run `ext_components/cp0_lvgl/tests/run_tests.sh` for module regression. Changes involving Linux commands, BlueZ, framebuffer, or sudo also require target-platform validation.

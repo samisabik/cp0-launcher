@@ -15,8 +15,6 @@ public:
     static bool parse_int(const std::string &text, int &value);
     static bool parse_percent(const std::string &text, int &value);
     static int clamp_percent(int value);
-    static int percent_from_raw(int raw, int maximum);
-    static int raw_from_percent(int percent, int maximum);
 
     int volume_or(int fallback) const;
     int brightness_or(int fallback) const;
@@ -25,7 +23,6 @@ public:
     bool muted() const { return muted_; }
     void set_volume(int percent);
     void set_brightness(int percent);
-    void set_brightness_from_raw(int raw, int maximum);
     bool toggle_mute();
     void set_mute(bool muted);
 

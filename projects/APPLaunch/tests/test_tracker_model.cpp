@@ -206,9 +206,6 @@ void test_noise()
 
 void test_tempo()
 {
-    assert(samples_per_row(120) == 4000);
-    assert(samples_per_row(150) == 3200);
-    assert(samples_per_row(60) == 8000);
     assert(clamp_bpm(1) == kMinBpm);
     assert(clamp_bpm(1000) == kMaxBpm);
 
@@ -228,7 +225,6 @@ void test_tempo()
     // 130 BPM is 3692.3 samples per row; the remainder carries, so 13 rows
     // are exactly 48000 samples.
     song.bpm = 130;
-    assert(samples_per_row(130) == 3692);
     player.play(song, 0);
     player.render(song, out.data(), 47999);
     assert(player.row() == 12);

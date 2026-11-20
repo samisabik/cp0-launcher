@@ -5,7 +5,7 @@
  */
 
 #include "lvgl/lvgl.h"
-#include "ui_screensaver.h"
+#include "ui_lockscreen.h"
 
 namespace launcher_ui {
 void init();
@@ -15,7 +15,7 @@ void deinit();
 extern "C" void ui_init(void)
 {
     launcher_ui::init();
-    ui_screensaver_init();
+    ui_lockscreen_init();
     lv_obj_invalidate(lv_scr_act());
     lv_refr_now(NULL);
 }

@@ -2,11 +2,11 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Wiring contract for the screensaver lock screen.
+"""Wiring contract for the lock screen.
 
 The state machine itself is covered by test_lockscreen_state_model.cpp, the panel
 and backlight behaviour by the low_battery_ui harness (which drives the real
-ui_screensaver.cpp), and the non-persisting backlight by
+ui_lockscreen.cpp), and the non-persisting backlight by
 test_launcher_media_controls.cpp.  This only pins the wiring that is easy to lose
 in a refactor.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = (ROOT / "main/ui/model/lockscreen_state_model.hpp").read_text()
-SOURCE = (ROOT / "main/ui/ui_screensaver.cpp").read_text()
+SOURCE = (ROOT / "main/ui/ui_lockscreen.cpp").read_text()
 CONTROLS = (ROOT / "main/ui/launcher_media_controls.cpp").read_text()
 CONTROLS_HEADER = (ROOT / "main/ui/launcher_media_controls.h").read_text()
 PAGE_SHELL = (ROOT / "../../ext_components/cp0_lvgl/include/ui_app_page.hpp").read_text()
@@ -39,10 +39,8 @@ assert not (ROOT / "APPLaunch/share/audio").exists()
 # so the two can no longer drift apart.
 assert "void enter_lockscreen()" in SOURCE
 assert SOURCE.count("enter_lockscreen();") >= 2
-assert "start_screensaver" not in SOURCE
-assert "start_screen_off" not in SOURCE
 
-# While the screensaver is up the lock screen owns every key and decides when the
+# While the lock screen is up it owns every key and decides when the
 # panel sleeps or unlocks.
 assert "s_lock.handle_key(item->key_code, pressed, released, now)" in SOURCE
 assert "s_lock.poll(now)" in SOURCE
@@ -50,7 +48,7 @@ assert "decision.unlock" in SOURCE
 assert "show_lockscreen_panel()" in SOURCE
 assert "sleep_lockscreen()" in SOURCE
 
-# The long-press gesture stays observation-only while the screensaver is idle, and
+# The long-press gesture stays observation-only while the lock screen is idle, and
 # a pending hold is polled faster than the idle check.
 assert "s_model.observe_hold_key(item->key_code, released, now)" in SOURCE
 assert "s_model.poll_hold(now)" in SOURCE
@@ -70,14 +68,14 @@ assert "AppPageRoot::kTopBarHeightPx" not in SOURCE
 assert "refresh_status(true)" in SOURCE
 
 # The locked state paints pure black over the whole display, so the black screen
-# never depends on the backlight actually dimming: the simulator, web and win32
+# never depends on the backlight actually dimming: the simulator and web
 # backends accept the write and dim nothing.
-assert "ScreensaverPanel full_screen_panel()" in SOURCE
+assert "LockscreenPanel full_screen_panel()" in SOURCE
 assert "apply_panel(full_screen_panel())" in SOURCE
 assert "panel_layout" not in SOURCE
 
 # The visible states show a clock and a prompt line with the step hint; no wallpaper.
-assert "ScreensaverPanel wake_panel()" in SOURCE
+assert "LockscreenPanel wake_panel()" in SOURCE
 assert "apply_panel(wake_panel())" in SOURCE
 assert "press tab to unlock" in SOURCE
 assert "press enter to unlock" in SOURCE
@@ -88,12 +86,6 @@ assert "lockscreen.png" not in SOURCE
 # Unlocking slides the wallpaper away, restoring the backlight first.
 assert "lv_anim_set_values(&animation, s_panel.y, -s_panel.height)" in SOURCE
 assert "release_screen_off_backlight();" in SOURCE
-
-# The removed bouncing-image screensaver must not be loaded or recreated.
-assert "s_block" not in SOURCE
-assert "ScreensaverImageCache" not in SOURCE
-assert '"screensaver.png"' not in SOURCE
-assert "kAnimationFrameMs" not in SOURCE
 
 assert "launcher_platform::path_c" not in SOURCE
 assert "std::thread" not in SOURCE

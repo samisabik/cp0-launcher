@@ -86,11 +86,6 @@ int main()
     assert(demod_label(Demod::WFM) == std::string("wfm"));
     assert(demod_label(Demod::AM) == std::string("am"));
 
-    const std::string power = power_cmd(433920000, 2000000, 30, "/tmp/p.csv");
-    assert(power.find("rtl_power -f 432920000:434920000:6250 -i 1 -g 30 '/tmp/p.csv'") != std::string::npos);
-    // Auto gain omits -g.
-    assert(power_cmd(100000000, 1000000, -1, "/x").find(" -g ") == std::string::npos);
-
 
     assert(decode_cmd(433920000, 40, "/tmp/d").find("rtl_433 -f 433920000 -F json -g 40 > '/tmp/d'") !=
            std::string::npos);
@@ -100,14 +95,6 @@ int main()
     const Detect found =
         parse_detect("Found 1 device(s):\n  0:  Realtek, RTL2838UHIDIR, SN: 1\n\nUsing device 0\n");
     assert(found.present && found.name.find("RTL2838") != std::string::npos);
-
-    const PowerRow row = parse_power_row("2024-01-01, 12:00:00, 433000000, 434000000, 2000.00, 20, -40, -38, -52");
-    assert(row.valid && row.low_hz == 433000000u && row.step_hz == 2000u);
-    assert(row.db.size() == 3 && row.db[0] == -40 && row.db[2] == -52);
-    assert(!parse_power_row("bad,line").valid);
-
-    const std::vector<int> cols = power_columns(row, 6);
-    assert(static_cast<int>(cols.size()) == 6 && cols.front() == -40 && cols.back() == -52);
 
     assert(level_index(-120, -110, -40, 64) == 0);
     assert(level_index(-40, -110, -40, 64) == 63);

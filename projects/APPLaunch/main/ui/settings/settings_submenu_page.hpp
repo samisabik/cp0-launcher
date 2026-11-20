@@ -92,8 +92,6 @@ public:
     // every key, so the page underneath cannot be used.
     void show_blocked_warning(const char *title_text, const char *message_text);
 
-    void set_compact_mode(bool enabled);
-
 
 private:
     struct StatusQueryResult {
@@ -117,8 +115,6 @@ private:
     void handle_power_warning_key(lv_event_t *event);
 
     void close_power_warning();
-
-    void create_third_page(const NodeIter &page_node);
 
     void back_from_third_page();
 
@@ -167,7 +163,6 @@ private:
     bool page3_transitioning_                   = false;
     std::function<void()> page3_animation_over_ = nullptr;
     lv_group_t *input_group_                    = nullptr;
-    bool compact_mode_                          = false;
     bool page3_hides_network_time_icon_         = false;
     int right_arrow_base_x_                     = 0;
     int hint_base_x_                            = 0;

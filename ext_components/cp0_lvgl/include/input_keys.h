@@ -6,7 +6,7 @@
 
 #pragma once
 // Shared cross-platform KEY_* constants for cp0_lvgl and its applications.
-// On Linux: use the real header. On macOS/Windows: define ourselves.
+// On Linux: use the real header. On macOS: define ourselves.
 
 #ifdef __linux__
 #include <linux/input.h>

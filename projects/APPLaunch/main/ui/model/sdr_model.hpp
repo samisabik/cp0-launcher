@@ -54,7 +54,6 @@ std::string gain_label(int gain_db);
 // Shell command lines run through the process API. outpath receives streamed
 // output the page tails; it is quoted by the caller's directory, assumed safe.
 std::string detect_cmd();
-std::string power_cmd(uint32_t center_hz, uint32_t span_hz, int gain_db, const std::string &outpath);
 std::string decode_cmd(uint32_t hz, int gain_db, const std::string &outpath);
 
 // rtl_test output -> is a device present, and its name if any.
@@ -63,19 +62,6 @@ struct Detect {
     std::string name;
 };
 Detect parse_detect(const std::string &output);
-
-// One rtl_power CSV line -> the frequency window and power in dBm per bin.
-struct PowerRow {
-    bool valid = false;
-    uint32_t low_hz = 0;
-    uint32_t step_hz = 0;
-    std::vector<int> db;
-};
-PowerRow parse_power_row(const std::string &line);
-
-// Resample a power row to width columns of dBm (nearest bin), for the trace
-// and waterfall.
-std::vector<int> power_columns(const PowerRow &row, int width);
 
 // Live scope: rtl_sdr streams 8-bit unsigned IQ at kIqRate into a FIFO and the
 // page takes a kIqFft-point FFT of the newest block.

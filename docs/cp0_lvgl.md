@@ -80,7 +80,7 @@ int cp0_wifi_radio_set_enabled(int enabled);
 
 ### Process and system
 
-`cp0_process_exec_blocking`, `cp0_process_spawn`, `cp0_process_stop`, `cp0_process_check_lock`, `cp0_process_kill`, `cp0_system_shutdown`, `cp0_system_reboot`, `cp0_process_run_argv`, and `cp0_process_capture_argv` are declared in `cp0_lvgl_app.h`. `keep_root` and `background` are 0/1. `grace_ms` is limited to 300000. `cp0_process_run_sudo` is deprecated; use asynchronous sudo. Check an executable with `cp0_desktop_exec_is_safe` before launching it.
+`cp0_process_exec_blocking`, `cp0_process_spawn`, `cp0_process_stop`, `cp0_process_check_lock`, `cp0_process_kill`, `cp0_system_shutdown`, `cp0_system_reboot`, `cp0_process_run_argv`, and `cp0_process_capture_argv` are declared in `cp0_lvgl_app.h`. `keep_root` and `background` are 0/1. `grace_ms` is limited to 300000. Check an executable with `cp0_desktop_exec_is_safe` before launching it.
 
 ### Sudo C API
 
@@ -135,7 +135,7 @@ Session commands are `BtSessionInit` (returns an id), `BtSessionDeinit id`, `BtS
 
 ### Process, OS information, and time
 
-`cp0_signal_process_api` commands are `ExecBlocking executable keep_root`, `Spawn executable keep_root`, `Stop pid`, `CheckLock path`, `Kill pid grace_ms`, `RunArgv background argv...`, `RunSudo password argv...` (legacy only), `CaptureArgv argv...`, `DesktopExecIsSafe executable`, `Shutdown`, `Reboot`, and `DelayMs milliseconds`. `Shutdown` and `Reboot` run `systemctl poweroff|reboot --check-inhibitors=yes`, so a block inhibitor (a package install, an update) refuses them; on refusal the code is the systemctl exit status and data is its first output line. `Spawn` returns a PID; `CaptureArgv` returns stdout.
+`cp0_signal_process_api` commands are `ExecBlocking executable keep_root`, `Spawn executable keep_root`, `Stop pid`, `CheckLock path`, `Kill pid grace_ms`, `RunArgv background argv...`, `CaptureArgv argv...`, `DesktopExecIsSafe executable`, `Shutdown`, `Reboot`, and `DelayMs milliseconds`. `Shutdown` and `Reboot` run `systemctl poweroff|reboot --check-inhibitors=yes`, so a block inhibitor (a package install, an update) refuses them; on refusal the code is the systemctl exit status and data is its first output line. `Spawn` returns a PID; `CaptureArgv` returns stdout.
 
 `cp0_signal_osinfo_api` and `cp0_signal_timedate_api` share one service. Commands are `NetworkDefaultInfoRead`, `EthInfoRead` (three lines: IPv4, gateway, MAC), `NetworkList` (tab-separated interface records), `AccountInfoRead` (user and hostname), `TimeSet timestamp`, `LocalTime` (`year,month,day,hour,minute,second`), `RandomU32`, `NtpGet`, and `NtpSet 0|1`.
 

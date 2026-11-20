@@ -332,8 +332,6 @@ private:
 
     static void api_result_timer_cb(lv_timer_t *timer) noexcept;
 
-    static void cursor_timer_cb(lv_timer_t *timer) noexcept;
-
     void append_text(const char *text);
 
     void sync_textarea_state();
@@ -360,7 +358,6 @@ private:
     std::size_t cursor_ = 0;
     bool saving_ = false;
     bool alias_edited_ = false;
-    bool cursor_visible_ = true;
     bool status_known_ = false;
     bool powered_ = false;
     bool status_pending_ = false;
@@ -371,7 +368,6 @@ private:
     lv_obj_t *keyboard_root_ = nullptr;
     lv_event_dsc_t *keyboard_event_dsc_ = nullptr;
     lv_timer_t *api_timer_ = nullptr;
-    lv_timer_t *cursor_timer_ = nullptr;
     lv_timer_t *status_retry_timer_ = nullptr;
     bool keyboard_mode_saved_ = false;
     int previous_keypad_intercept_ = 0;

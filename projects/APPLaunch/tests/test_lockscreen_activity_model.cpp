@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "../main/ui/model/screensaver_model.hpp"
-#include "../main/ui/model/screensaver_runtime_contract.hpp"
+#include "../main/ui/model/lockscreen_activity_model.hpp"
+#include "../main/ui/model/lockscreen_runtime_contract.hpp"
 
 #include "input_keys.h"
 
@@ -16,26 +16,26 @@ int main()
 {
     int timer = 0;
     int stale_timer = 0;
-    assert(screensaver_timer_is_current(&timer, &timer));
-    assert(!screensaver_timer_is_current(&stale_timer, &timer));
-    assert(!screensaver_timer_is_current(nullptr, &timer));
-    assert(screensaver_delete_is_tracked(&timer, &timer, &timer));
-    assert(!screensaver_delete_is_tracked(&stale_timer, &timer, &timer));
-    assert(!screensaver_delete_is_tracked(&timer, &stale_timer, &timer));
-    assert(!screensaver_delete_is_tracked(&timer, &timer, &stale_timer));
-    assert(!screensaver_delete_is_tracked(nullptr, &timer, &timer));
-    assert(screensaver_timeout_from_config(true, "0") == 0);
-    assert(screensaver_timeout_from_config(true, "10") == 10);
-    assert(screensaver_timeout_from_config(true, "300") == 300);
-    assert(screensaver_timeout_from_config(true, "garbage") == 30);
-    assert(screensaver_timeout_from_config(true, "10junk") == 30);
-    assert(screensaver_timeout_from_config(true, " 10") == 30);
-    assert(screensaver_timeout_from_config(true, "+10") == 30);
-    assert(screensaver_timeout_from_config(true, "99999999999999999999") == 30);
-    assert(screensaver_timeout_from_config(true, "-1") == 30);
-    assert(screensaver_timeout_from_config(false, "0") == 30);
+    assert(lockscreen_timer_is_current(&timer, &timer));
+    assert(!lockscreen_timer_is_current(&stale_timer, &timer));
+    assert(!lockscreen_timer_is_current(nullptr, &timer));
+    assert(lockscreen_delete_is_tracked(&timer, &timer, &timer));
+    assert(!lockscreen_delete_is_tracked(&stale_timer, &timer, &timer));
+    assert(!lockscreen_delete_is_tracked(&timer, &stale_timer, &timer));
+    assert(!lockscreen_delete_is_tracked(&timer, &timer, &stale_timer));
+    assert(!lockscreen_delete_is_tracked(nullptr, &timer, &timer));
+    assert(lockscreen_timeout_from_config(true, "0") == 0);
+    assert(lockscreen_timeout_from_config(true, "10") == 10);
+    assert(lockscreen_timeout_from_config(true, "300") == 300);
+    assert(lockscreen_timeout_from_config(true, "garbage") == 30);
+    assert(lockscreen_timeout_from_config(true, "10junk") == 30);
+    assert(lockscreen_timeout_from_config(true, " 10") == 30);
+    assert(lockscreen_timeout_from_config(true, "+10") == 30);
+    assert(lockscreen_timeout_from_config(true, "99999999999999999999") == 30);
+    assert(lockscreen_timeout_from_config(true, "-1") == 30);
+    assert(lockscreen_timeout_from_config(false, "0") == 30);
 
-    ScreensaverModel model;
+    LockscreenActivityModel model;
     model.reset(1000);
     assert(!model.active());
     assert(!model.should_activate(30999, 30000, true));
@@ -47,7 +47,7 @@ int main()
     assert(model.active());
     assert(!model.should_activate(61000, 30000, true));
 
-    // While the screensaver is up the model only records activity; the lock
+    // While the lock screen is up the model only records activity; the lock
     // screen owns every key, so nothing here clears the active flag.
     model.note_activity(40020);
     assert(model.last_activity_tick() == 40020);
@@ -65,15 +65,15 @@ int main()
     assert(model.should_activate(9, 20, true));
 
     // ---- Long-press gesture that requests the lock ----
-    ScreensaverModel hold;
-    assert(ScreensaverModel::screen_off_hold_ms() == 3000);
-    assert(ScreensaverModel::hold_hint_ms() == 500);
+    LockscreenActivityModel hold;
+    assert(LockscreenActivityModel::screen_off_hold_ms() == 3000);
+    assert(LockscreenActivityModel::hold_hint_ms() == 500);
     hold.reset(1000);
     assert(!hold.hold_pending());
     assert(!hold.hold_hint_visible());
     assert(!hold.poll_hold(500000).fire);
 
-    ScreensaverHoldDecision decision = hold.observe_hold_key(KEY_TAB, false, 2000);
+    LockscreenHoldDecision decision = hold.observe_hold_key(KEY_TAB, false, 2000);
     assert(!decision.show_hint && !decision.hide_hint && !decision.fire);
     assert(hold.hold_pending());
     // The gesture announces itself once, before it fires.

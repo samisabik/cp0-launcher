@@ -23,41 +23,10 @@ void test_eth_round_trip_and_field_order()
     assert(payload == "192.0.2.4/24\n192.0.2.1\n02:00:00:00:00:04");
 
     cp0_eth_info_t decoded{};
-    cp0::osinfo::decode_eth_info(payload, &decoded);
+    assert(cp0::osinfo::decode_eth_info_strict(payload, &decoded));
     assert(std::strcmp(decoded.ipv4, source.ipv4) == 0);
     assert(std::strcmp(decoded.gateway, source.gateway) == 0);
     assert(std::strcmp(decoded.mac, source.mac) == 0);
-}
-
-void test_eth_missing_fields_use_legacy_defaults()
-{
-    cp0_eth_info_t info{};
-    cp0::osinfo::decode_eth_info("198.51.100.8", &info);
-    assert(std::strcmp(info.ipv4, "198.51.100.8") == 0);
-    assert(std::strcmp(info.gateway, "N/A") == 0);
-    assert(std::strcmp(info.mac, "N/A") == 0);
-
-    cp0::osinfo::decode_eth_info("\n\n", &info);
-    assert(info.ipv4[0] == '\0');
-    assert(info.gateway[0] == '\0');
-    assert(std::strcmp(info.mac, "N/A") == 0);
-    cp0::osinfo::decode_eth_info("ignored", nullptr);
-}
-
-void test_decoders_truncate_and_terminate_fields()
-{
-    cp0_eth_info_t eth{};
-    cp0::osinfo::decode_eth_info(std::string(200, 'i') + "\n" + std::string(200, 'g') + "\n" +
-                                     std::string(200, 'm'),
-                                 &eth);
-    assert(std::strlen(eth.ipv4) == sizeof(eth.ipv4) - 1);
-    assert(std::strlen(eth.gateway) == sizeof(eth.gateway) - 1);
-    assert(std::strlen(eth.mac) == sizeof(eth.mac) - 1);
-
-    cp0_account_info_t account{};
-    cp0::osinfo::decode_account_info(std::string(200, 'u') + "\n" + std::string(300, 'h'), &account);
-    assert(std::strlen(account.user) == sizeof(account.user) - 1);
-    assert(std::strlen(account.hostname) == sizeof(account.hostname) - 1);
 }
 
 void test_strict_decoders_reject_malformed_payloads()
@@ -83,13 +52,6 @@ void test_account_payload_compatibility()
     std::strcpy(source.user, "operator");
     std::strcpy(source.hostname, "cardputer-zero");
     assert(cp0::osinfo::encode_account_info(source) == "operator\ncardputer-zero");
-
-    cp0_account_info_t decoded{};
-    std::memset(&decoded, 0x7f, sizeof(decoded));
-    cp0::osinfo::decode_account_info("operator", &decoded);
-    assert(std::strcmp(decoded.user, "operator") == 0);
-    assert(decoded.hostname[0] == '\0');
-    cp0::osinfo::decode_account_info("ignored", nullptr);
 }
 
 void test_network_list_payload_order()
@@ -126,8 +88,6 @@ void test_local_time_payload_order()
 int main()
 {
     test_eth_round_trip_and_field_order();
-    test_eth_missing_fields_use_legacy_defaults();
-    test_decoders_truncate_and_terminate_fields();
     test_strict_decoders_reject_malformed_payloads();
     test_account_payload_compatibility();
     test_network_list_payload_order();

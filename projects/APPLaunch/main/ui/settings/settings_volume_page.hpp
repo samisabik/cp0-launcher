@@ -52,9 +52,6 @@ public:
     };
 
     bool ready() const;
-    bool request_pending() const;
-    int backend_volume() const;
-    int original_volume() const;
     const std::string &last_error() const;
 
 protected:

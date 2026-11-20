@@ -197,18 +197,17 @@ The implementation sources of truth are
 `ext_components/cp0_lvgl/include/keyboard_input.h` for the custom event
 contract.
 
-## Lock Screen (Not the Removed Bouncing Screensaver)
+## Lock Screen
 
-`ui_screensaver.*`, `model/screensaver_model.*`, and the `ui_screensaver_*`
-entry points retain their legacy names, but only implement the lock screen.
-Do not remove them or the keyboard backend hooks when cleaning up the removed
-bouncing-image screensaver. `home_icon_fallback.*` is an independent embedded
-home icon; the lock screen uses no image assets.
+`ui_lockscreen.*`, `model/lockscreen_*`, and the `ui_lockscreen_*` entry points
+implement the lock screen. The keyboard backends in `cp0_lvgl` call
+`ui_lockscreen_filter_key` through a weak symbol. The lock screen uses no image
+assets.
 
 Initialize the lock screen after `launcher_ui::init()` and deinitialize it in
 `launcher_ui::deinit()`. `Launch::launch_Exec()` calls
-`ui_screensaver_set_foreground(0)` before handing off input/timers to an external
-process and `ui_screensaver_set_foreground(1)` after restoring home. This clears
+`ui_lockscreen_set_foreground(0)` before handing off input/timers to an external
+process and `ui_lockscreen_set_foreground(1)` after restoring home. This clears
 the lock and restarts the idle interval; it does not resume a previous lock state.
 
 `settings/settings_screen_timeout_page.*` implements screen -> auto-lock.
@@ -229,7 +228,7 @@ TAB then arms and ENTER confirms. ESC from either visible state returns to black
 another key in the armed state returns to waiting for TAB. Press/repeat activity
 resets the 10-second visible-state timeout; release does not. All lock-state
 events and the exit animation (`kExitAnimationMs`) consume keys. Low-battery UI remains hidden
-until `ui_screensaver_is_active()` becomes false, including that animation.
+until `ui_lockscreen_is_active()` becomes false, including that animation.
 
 The lock is an `lv_layer_top()` overlay, not a page. Paint the black state over
 the whole display even on backends whose backlight write is a no-op. Backlight

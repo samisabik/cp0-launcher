@@ -232,17 +232,8 @@ void test_steps()
 
 void test_grid()
 {
-    int row = -1, column = -1;
-    assert(grid_cell(0x08, row, column) && row == 0 && column == 8);
-    assert(grid_cell(0x48, row, column) && row == 4 && column == 8);
-    assert(grid_cell(0x77, row, column) && row == 7 && column == 7);
-    assert(!grid_cell(0x07, row, column) && !grid_cell(0x78, row, column) && !grid_cell(-1, row, column));
     assert(grid_address(0, 7) == -1 && grid_address(0, 8) == 0x08 && grid_address(7, 7) == 0x77);
     assert(grid_address(7, 8) == -1 && grid_address(8, 0) == -1 && grid_address(0, 16) == -1);
-    for (int address = kI2cFirst; address <= kI2cLast; ++address) {
-        assert(grid_cell(address, row, column));
-        assert(grid_address(row, column) == address);
-    }
 
     ProbeMap map{};
     assert(count(map, Probe::Found) == 0 && found_list(map).empty());

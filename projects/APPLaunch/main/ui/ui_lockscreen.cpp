@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "ui_screensaver.h"
+#include "ui_lockscreen.h"
 #include "cp0_theme.hpp"
 #include "ui_low_battery.h"
 
@@ -21,8 +21,8 @@
 #include "settings/settings_battery_info_model.hpp"
 #include "settings/settings_prefs.hpp"
 #include "model/lockscreen_state_model.hpp"
-#include "model/screensaver_model.hpp"
-#include "model/screensaver_runtime_contract.hpp"
+#include "model/lockscreen_activity_model.hpp"
+#include "model/lockscreen_runtime_contract.hpp"
 #include "ui_app_page.hpp"
 #include "cp0_font_service.hpp"
 
@@ -52,7 +52,6 @@ constexpr uint32_t kExitAnimationMs = 200;
 constexpr const char *kHoldHintText = "hold tab 3s to lock";
 
 lv_obj_t *s_overlay = nullptr;
-lv_obj_t *s_hint = nullptr;
 lv_obj_t *s_content = nullptr;
 lv_obj_t *s_clock = nullptr;
 lv_obj_t *s_date = nullptr;
@@ -95,14 +94,14 @@ constexpr uint16_t kLifeUndrawn = 1;
 LifeGrid s_life(kLifeCols, kLifeRows);
 uint32_t s_life_rng = 0x2545F491u;
 void life_run(bool running);
-ScreensaverModel s_model;
+LockscreenActivityModel s_model;
 LockscreenStateModel s_lock;
 bool s_exiting = false;
 /* Raw backlight value captured when the panel is forced dark, or -1 while the
  * backlight is under normal control. */
 int s_screen_off_backlight_raw = -1;
 
-struct ScreensaverPanel
+struct LockscreenPanel
 {
     int x = 0;
     int y = 0;
@@ -111,14 +110,14 @@ struct ScreensaverPanel
     bool black = false;
 };
 
-/* While the screensaver is up the panel is pure black over the whole display, so
+/* While the lock screen is up the panel is pure black over the whole display, so
  * it reads as a black screen on every backend - including the ones whose
  * backlight write is a stub that reports success without dimming anything.
  * Driving the backlight down is a power optimisation on top of that, never the
  * reason the screen looks black. */
-ScreensaverPanel full_screen_panel()
+LockscreenPanel full_screen_panel()
 {
-    ScreensaverPanel panel;
+    LockscreenPanel panel;
     lv_display_t *display = lv_display_get_default();
     panel.width = display ? lv_display_get_horizontal_resolution(display) : 0;
     panel.height = display ? lv_display_get_vertical_resolution(display) : 0;
@@ -129,9 +128,9 @@ ScreensaverPanel full_screen_panel()
 /* The cached wallpaper fills the application area below the page's top bar. */
 /* The visible states cover the top bar too: the card carries the time and
  * status, and the simulation gets the whole display. */
-ScreensaverPanel wake_panel()
+LockscreenPanel wake_panel()
 {
-    ScreensaverPanel panel = full_screen_panel();
+    LockscreenPanel panel = full_screen_panel();
     panel.black = false;
     return panel;
 }
@@ -139,9 +138,9 @@ ScreensaverPanel wake_panel()
 /* Panel currently in effect.  Animation must use these numbers rather than read
  * the object's geometry: the model is activated with them, and an object that
  * has not been through a layout pass reports stale (zero) dimensions. */
-ScreensaverPanel s_panel;
+LockscreenPanel s_panel;
 
-void apply_panel(const ScreensaverPanel &panel)
+void apply_panel(const LockscreenPanel &panel)
 {
     if (!s_overlay) return;
     s_panel = panel;
@@ -458,7 +457,6 @@ void create_content()
  * bounds must not clip text in the status bar above it. */
 void hide_hint()
 {
-    if (s_hint) lv_obj_add_flag(s_hint, LV_OBJ_FLAG_HIDDEN);
     if (s_prompt_text) lv_label_set_text(s_prompt_text, "");
 }
 
@@ -517,7 +515,7 @@ void curtain_exit_anim_exec(void *object, int32_t y) noexcept
     }
 }
 
-void finish_screensaver_exit() noexcept
+void finish_lockscreen_exit() noexcept
 {
     release_screen_off_backlight();
     try {
@@ -542,9 +540,9 @@ void curtain_exit_anim_completed(lv_anim_t *animation) noexcept
     try {
         if (!animation || lv_anim_get_user_data(animation) != s_overlay || !s_exiting)
             return;
-        finish_screensaver_exit();
+        finish_lockscreen_exit();
     } catch (...) {
-        finish_screensaver_exit();
+        finish_lockscreen_exit();
     }
 }
 
@@ -558,7 +556,7 @@ void cancel_exit_animation() noexcept
 void overlay_delete_cb(lv_event_t *event) noexcept
 {
     try {
-        if (!event || !screensaver_delete_is_tracked(
+        if (!event || !lockscreen_delete_is_tracked(
                 lv_event_get_target(event), lv_event_get_current_target(event), s_overlay))
             return;
         s_overlay = nullptr;
@@ -567,8 +565,6 @@ void overlay_delete_cb(lv_event_t *event) noexcept
         s_life_canvas = nullptr;
         if (s_life_timer) lv_timer_delete(s_life_timer);
         s_life_timer = nullptr;
-        if (s_hint) lv_obj_delete(s_hint);
-        s_hint = nullptr;
         s_exiting = false;
         s_model.deactivate();
         release_screen_off_backlight();
@@ -580,8 +576,6 @@ void overlay_delete_cb(lv_event_t *event) noexcept
         s_life_canvas = nullptr;
         if (s_life_timer) lv_timer_delete(s_life_timer);
         s_life_timer = nullptr;
-        if (s_hint) lv_obj_delete(s_hint);
-        s_hint = nullptr;
         s_exiting = false;
         release_screen_off_backlight();
         update_timer_period();
@@ -589,18 +583,6 @@ void overlay_delete_cb(lv_event_t *event) noexcept
             s_model.deactivate();
         } catch (...) {
         }
-    }
-}
-
-void hint_delete_cb(lv_event_t *event) noexcept
-{
-    try {
-        if (!event || !screensaver_delete_is_tracked(
-                lv_event_get_target(event), lv_event_get_current_target(event), s_hint))
-            return;
-        s_hint = nullptr;
-    } catch (...) {
-        s_hint = nullptr;
     }
 }
 
@@ -614,9 +596,9 @@ int timeout_seconds() noexcept
                               succeeded = code == 0;
                               response = std::move(data);
                           });
-    return screensaver_timeout_from_config(succeeded, response);
+    return lockscreen_timeout_from_config(succeeded, response);
     } catch (...) {
-        return screensaver_timeout_from_config(false, {});
+        return lockscreen_timeout_from_config(false, {});
     }
 }
 
@@ -645,7 +627,7 @@ void create_objects()
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 }
 
-void stop_screensaver(bool was_active = false, bool animated = false)
+void stop_lockscreen(bool was_active = false, bool animated = false)
 {
     const bool active = was_active || s_model.active();
 
@@ -681,7 +663,7 @@ void stop_screensaver(bool was_active = false, bool animated = false)
     }
 
     cancel_exit_animation();
-    finish_screensaver_exit();
+    finish_lockscreen_exit();
 }
 
 /* (1) locked: pure black over the whole display.  Both entry points (the idle
@@ -694,7 +676,7 @@ void enter_lockscreen()
     if (!s_overlay)
         return;
 
-    const ScreensaverPanel panel = full_screen_panel();
+    const LockscreenPanel panel = full_screen_panel();
     if (panel.width <= 0 || panel.height <= 0) return;
 
     cancel_exit_animation();
@@ -739,7 +721,7 @@ void sleep_lockscreen()
 void timer_cb(lv_timer_t *timer) noexcept
 {
     try {
-    if (!screensaver_timer_is_current(timer, s_timer)) return;
+    if (!lockscreen_timer_is_current(timer, s_timer)) return;
     if (!s_model.foreground() || LVGL_RUN_FLAGE != 1 || s_exiting)
         return;
 
@@ -755,7 +737,7 @@ void timer_cb(lv_timer_t *timer) noexcept
         return;
     }
 
-    const ScreensaverHoldDecision hold = s_model.poll_hold(now);
+    const LockscreenHoldDecision hold = s_model.poll_hold(now);
     if (hold.show_hint)
         launcher_toast().show_persistent(kHoldHintText);
     if (hold.fire) {
@@ -776,13 +758,13 @@ void timer_cb(lv_timer_t *timer) noexcept
         lv_timer_set_period(s_timer, std::clamp(remaining, kIdleCheckMs, kIdleMaxMs));
     }
     } catch (...) {
-        stop_screensaver();
+        stop_lockscreen();
     }
 }
 
 } // namespace
 
-extern "C" void ui_screensaver_init(void)
+extern "C" void ui_lockscreen_init(void)
 {
     try {
     if (s_timer)
@@ -799,7 +781,7 @@ extern "C" void ui_screensaver_init(void)
     }
 }
 
-extern "C" void ui_screensaver_deinit(void)
+extern "C" void ui_lockscreen_deinit(void)
 {
     if (s_timer) {
         lv_timer_delete(s_timer);
@@ -809,25 +791,22 @@ extern "C" void ui_screensaver_deinit(void)
     release_screen_off_backlight();
     if (s_overlay)
         lv_obj_delete(s_overlay);
-    if (s_hint)
-        lv_obj_delete(s_hint);
     s_overlay = nullptr;
     s_content = s_clock = s_date = s_prompt_text = nullptr;
-    s_hint = nullptr;
     s_model.reset(0);
     s_model.set_foreground(false, 0);
 }
 
-extern "C" void ui_screensaver_lock_now(void)
+extern "C" void ui_lockscreen_lock_now(void)
 {
     try {
         if (!s_model.active() && !s_exiting) enter_lockscreen();
     } catch (...) {
-        stop_screensaver();
+        stop_lockscreen();
     }
 }
 
-extern "C" int ui_screensaver_filter_key(const struct key_item *item)
+extern "C" int ui_lockscreen_filter_key(const struct key_item *item)
 {
     try {
     if (!item)
@@ -846,7 +825,7 @@ extern "C" int ui_screensaver_filter_key(const struct key_item *item)
         const LockscreenDecision decision =
             s_lock.handle_key(item->key_code, pressed, released, now);
         if (decision.unlock) {
-            stop_screensaver(true, true);
+            stop_lockscreen(true, true);
         } else if (decision.sleep) {
             sleep_lockscreen();
         } else if (decision.show_panel) {
@@ -858,30 +837,30 @@ extern "C" int ui_screensaver_filter_key(const struct key_item *item)
     /* Idle: watch the long-press gesture without consuming the key, so that a
      * short press still reaches the pages that use this key themselves. */
     s_model.note_activity(now);
-    const ScreensaverHoldDecision hold =
+    const LockscreenHoldDecision hold =
         s_model.observe_hold_key(item->key_code, released, now);
     if (hold.hide_hint)
         launcher_toast().hide();
     update_timer_period();
     return 0;
     } catch (...) {
-        stop_screensaver();
+        stop_lockscreen();
         return 0;
     }
 }
 
-extern "C" int ui_screensaver_is_active(void)
+extern "C" int ui_lockscreen_is_active(void)
 {
     return s_model.active() || s_exiting;
 }
 
-extern "C" void ui_screensaver_set_foreground(int foreground)
+extern "C" void ui_lockscreen_set_foreground(int foreground)
 {
     try {
-    stop_screensaver();
+    stop_lockscreen();
     s_model.set_foreground(foreground != 0, lv_tick_get());
     } catch (...) {
-        stop_screensaver();
+        stop_lockscreen();
         s_model.set_foreground(false, 0);
     }
 }

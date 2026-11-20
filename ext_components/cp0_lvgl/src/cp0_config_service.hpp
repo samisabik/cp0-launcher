@@ -50,6 +50,6 @@ private:
     int save(const Entries &entries) const;
 };
 
-int parse_legacy_integer(const std::string &value, int fallback_if_empty);
+int parse_config_integer(const std::string &value, int fallback_if_empty);
 
 } // namespace cp0cfg

@@ -41,7 +41,7 @@ static cp0_keyboard_input_lifecycle_t keyboard_lifecycle;
 static pthread_mutex_t keyboard_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int mouse_initialized;
 
-__attribute__((weak)) int ui_screensaver_filter_key(const struct key_item *elm)
+__attribute__((weak)) int ui_lockscreen_filter_key(const struct key_item *elm)
 {
     (void)elm;
     return 0;
@@ -481,7 +481,7 @@ static void cp0_sdl_keyboard_read(lv_indev_t *indev, lv_indev_data_t *data)
     if (elm) {
         const int intercept = lvgl_keypad_intercept;
 
-        int swallowed = ui_screensaver_filter_key(elm);
+        int swallowed = ui_lockscreen_filter_key(elm);
         if (!swallowed && key_filter)
             swallowed = key_filter(elm);
         if (!swallowed) {

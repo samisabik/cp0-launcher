@@ -131,7 +131,7 @@ def test_ext_port_order_and_hardware_mappings():
 
 
 def test_launcher_settings_use_builtin_and_release_preinstalled_apps():
-    assert SETTINGS_ADAPTER.count("launcher_app_registry_entries(&count)") == 2
+    assert SETTINGS_ADAPTER.count("launcher_app_registry_entries(&count)") == 1
     assert "launcher_builtin_app_registry_entries(&count)" not in SETTINGS_ADAPTER
     assert "launcher::is_launcher_settings_origin(descriptor.origin)" in SETTINGS_ADAPTER
     assert "launcher::is_protected_launcher_app(descriptor.config_key)" in SETTINGS_ADAPTER

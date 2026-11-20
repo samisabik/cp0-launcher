@@ -8,7 +8,7 @@
 
 #include "input_keys.h"
 #include "keyboard_input.h"
-#include "ui_screensaver.h"
+#include "ui_lockscreen.h"
 
 namespace {
 
@@ -58,7 +58,7 @@ void UILaunchPage::handle_home_key(lv_event_t *event)
             move_selection(0, 1);
             break;
         case KEY_TAB:
-            if (elm->key_state == KBD_KEY_PRESSED) ui_screensaver_lock_now();
+            if (elm->key_state == KBD_KEY_PRESSED) ui_lockscreen_lock_now();
             break;
         default:
             break;

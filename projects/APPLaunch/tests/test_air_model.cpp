@@ -104,16 +104,6 @@ void test_bands()
     assert(band_of(0) == Band::Unknown && band_of(-3) == Band::Unknown);
     assert(band_of(15) == Band::Unknown && band_of(31) == Band::Unknown && band_of(178) == Band::Unknown);
 
-    assert(centre_mhz(1) == 2412);
-    assert(centre_mhz(6) == 2437);
-    assert(centre_mhz(11) == 2462);
-    assert(centre_mhz(13) == 2472);
-    assert(centre_mhz(14) == 2484);
-    assert(centre_mhz(36) == 5180);
-    assert(centre_mhz(100) == 5500);
-    assert(centre_mhz(165) == 5825);
-    assert(centre_mhz(0) == 0 && centre_mhz(20) == 0);
-
     assert(std::string(band_label(Band::G24)) == "2.4 ghz");
     assert(std::string(band_label(Band::G5)) == "5 ghz");
 
@@ -131,12 +121,6 @@ void test_signal_conversion()
     assert(percent_to_dbm(0) == -100);
     assert(percent_to_dbm(-20) == -100);
     assert(percent_to_dbm(400) == -50);
-    assert(dbm_to_percent(-50) == 100);
-    assert(dbm_to_percent(-58) == 84);
-    assert(dbm_to_percent(-100) == 0);
-    assert(dbm_to_percent(-120) == 0);
-    assert(dbm_to_percent(-20) == 100);
-    for (int percent = 0; percent <= 100; percent += 2) assert(dbm_to_percent(percent_to_dbm(percent)) == percent);
 }
 
 void test_sorting()

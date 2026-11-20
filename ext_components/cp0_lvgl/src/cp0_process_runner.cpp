@@ -10,7 +10,6 @@
 #include <chrono>
 #include <climits>
 #include <cstdlib>
-#if !defined(_WIN32)
 #include <fcntl.h>
 #include <grp.h>
 #include <poll.h>
@@ -19,11 +18,8 @@
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
-#endif
 
-#if !defined(_WIN32)
 extern char **environ;
-#endif
 namespace cp0_runner {
 Result run(std::vector<std::string> argv, const std::string *input, Output output,
            const std::atomic<bool> *cancel, int timeout_ms, std::size_t capacity,
@@ -32,12 +28,6 @@ Result run(std::vector<std::string> argv, const std::string *input, Output outpu
            const std::string &home, const std::string &shell,
            InputConsumed input_consumed)
 {
-#if defined(_WIN32)
-    (void)argv; (void)input; (void)output; (void)cancel; (void)timeout_ms;
-    (void)capacity; (void)portable_uid; (void)portable_gid; (void)user_name;
-    (void)home; (void)shell; (void)input_consumed;
-    return {-ENOTSUP, {}};
-#else
     const uid_t uid = static_cast<uid_t>(portable_uid);
     const gid_t gid = static_cast<gid_t>(portable_gid);
     Result result;
@@ -239,6 +229,5 @@ Result run(std::vector<std::string> argv, const std::string *input, Output outpu
     }
     if (out[0] >= 0) close(out[0]);
     return result;
-#endif
 }
 }

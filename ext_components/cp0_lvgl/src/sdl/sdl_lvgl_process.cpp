@@ -92,14 +92,6 @@ public:
                 return invalid(callback);
             report(callback, cp0_process_commands::run_argv(
                                  cp0_process_api_contract::arguments_from(args, 2), background), "");
-        } else if (command == "RunSudo") {
-            if (!cp0_process_api_contract::has_at_least_arguments(args, 3))
-                return invalid(callback);
-            report(callback,
-                   cp0_process_commands::run_sudo(
-                       *cp0_process_api_contract::argument_at(args, 1),
-                       cp0_process_api_contract::arguments_from(args, 2)),
-                   "");
         } else if (command == "CaptureArgv") {
             if (!cp0_process_api_contract::has_at_least_arguments(args, 2))
                 return invalid(callback);
@@ -252,14 +244,6 @@ extern "C" int cp0_process_capture_argv(const char *const *argv, char *out, int 
         const int result = ProcessSystem::api_simple(args, &data);
         if (out && out_size > 0) cp0_copy_string(out, out_size, data);
         return result;
-    });
-}
-
-extern "C" int cp0_process_run_sudo(const char *password, const char *const *argv)
-{
-    return cp0_process_api_contract::invoke_c_api([&] {
-        return ProcessSystem::api_simple(
-            cp0_process_api_contract::make_run_sudo_request(password, argv));
     });
 }
 

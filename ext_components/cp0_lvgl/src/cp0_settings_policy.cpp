@@ -103,11 +103,6 @@ bool parse_integer_file_line(std::string_view text,
     return parse_integer_response(text, minimum, maximum, value);
 }
 
-bool parse_switch_response(std::string_view text, int &value)
-{
-    return parse_integer_response(text, 0, 1, value);
-}
-
 std::string gpiochip_path_from_debug_line(std::string_view line,
                                           std::string_view controller_name)
 {

@@ -15,7 +15,7 @@
 #include "ui_low_battery.h"
 #include "ui_global_hint.h"
 #include "ui_loading.h"
-#include "ui_screensaver.h"
+#include "ui_lockscreen.h"
 #include <stdio.h>
 #include <cstdlib>
 #include "lvgl/src/widgets/gif/lv_gif.h"
@@ -61,7 +61,7 @@ void deinit()
     ui_global_hint::shutdown();
     launcher_battery_ui::shutdown_warning();
     ui_loading::shutdown();
-    ui_screensaver_deinit();
+    ui_lockscreen_deinit();
     home.reset();
 }
 

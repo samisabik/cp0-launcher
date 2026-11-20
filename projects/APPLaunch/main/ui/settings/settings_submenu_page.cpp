@@ -308,36 +308,6 @@ void LvSettingRollerPage2::show_blocked_warning(const char *title_text, const ch
         std::bind(&LvSettingRollerPage2::handle_power_warning_key, this, std::placeholders::_1));
 }
 
-void LvSettingRollerPage2::set_compact_mode(bool enabled)
-{
-    compact_mode_ = enabled;
-
-    if (right_arrow_) {
-        if (enabled)
-            lv_obj_add_flag(right_arrow_, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_remove_flag(right_arrow_, LV_OBJ_FLAG_HIDDEN);
-    }
-
-    if (hint_) {
-        if (enabled)
-            lv_obj_add_flag(hint_, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_remove_flag(hint_, LV_OBJ_FLAG_HIDDEN);
-    }
-
-    if (!ComponensObj) return;
-    const uint32_t child_count = lv_obj_get_child_count(ComponensObj);
-    for (uint32_t index = 0; index < child_count; ++index) {
-        lv_obj_t *row   = lv_obj_get_child(ComponensObj, index);
-        lv_obj_t *label = row ? lv_obj_get_child(row, 0) : nullptr;
-        if (!label) continue;
-
-        const int distance = std::abs(static_cast<int32_t>(index) - selected_index);
-        style_label(label, distance, enabled);
-    }
-}
-
 void LvSettingRollerPage2::set_status_icon(lv_obj_t *icon_obj, bool enabled)
 {
     if (!icon_obj) return;
@@ -484,31 +454,6 @@ void LvSettingRollerPage2::close_power_warning()
         lv_group_add_obj(group, ComponensObj);
         lv_group_focus_obj(ComponensObj);
     }
-}
-
-void LvSettingRollerPage2::create_third_page(const NodeIter &page_node)
-{
-    if (page3_transitioning_ || roller3_ || !page_node->page_factory || !parent_) return;
-
-    lv_group_t *group = ComponensObj ? lv_obj_get_group(ComponensObj) : nullptr;
-    if (ComponensObj && group) lv_group_remove_obj(ComponensObj);
-    input_group_ = group;
-
-    roller3_ = page_node->page_factory(parent_, page_node, std::bind(&LvSettingRollerPage2::LeaveNextPage, this));
-    if (!roller3_ || !roller3_->Get()) {
-        roller3_.reset();
-        if (ComponensObj && group) {
-            lv_group_add_obj(group, ComponensObj);
-            lv_group_focus_obj(ComponensObj);
-        }
-        return;
-    }
-
-    // The transition is driven by the object's x coordinate below.  Keep the
-    // style translation neutral so it does not add a second page-width offset
-    // to full-custom pages such as System -> Storage.
-    lv_obj_set_style_translate_x(roller3_->Get(), 0, LV_PART_MAIN);
-    AnimateNextOut(nullptr);
 }
 
 void LvSettingRollerPage2::back_from_third_page()

@@ -10,10 +10,8 @@
 #include <cstring>
 #include <sstream>
 
-#if !defined(_WIN32)
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
 
 namespace cp0_desktop_exec_policy {
 namespace {
@@ -34,14 +32,9 @@ std::string first_token(const char *exec)
 
 bool file_executable(const std::string &path)
 {
-#if defined(_WIN32)
-    (void)path;
-    return false;
-#else
     struct stat status;
     return stat(path.c_str(), &status) == 0 && S_ISREG(status.st_mode) &&
            access(path.c_str(), X_OK) == 0;
-#endif
 }
 
 Result reject(const char *reason)

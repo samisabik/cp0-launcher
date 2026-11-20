@@ -317,7 +317,7 @@ void api_call(std::list<std::string> args, std::function<void(int, std::string)>
                 sessions.push_back(entry.second);
             }
         }
-        // Legacy scan loops must finish submitting their old commands before
+        // Running scan loops must finish submitting their old commands before
         // the worker advances its reset generation.
         for (const auto &session : sessions)
             if (session->scan_thread.joinable()) session->scan_thread.join();

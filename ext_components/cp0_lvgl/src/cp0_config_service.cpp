@@ -31,7 +31,7 @@ void report(const ConfigService::Callback &callback, int code, const std::string
 
 } // namespace
 
-int parse_legacy_integer(const std::string &value, int fallback_if_empty)
+int parse_config_integer(const std::string &value, int fallback_if_empty)
 {
     return cp0_integer_codec::parse_int_prefix_clamped(value, fallback_if_empty);
 }
@@ -85,7 +85,7 @@ int ConfigService::get_integer(const std::string &key, int fallback) const
         return fallback;
     for (const auto &entry : entries_)
         if (entry.first == key)
-            return parse_legacy_integer(entry.second, 0);
+            return parse_config_integer(entry.second, 0);
     return fallback;
 }
 
@@ -193,10 +193,10 @@ void ConfigService::api_call(Arguments arguments, Callback callback)
             mutation_lock = std::unique_lock<std::mutex>(mutation_mutex_);
         std::lock_guard<std::mutex> lock(mutex_);
         if (command == "GetInt") {
-            const int fallback = parse_legacy_integer(argument_at(arguments, 2), 0);
+            const int fallback = parse_config_integer(argument_at(arguments, 2), 0);
             result_data = std::to_string(get_integer(argument_at(arguments, 1), fallback));
         } else if (command == "SetInt") {
-            set_integer(argument_at(arguments, 1), parse_legacy_integer(argument_at(arguments, 2), 0));
+            set_integer(argument_at(arguments, 1), parse_config_integer(argument_at(arguments, 2), 0));
             result_data = "ok";
         } else if (command == "GetStr") {
             result_data = get_string(argument_at(arguments, 1), argument_at(arguments, 2));

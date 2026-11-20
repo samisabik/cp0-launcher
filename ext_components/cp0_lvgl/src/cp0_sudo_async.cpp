@@ -41,10 +41,8 @@
 #include <utility>
 #include <vector>
 
-#if !defined(_WIN32)
 #include <pwd.h>
 #include <unistd.h>
-#endif
 
 namespace {
 
@@ -148,7 +146,6 @@ void secure_clear(std::string &value)
     value.clear();
 }
 
-#if !defined(_WIN32)
 struct UserIdentity {
     std::string name, home, shell;
     uint32_t uid = UINT32_MAX, gid = UINT32_MAX;
@@ -212,7 +209,6 @@ bool authentication_error(const std::string &output)
         if (lowered.find(marker) != std::string::npos) return true;
     return false;
 }
-#endif
 
 void key_event_cb(lv_event_t *event);
 void prompt_object_delete_cb(lv_event_t *event);
@@ -561,9 +557,7 @@ void run_worker(std::shared_ptr<Request> request, std::string password)
 {
     cp0_sudo_result_t result = CP0_SUDO_RESULT_EXEC_FAILED;
     int exit_code = -ENOTSUP;
-#if defined(_WIN32)
-    (void)request;
-#elif defined(HAL_PLATFORM_SDL)
+#if   defined(HAL_PLATFORM_SDL)
     auto authenticated = g_coordinator.worker_authenticated(request->id);
     if (!authenticated.empty() && !post_actions(authenticated))
         g_coordinator.requeue_actions(std::move(authenticated));
@@ -873,7 +867,7 @@ void deliver_on_lvgl(void *user)
 bool run_passwordless(std::vector<std::string> argv, int exec_timeout_ms, std::function<void(int, int)> complete,
                       std::function<void(int, uint64_t)> started)
 {
-#if defined(_WIN32) || defined(HAL_PLATFORM_SDL)
+#if defined(HAL_PLATFORM_SDL)
     (void)argv;
     (void)exec_timeout_ms;
     (void)complete;

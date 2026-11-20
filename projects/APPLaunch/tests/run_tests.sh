@@ -120,12 +120,6 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
 "$build_dir/test_settings_battery_info_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$settings_ui_root" \
-    "$test_root/test_settings_about_info_model.cpp" \
-    "$settings_ui_root/settings_about_info_model.cpp" \
-    -o "$build_dir/test_settings_about_info_model"
-"$build_dir/test_settings_about_info_model"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
-    -I"$settings_ui_root" \
     "$test_root/test_settings_system_update_model.cpp" \
     "$settings_ui_root/settings_system_model.cpp" \
     -o "$build_dir/test_settings_system_update_model"
@@ -134,21 +128,12 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
     "$test_root/../../../ext_components/cp0_lvgl/tests/test_update_job.cpp" \
     -o "$build_dir/test_update_job"
 "$build_dir/test_update_job"
-${CXX:-g++} -std=c++17 -Wall -Wextra -Werror -pthread \
-    -I"$settings_ui_root" \
-    -I"$test_root/../../../ext_components/cp0_lvgl/include" \
-    -I"$test_root/../../../SDK/github_source/eventpp/include" \
-    "$test_root/test_settings_adapter.cpp" \
-    "$settings_ui_root/settings_adapter.cpp" \
-    "$settings_ui_root/settings_boot_action_policy.cpp" \
-    -o "$build_dir/test_settings_adapter"
-"$build_dir/test_settings_adapter"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -I"$test_root/../../../ext_components/cp0_lvgl/include" \
-    "$test_root/test_screensaver_model.cpp" \
-    "$test_root/../main/ui/model/screensaver_model.cpp" \
-    -o "$build_dir/test_screensaver_model"
-"$build_dir/test_screensaver_model"
+    "$test_root/test_lockscreen_activity_model.cpp" \
+    "$test_root/../main/ui/model/lockscreen_activity_model.cpp" \
+    -o "$build_dir/test_lockscreen_activity_model"
+"$build_dir/test_lockscreen_activity_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_spectrum_model.cpp" \
     "$test_root/../main/ui/model/spectrum_model.cpp" \

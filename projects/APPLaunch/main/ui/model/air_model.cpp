@@ -141,16 +141,6 @@ Band band_of(int channel)
     return Band::Unknown;
 }
 
-int centre_mhz(int channel)
-{
-    switch (band_of(channel)) {
-    case Band::G24: return channel == 14 ? 2484 : 2407 + 5 * channel;
-    case Band::G5: return 5000 + 5 * channel;
-    case Band::Unknown: break;
-    }
-    return 0;
-}
-
 const char *band_label(Band band)
 {
     switch (band) {
@@ -164,11 +154,6 @@ const char *band_label(Band band)
 int percent_to_dbm(int percent)
 {
     return std::clamp(percent, 0, 100) / 2 - 100;
-}
-
-int dbm_to_percent(int dbm)
-{
-    return std::clamp(2 * (dbm + 100), 0, 100);
 }
 
 std::vector<Network> in_band(const std::vector<Network> &networks, Band band)

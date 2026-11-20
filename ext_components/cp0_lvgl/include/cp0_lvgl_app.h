@@ -34,7 +34,7 @@ typedef struct {
 
 typedef struct {
     char ssid[CP0_WIFI_SSID_MAX];
-    int signal; /* Wi-Fi RSSI in dBm; legacy backends may report 0..100 strength */
+    int signal; /* 0..100 strength as NetworkManager reports it, or RSSI in dBm when negative */
     char security[32];
     int in_use;
     int saved;
@@ -44,7 +44,7 @@ typedef struct {
     int connected;
     char ssid[CP0_WIFI_SSID_MAX];
     char ip[48];
-    int signal; /* Wi-Fi RSSI in dBm; legacy backends may report 0..100 strength */
+    int signal; /* 0..100 strength as NetworkManager reports it, or RSSI in dBm when negative */
     int ethernet; /* 1 if a wired ethernet device is connected */
 } cp0_wifi_status_t;
 
@@ -144,10 +144,6 @@ void cp0_system_reboot(void);
 
 int cp0_process_run_argv(const char *const *argv, int background);
 int cp0_process_capture_argv(const char *const *argv, char *out, int out_size);
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((deprecated("use cp0_sudo_run_argv_async or cp0_sudo_run_shell_async")))
-#endif
-int cp0_process_run_sudo(const char *password, const char *const *argv);
 int cp0_sudo_run_argv_async(const char *const *argv,
                             cp0_sudo_callback_thread_t callback_thread,
                             cp0_sudo_output_cb_t output_cb,

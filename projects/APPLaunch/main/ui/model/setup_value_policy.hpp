@@ -29,8 +29,6 @@ constexpr int volume_metric(VolumeMetric metric)
     return static_cast<int>(metric);
 }
 
-int brightness_index(int value, int maximum);
-int brightness_value(int index, int maximum);
 int brightness_step_percent(int index);
 int brightness_step_index(int percent);
 int brightness_step_value(int index, int maximum);

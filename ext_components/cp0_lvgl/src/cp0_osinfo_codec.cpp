@@ -28,22 +28,6 @@ std::string encode_eth_info(const cp0_eth_info_t &info)
     return std::string(info.ipv4) + "\n" + info.gateway + "\n" + info.mac;
 }
 
-void decode_eth_info(const std::string &payload, cp0_eth_info_t *info)
-{
-    clear_eth_info(info);
-    if (!info)
-        return;
-
-    std::istringstream lines(payload);
-    std::string line;
-    if (std::getline(lines, line))
-        cp0_copy_string(info->ipv4, sizeof(info->ipv4), line);
-    if (std::getline(lines, line))
-        cp0_copy_string(info->gateway, sizeof(info->gateway), line);
-    if (std::getline(lines, line))
-        cp0_copy_string(info->mac, sizeof(info->mac), line);
-}
-
 bool decode_eth_info_strict(const std::string &payload, cp0_eth_info_t *info)
 {
     clear_eth_info(info);
@@ -63,20 +47,6 @@ bool decode_eth_info_strict(const std::string &payload, cp0_eth_info_t *info)
 std::string encode_account_info(const cp0_account_info_t &info)
 {
     return std::string(info.user) + "\n" + info.hostname;
-}
-
-void decode_account_info(const std::string &payload, cp0_account_info_t *info)
-{
-    if (!info)
-        return;
-    std::memset(info, 0, sizeof(*info));
-
-    std::istringstream lines(payload);
-    std::string line;
-    if (std::getline(lines, line))
-        cp0_copy_string(info->user, sizeof(info->user), line);
-    if (std::getline(lines, line))
-        cp0_copy_string(info->hostname, sizeof(info->hostname), line);
 }
 
 bool decode_account_info_strict(const std::string &payload, cp0_account_info_t *info)

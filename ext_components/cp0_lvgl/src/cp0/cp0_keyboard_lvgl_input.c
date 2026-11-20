@@ -43,7 +43,7 @@ __attribute__((weak)) void ui_global_hint_on_key(const struct key_item *item)
     (void)item;
 }
 
-__attribute__((weak)) int ui_screensaver_filter_key(const struct key_item *item)
+__attribute__((weak)) int ui_lockscreen_filter_key(const struct key_item *item)
 {
     (void)item;
     return 0;
@@ -123,7 +123,7 @@ static void keypad_read(lv_indev_t *indev, lv_indev_data_t *data)
               item->key_code, kbd_state_name(item->key_state), item->sym_name,
               utf8_debug, item->codepoint, (void *)lv_screen_active());
 
-        int swallowed = ui_screensaver_filter_key(item);
+        int swallowed = ui_lockscreen_filter_key(item);
         if (!swallowed && key_filter)
             swallowed = key_filter(item);
         if (!swallowed) {
