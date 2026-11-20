@@ -110,6 +110,11 @@ std::string start_script(const std::string &dir)
         << "set -e\n"
         << "IF=" << kInterface << "\n"
         << "DIR=\"" << dir << "\"\n"
+        << "# Where the USB adapter's driver stays unloaded while unused, load it.\n"
+        << "if [ -x " << kUsbWifiHelper << " ]; then\n"
+        << "    " << kUsbWifiHelper << " on\n"
+        << "    for _ in $(seq 1 20); do [ -e \"/sys/class/net/$IF\" ] && break; sleep 0.5; done\n"
+        << "fi\n"
         << "# After a cold boot this USB adapter enumerates with its AP receive\n"
         << "# path broken: it beacons, but client auth frames never reach it, so\n"
         << "# nothing can associate. Re-enumerate the USB device backing the\n"
@@ -158,7 +163,9 @@ std::string stop_script(const std::string &dir)
         << "done\n"
         << "ip addr flush dev \"$IF\" 2>/dev/null || true\n"
         << "ip link set \"$IF\" down 2>/dev/null || true\n"
-        << "nmcli dev set \"$IF\" managed yes 2>/dev/null || true\n";
+        << "nmcli dev set \"$IF\" managed yes 2>/dev/null || true\n"
+        << "[ -x " << kUsbWifiHelper << " ] && " << kUsbWifiHelper << " off\n"
+        << "exit 0\n";
     return out.str();
 }
 

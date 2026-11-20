@@ -1,0 +1,81 @@
+#!/bin/sh
+# SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
+# SPDX-License-Identifier: MIT
+#
+# Loads and unloads the USB Wi-Fi drivers named in
+# /etc/modprobe.d/cp0-usb-wifi.conf. Installed as /usr/local/sbin/cp0-usb-wifi
+# and run as root: by cp0-usb-wifi.service at boot (off) and by the launcher
+# when an app needs the USB adapter (on) or is done with it (off).
+#
+# Those drivers are blacklisted so they never load on their own, for two
+# reasons. The onboard radio must register first to be wlan0. And a USB
+# adapter with its driver bound keeps the USB bus awake, which costs the dwc2
+# controller thousands of interrupts per second; unbound and set to
+# autosuspend, the adapter and the bus sleep.
+#
+# Usage: cp0-usb-wifi on|off|status
+
+set -u
+
+CONF=/etc/modprobe.d/cp0-usb-wifi.conf
+
+modules() {
+    [ -r "$CONF" ] && sed -n 's/^blacklist[[:space:]]\{1,\}//p' "$CONF"
+}
+
+# USB devices with an interface one of the modules claims.
+devices() {
+    for interface in /sys/bus/usb/devices/*:*; do
+        [ -r "$interface/modalias" ] || continue
+        for candidate in $(modprobe -R "$(cat "$interface/modalias")" 2>/dev/null); do
+            for module in $(modules); do
+                [ "$candidate" = "$module" ] && echo "${interface%:*}"
+            done
+        done
+    done | sort -u
+}
+
+loaded() {
+    for module in $(modules); do
+        [ -d "/sys/module/$module" ] && return 0
+    done
+    return 1
+}
+
+case "${1:-}" in
+on)
+    # The onboard radio takes wlan0 first; without one there is nothing to wait for.
+    tries=0
+    while [ ! -e /sys/class/net/wlan0 ] && [ "$tries" -lt 40 ]; do
+        sleep 0.5
+        tries=$((tries + 1))
+    done
+    for device in $(devices); do
+        echo on > "$device/power/control" 2>/dev/null
+    done
+    for module in $(modules); do
+        modprobe "$module"
+    done
+    ;;
+off)
+    # An access point still using the adapter keeps it.
+    if pgrep -x hostapd >/dev/null 2>&1; then
+        echo "busy: hostapd is running" >&2
+        exit 0
+    fi
+    for module in $(modules); do
+        modprobe -r "$module" 2>/dev/null
+    done
+    for device in $(devices); do
+        echo auto > "$device/power/control" 2>/dev/null
+    done
+    ;;
+status)
+    if loaded; then echo on; else echo off; fi
+    ;;
+*)
+    echo "usage: $0 on|off|status" >&2
+    exit 2
+    ;;
+esac
+exit 0

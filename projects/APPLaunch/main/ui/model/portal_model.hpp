@@ -23,6 +23,9 @@ namespace portal {
 inline constexpr const char *kInterface = "wlan1";
 inline constexpr const char *kGatewayIp = "10.0.0.1";
 inline constexpr int kPortalPort = 8080;
+// Root helper that loads and unloads the USB adapter's driver on devices that
+// keep it unloaded while unused (scripts/cp0-usb-wifi); absent elsewhere.
+inline constexpr const char *kUsbWifiHelper = "/usr/local/sbin/cp0-usb-wifi";
 inline constexpr const char *kDefaultSsid = "cp0 portal";
 inline constexpr int kDefaultChannel = 6;
 
