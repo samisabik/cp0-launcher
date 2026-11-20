@@ -23,7 +23,8 @@ int main()
     assert(launcher_home_first_page_order("Fox") == 16);
     assert(launcher_home_first_page_order("Pins") == 18);
     assert(launcher_home_first_page_order("Rec") == 19);
-    assert(launcher_home_first_page_order("Slime") == 22);
+    assert(launcher_home_first_page_order("Pd") == 22);
+    assert(launcher_home_first_page_order("Slime") == 23);
     assert(launcher_home_first_page_order("Vim") == -1);
 
     assert(launcher_home_category("Settings") == 0);
