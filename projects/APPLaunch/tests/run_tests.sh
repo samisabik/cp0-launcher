@@ -155,6 +155,10 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     -o "$build_dir/test_files_model"
 "$build_dir/test_files_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_setting_tree.cpp" \
+    -o "$build_dir/test_setting_tree"
+"$build_dir/test_setting_tree"
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_location_model.cpp" \
     "$test_root/../main/ui/model/location_model.cpp" \
     -o "$build_dir/test_location_model"

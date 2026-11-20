@@ -17,7 +17,7 @@
 
 #include "eventpp/callbacklist.h"
 #include "settings_async_dispatch.hpp"
-#include "tree.hh"
+#include "../model/setting_tree.hpp"
 
 struct _lv_obj_t;
 
@@ -129,7 +129,7 @@ private:
 };
 
 struct SettingEntry;
-using Tree     = tree<SettingEntry>;
+using Tree     = SettingTree<SettingEntry>;
 using NodeIter = Tree::iterator;
 
 using SettingPageFactory =
