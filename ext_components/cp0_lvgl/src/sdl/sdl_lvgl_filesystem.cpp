@@ -37,7 +37,6 @@ static char s_applications_dir[512] = "./applications";
 static char s_lock_file[512] = "/tmp/M5CardputerZero-APPLaunch_fcntl.lock";
 static char s_font_dir[512] = "./APPLaunch/share/font";
 static char s_images_dir[512] = "./APPLaunch/share/images";
-static char s_audio_dir[512] = "./APPLaunch/share/audio";
 
 extern "C" void hal_paths_init(const char *exe_dir)
 {
@@ -47,7 +46,6 @@ extern "C" void hal_paths_init(const char *exe_dir)
     std::snprintf(s_applications_dir, sizeof(s_applications_dir), "%s/applications", exe_dir);
     std::snprintf(s_images_dir, sizeof(s_images_dir), "%s/APPLaunch/share/images", exe_dir);
     std::snprintf(s_font_dir, sizeof(s_font_dir), "%s/APPLaunch/share/font", exe_dir);
-    std::snprintf(s_audio_dir, sizeof(s_audio_dir), "%s/APPLaunch/share/audio", exe_dir);
 }
 
 extern "C" const char *hal_path_data_dir(void) { return s_data_dir; }
@@ -57,7 +55,6 @@ extern "C" const char *hal_path_font_dir(void) { return s_font_dir; }
 extern "C" const char *hal_path_keyboard_device(void) { return nullptr; }
 extern "C" const char *hal_path_keyboard_map(void) { return nullptr; }
 extern "C" const char *hal_path_images_dir(void) { return s_images_dir; }
-extern "C" const char *hal_path_audio_dir(void) { return s_audio_dir; }
 
 namespace {
 
@@ -169,8 +166,6 @@ private:
             return "";
         if (kind == cp0::filesystem::ResourceKind::image)
             return resource_path(hal_path_images_dir(), "share/images", file);
-        if (kind == cp0::filesystem::ResourceKind::audio)
-            return resource_path(hal_path_audio_dir(), "share/audio", file);
         if (kind == cp0::filesystem::ResourceKind::font)
             return resource_path(hal_path_font_dir(), "share/font", file);
         if (cp0::filesystem::has_lvgl_drive(file)) {

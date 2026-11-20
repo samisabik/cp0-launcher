@@ -57,7 +57,7 @@ launcher/
 │   │   ├── APPLaunch/         #   runtime resource tree (copied wholesale into dist/): share
 │   │   ├── tests/             #   C++ unit tests + Python source-contract tests + run_tests.sh (+ low_battery_ui/ runner)
 │   │   └── dist/ build/       #   artifacts (git-ignored, wholly replaced on every build)
-│   ├── CardputerZero-Emulator/ # desktop/web device emulator (**CMake**, reuses APPLaunch/main at source level)
+│   ├── CardputerZero-Emulator/ # desktop device emulator (**CMake**, reuses APPLaunch/main at source level)
 ├── docs/                      # topical docs (see §11)
 ├── scripts/                   # sysroot, packaging and install scripts
 ├── LICENSES/                  # verbatim third-party licenses (this does NOT relicense the repo)
@@ -108,7 +108,7 @@ Host build dependencies: `python3 python3-pip build-essential pkg-config libffi-
 | Project | Purpose | Build | Artifacts | Host SDL2 | Repo nature |
 | --- | --- | --- | --- | --- | --- |
 | **APPLaunch** | Launcher: grid home, built-in pages, `.desktop` app management | SCons | `M5CardputerZero-APPLaunch` + `APPLaunch/` resource tree | ✅ | plain directory |
-| CardputerZero-Emulator | Desktop/web device emulator | **CMake** (not SCons) | `cardputer-zero-emu`; web `index.html/js/wasm/data` | ✅ | plain directory (`lib/lvgl` is a submodule) |
+| CardputerZero-Emulator | Desktop device emulator | **CMake** (not SCons) | `cardputer-zero-emu` | ✅ | plain directory (`lib/lvgl` is a submodule) |
 
 ---
 

@@ -49,8 +49,6 @@ int main()
     assert(cp0_file_path("icon.PNG") == "/opt/test-data/APPLaunch/share/images/icon.PNG");
     assert(cp0_file_path("APPLaunch/share/font/a.ttf") ==
            "/opt/test-data/APPLaunch/share/font/a.ttf");
-    assert(cp0_file_path("share/audio/tone.ogg") ==
-           "/opt/test-data/APPLaunch/share/audio/tone.ogg");
     assert(cp0_file_path("share/images/../secret.png").empty());
     assert(cp0_file_path("plain.txt") == "plain.txt");
 

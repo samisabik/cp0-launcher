@@ -39,8 +39,6 @@ ResourceKind classify_resource(const std::string &path)
     if (extension == "png" || extension == "gif" || extension == "jpg" ||
         extension == "jpeg" || extension == "svg")
         return ResourceKind::image;
-    if (extension == "wav" || extension == "mp3" || extension == "ogg")
-        return ResourceKind::audio;
     if (extension == "ttf" || extension == "otf") return ResourceKind::font;
     return ResourceKind::none;
 }

@@ -174,9 +174,6 @@ private:
             cp0::filesystem::has_parent_component(file))
             return "";
         if (kind == cp0::filesystem::ResourceKind::image) return resolve_lvgl_image_path(file);
-        if (kind == cp0::filesystem::ResourceKind::audio)
-            return resolve_native_resource_path(
-                std::string(kAppRoot) + "/share/audio", "share/audio", file);
         if (kind == cp0::filesystem::ResourceKind::font)
             return resolve_native_resource_path(
                 std::string(kAppRoot) + "/share/font", "share/font", file);

@@ -13,7 +13,6 @@ namespace cp0::filesystem {
 enum class ResourceKind {
     none,
     image,
-    audio,
     font,
 };
 

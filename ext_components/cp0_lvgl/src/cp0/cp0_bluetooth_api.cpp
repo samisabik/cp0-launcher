@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "cp0_bluetooth_backend.hpp"
 #include "cp0_bluez_dbus_client.hpp"
 #include "cp0_lvgl_log.h"
 #include "../cp0_init_once.hpp"
@@ -63,7 +62,6 @@ cp0::bluetooth::Reply load_devices(int requested_count, Loader loader)
 
 void api_call(std::list<std::string> args, std::function<void(int, std::string)> callback)
 {
-    using namespace cp0_bluetooth_backend;
     std::ostringstream raw_request;
     for (const auto &arg : args)
         raw_request << '[' << arg << ']';
@@ -76,14 +74,14 @@ void api_call(std::list<std::string> args, std::function<void(int, std::string)>
     }
     using cp0::bluetooth::Command;
     if (request.command == Command::Status) {
-        report(callback, 0, encode_status(cp0_bluetooth_backend::status()));
+        report(callback, 0, encode_status(cp0_bluez_dbus::status()));
         return;
     }
     if (request.command == Command::List || request.command == Command::ConnectedList) {
         const bool connected_only = request.command == Command::ConnectedList;
         const auto reply = load_devices(request.max_count,
             [connected_only](cp0_bt_device_t *out, int count) {
-                return cp0_bluetooth_backend::list(out, count, connected_only);
+                return cp0_bluez_dbus::list(out, count, connected_only);
             });
         report(callback, reply.code, reply.data);
         return;
@@ -96,7 +94,7 @@ void api_call(std::list<std::string> args, std::function<void(int, std::string)>
             }
             const auto reply = load_devices(request.max_count,
                 [](cp0_bt_device_t *out, int count) {
-                    return cp0_bluetooth_backend::list(out, count, false);
+                    return cp0_bluez_dbus::list(out, count, false);
                 });
             report(callback, reply.code, reply.data);
         });

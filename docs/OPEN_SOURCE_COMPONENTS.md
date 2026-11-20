@@ -18,6 +18,12 @@ Paths in the evidence column are relative to the repository root.
 | tree.hh 3.20 | `ext_components/cp0_lvgl/include/tree.hh`, Kasper Peeters 2001–2024 | [GPL-3.0-only](../LICENSES/tree.hh-GPL-3.0-only.txt): header specifies version 3 without an “or later” grant |
 | eventpp | cp0_lvgl and APPLaunch requirements; SDK eventpp component | [Apache-2.0](../LICENSES/eventpp-Apache-2.0.txt) |
 | Departure Mono | `projects/APPLaunch/APPLaunch/share/font` | [OFL-1.1](../projects/APPLaunch/APPLaunch/share/font/DepartureMono-OFL.txt) |
+| DejaVu Sans 2.35 | `projects/APPLaunch/APPLaunch/share/font/DejaVuSans.ttf`; fallback glyphs in `cp0_font_service.cpp` | [Bitstream Vera and Arev terms, DejaVu changes public domain](../projects/APPLaunch/APPLaunch/share/font/DejaVuSans-LICENSE.txt) |
+| Montserrat | LVGL built-in `lv_font_montserrat_*` arrays enabled in the build profiles | OFL-1.1; text in the LVGL source under `scripts/built_in_font/font_license/` |
+| Pixelarticons | home icons in `projects/APPLaunch/APPLaunch/share/images/line` | [MIT](../projects/APPLaunch/APPLaunch/share/images/line/Pixelarticons-LICENSE.txt), Gerrit Halfmann |
+| Pixel Icon Library | home icons in the same directory | [CC BY 4.0 notice](../projects/APPLaunch/APPLaunch/share/images/line/HackerNoon-Pixel-Icon-Library-NOTICE.txt), HackerNoon |
+| Memory icons | `ir.png` in the same directory | [Apache-2.0 notice](../projects/APPLaunch/APPLaunch/share/images/line/Memory-LICENSE.txt), Pictogrammers |
+| 1-bit Pixel Icons | home icons in the same directory | [CC0-1.0 notice](../projects/APPLaunch/APPLaunch/share/images/line/1-bit-Pixel-Icons-NOTICE.txt), Nikoichu |
 
 LVGL embeds separately licensed codecs, renderers and fonts. Preserve its `src/libs/*/LICENSE*`, `src/stdlib/builtin/LICENSE*` and `scripts/built_in_font/font_license/` records when distributing those features. Generated font arrays retain the input font's license.
 

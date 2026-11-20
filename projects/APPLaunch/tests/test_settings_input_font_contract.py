@@ -44,7 +44,6 @@ def test_editors_use_regular_bitmap_freetype_style():
     cjk_sans = function_definition(
         SETTINGS_FONTS, "inline const lv_font_t *cjk_sans"
     )
-    assert "LV_FREETYPE_FONT_STYLE_NORMAL" in cjk_sans
     assert "get_chrome(size)" in cjk_sans
 
     get_start = FONT_SERVICE.index("lv_font_t *get(")

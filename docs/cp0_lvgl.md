@@ -52,7 +52,7 @@ void cp0_lvgl_init(void);
 const char *cp0_file_path_c(const char *file);
 ```
 
-`cp0_file_path_c` resolves logical names such as `applications`, `launcher_settings`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/`, `share/audio/`, or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. C++ callers use `std::string cp0_file_path(std::string)` from `hal_lvgl_bsp.h`.
+`cp0_file_path_c` resolves logical names such as `applications`, `launcher_settings`, `home_dir`, `lock_file`, `keyboard_device`, `keyboard_map`, and `share/images/` or font resources. The returned C string belongs to a thread-local cache; copy it if it must outlive the call. C++ callers use `std::string cp0_file_path(std::string)` from `hal_lvgl_bsp.h`.
 
 ### Network and Wi-Fi
 

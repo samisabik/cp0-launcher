@@ -50,14 +50,4 @@ void connect_async(const char *address, Completion completion);
 void disconnect_async(const char *address, Completion completion);
 void remove_async(const char *address, Completion completion);
 
-int set_power(int enabled);
-int set_alias(const char *alias);
-int set_discoverable(int enabled);
-int start_discovery();
-int stop_discovery();
-int pair(const char *address);
-int connect(const char *address);
-int disconnect(const char *address);
-int remove(const char *address);
-
 } // namespace cp0_bluez_dbus
