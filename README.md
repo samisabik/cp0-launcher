@@ -62,6 +62,7 @@ The home screen lists the app types in a rail on the left and shows the apps of 
 - **Rec**: voice recorder with on-device transcription (whisper.cpp).
 - **Audio**: live microphone spectrum and pitch readout.
 - **Tracker**: four-channel chiptune tracker (two squares, wave, noise) with song save and WAV export.
+- **Pd**: runs the Pure Data patches in `~/pd` without the Pd GUI, with the microphone on `adc~` and the speaker on `dac~`. Shows what the patch prints, and the spectrum and level of the sound output. Needs `puredata-core` and `pipewire-jack`.
 
 | | |
 |---|---|

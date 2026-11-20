@@ -110,6 +110,8 @@ constexpr BuiltinAppRegistration BUILTIN_APPS[] = {
      nullptr, false, true, append_page_app<UISlimePage>},
     {{"Tracker", "app_Tracker", true, false},
      nullptr, false, true, append_page_app<UITrackerPage>},
+    {{"Pd", "app_Pd", true, false},
+     nullptr, false, true, append_page_app<UIPdPage>},
 #endif
 };
 
