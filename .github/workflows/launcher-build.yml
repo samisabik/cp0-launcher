@@ -57,7 +57,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         persist-credentials: false
@@ -169,11 +169,11 @@ jobs:
       run: pip install scons parse requests tqdm
 
     - name: Set up QEMU for the arm64 sysroot container
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@v4
 
     - name: Cache cross-compile sysroot
       id: sysroot-cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: sysroot
         key: sysroot-${{ hashFiles('scripts/make_sysroot.sh') }}
@@ -203,7 +203,7 @@ jobs:
         cp projects/APPLaunch/dist/M5CardputerZero-APPLaunch artifacts/
         cp release/cp0-launcher-arm64.tar.gz artifacts/
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: applaunch-arm64
         path: artifacts/
@@ -213,7 +213,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         persist-credentials: false
 
@@ -319,13 +319,13 @@ jobs:
         fi
         echo "Preconditions OK: main=${head}, version=${VERSION}"
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: applaunch-arm64
         path: artifacts/
 
     - name: Create release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ needs.build.outputs.tag }}
         # Pin the tag to the commit that was actually built instead of letting
