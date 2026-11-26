@@ -153,6 +153,12 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/../main/ui/model/pd_model.cpp" \
     -o "$build_dir/test_pd_model"
 "$build_dir/test_pd_model"
+
+${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
+    "$test_root/test_gps_model.cpp" \
+    "$test_root/../main/ui/model/gps_model.cpp" \
+    -o "$build_dir/test_gps_model"
+"$build_dir/test_gps_model"
 "$build_dir/test_sdr_model"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -Werror \
     "$test_root/test_files_model.cpp" \
