@@ -46,6 +46,7 @@ The home screen lists the app types in a rail on the left and shows the apps of 
 - **Fox**: transmitter hunting on one frequency with a live RSSI meter, peak hold, history strip and a beep that speeds up with the signal.
 - **IR**: learns an infrared remote button by button (NEC decode, raw timings otherwise) and replays it; four remotes of eight buttons.
 - **Pins**: I2C bus scanner that only reads and skips addresses a kernel driver owns, and a GPIO logic view with I2C decode.
+- **GPS**: position logger for a serial GPS receiver on the Grove port (M5Stack GPS Unit v1.1) at 10 fixes a second. `enter` starts and stops a log; each log is a CSV file in `~/gps` with time, position, altitude, speed, course, satellites and HDOP. Needs `enable_uart=1` in `config.txt`.
 - **Tailnet**: Tailscale peers with status, path and ping; `s` opens SSH to a peer, `e` sets an exit node.
 - **Air**: 2.4 and 5 GHz Wi-Fi channel map with a network list, and nearby Bluetooth devices. `w` picks the adapter that scans, so a USB adapter on `wlan1` can scan while `wlan0` stays the system Wi-Fi.
 - **Portal**: brings an open test access point up and down on `wlan1` (hostapd, dnsmasq DHCP with wildcard DNS, and a static "hello" page that exercises captive-portal detection). `wlan0` stays the system Wi-Fi. Shows state and connected-client count; it serves one page (`share/images/portal/index.html`) and logs nothing a client sends. Needs `hostapd`, `dnsmasq` and `iptables`.

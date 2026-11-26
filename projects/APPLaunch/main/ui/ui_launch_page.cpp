@@ -55,7 +55,7 @@ std::string app_slug(const std::string &name)
 std::string line_icon_path(const std::string &name)
 {
     static const std::set<std::string> kKnown = {
-        "adsb", "air", "audio", "cli", "files", "fox", "ip_panel", "ir", "keys",
+        "adsb", "air", "audio", "cli", "files", "fox", "gps", "ip_panel", "ir", "keys",
         "pd", "pins", "portal", "power", "python", "rec", "sat", "sdr", "sensors", "settings", "slime",
         "spectrum", "ssh", "tailnet", "tracker",
     };

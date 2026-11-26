@@ -33,11 +33,11 @@ struct HomeApp {
 constexpr std::array<const char *, kHomeCategoryCount> kCategoryNames = {
     "system", "network", "radio", "hardware", "sound", "play", "apps",
 };
-constexpr std::array<HomeApp, 24> kHomeOrder = {{
+constexpr std::array<HomeApp, 25> kHomeOrder = {{
     {"settings", 0}, {"files", 0},   {"cli", 0},     {"python", 0}, {"power", 0},
     {"ssh", 1},      {"ippanel", 1}, {"tailnet", 1}, {"air", 1}, {"portal", 1},
     {"sdr", 2},      {"adsb", 2},    {"sat", 2},     {"sensors", 2}, {"spectrum", 2}, {"keys", 2}, {"fox", 2},
-    {"ir", 3},       {"pins", 3},
+    {"ir", 3},       {"pins", 3},    {"gps", 3},
     {"rec", 4},      {"audio", 4},   {"tracker", 4}, {"pd", 4},
     {"slime", 5},
 }};

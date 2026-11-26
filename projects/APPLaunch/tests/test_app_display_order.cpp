@@ -22,9 +22,10 @@ int main()
     assert(launcher_home_first_page_order("SDR") == 10);
     assert(launcher_home_first_page_order("Fox") == 16);
     assert(launcher_home_first_page_order("Pins") == 18);
-    assert(launcher_home_first_page_order("Rec") == 19);
-    assert(launcher_home_first_page_order("Pd") == 22);
-    assert(launcher_home_first_page_order("Slime") == 23);
+    assert(launcher_home_first_page_order("GPS") == 19);
+    assert(launcher_home_first_page_order("Rec") == 20);
+    assert(launcher_home_first_page_order("Pd") == 23);
+    assert(launcher_home_first_page_order("Slime") == 24);
     assert(launcher_home_first_page_order("Vim") == -1);
 
     assert(launcher_home_category("Settings") == 0);
@@ -33,6 +34,7 @@ int main()
     assert(launcher_home_category("Portal") == 1);
     assert(launcher_home_category("Sensors") == 2);
     assert(launcher_home_category("IR") == 3);
+    assert(launcher_home_category("GPS") == 3);
     assert(launcher_home_category("Tracker") == 4);
     assert(launcher_home_category("Slime") == 5);
     // Anything else, such as a .desktop app, lands in the last type.
